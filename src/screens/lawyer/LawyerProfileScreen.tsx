@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, Modal, Dimensions,
-  ActivityIndicator, StatusBar,
+  ActivityIndicator, StatusBar, TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -26,11 +26,14 @@ export const LawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigation 
   const [lawyerInfo, setLawyerInfo] = useState<Record<string, any> | null>(null);
   const [stats, setStats] = useState({ casesWon: 0, clients: 0, rating: 0 });
   const [showSecurity, setShowSecurity] = useState(false);
+  const [showAppearance, setShowAppearance] = useState(false);
 
   // Change password state
   const [pwOtpSent, setPwOtpSent] = useState(false);
-  const [pwOtp, setPwOtp] = useState('');
+  const [otpDigits, setOtpDigits] = useState(['', '', '']);
+  const otpRefs = [useRef<TextInput>(null), useRef<TextInput>(null), useRef<TextInput>(null)];
   const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [pwLoading, setPwLoading] = useState(false);
 
   useEffect(() => { getUser(); fetchLawyerInfo(); fetchStats(); }, []);
@@ -97,15 +100,31 @@ export const LawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigation 
     } finally { setPwLoading(false); }
   };
 
+  const handleOtpChange = (text: string, index: number) => {
+    const digit = text.replace(/[^0-9]/g, '').slice(-1);
+    const next = [...otpDigits];
+    next[index] = digit;
+    setOtpDigits(next);
+    if (digit && index < 2) otpRefs[index + 1].current?.focus();
+  };
+
+  const handleOtpKeyPress = (e: any, index: number) => {
+    if (e.nativeEvent.key === 'Backspace' && !otpDigits[index] && index > 0) {
+      otpRefs[index - 1].current?.focus();
+    }
+  };
+
   const handleChangePassword = async () => {
     const email = (user || authUser)?.email;
-    if (!email || !pwOtp || !newPassword) return;
+    const otp = otpDigits.join('');
+    if (!email || otp.length < 3 || !newPassword) return;
     if (newPassword.length < 8) { Alert.alert('Error', 'Min 8 characters'); return; }
+    if (newPassword !== confirmPassword) { Alert.alert('Error', 'Passwords do not match'); return; }
     setPwLoading(true);
     try {
-      await authApi.restorePassword(email, pwOtp, newPassword);
+      await authApi.restorePassword(email, otp, newPassword);
       Alert.alert('Success', 'Password changed successfully');
-      setPwOtp(''); setNewPassword(''); setPwOtpSent(false); setShowSecurity(false);
+      setOtpDigits(['', '', '']); setNewPassword(''); setConfirmPassword(''); setPwOtpSent(false); setShowSecurity(false);
     } catch (err: any) {
       Alert.alert('Error', err.response?.data?.error || 'Failed to change password');
     } finally { setPwLoading(false); }
@@ -176,9 +195,9 @@ export const LawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigation 
         <Text style={styles.sectionLabel}>AVAILABILITY</Text>
         <View style={styles.menuCard}>
           <MenuItem icon="time-outline" label="Set Availability" subtitle="Manage your schedule"
-            onPress={() => navigation.navigate('EditLawyerProfile')} />
+            onPress={() => navigation.navigate('Availability')} />
           <MenuItem icon="cash-outline" label="Consultation Fees" subtitle={info?.feePerConsultation ? `₹${info.feePerConsultation}` : 'Set your fee'}
-            onPress={() => navigation.navigate('EditLawyerProfile')} last />
+            onPress={() => navigation.navigate('Availability')} last />
         </View>
 
         {/* ── TOOLS Section ── */}
@@ -211,11 +230,7 @@ export const LawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigation 
           <MenuItem icon="notifications-outline" label="Notifications" subtitle="View alerts"
             onPress={() => navigation.navigate('Notifications')} />
           <MenuItem icon="contrast-outline" label="Appearance" subtitle={themeMode.charAt(0).toUpperCase() + themeMode.slice(1)}
-            onPress={() => {
-              const modes: ('light' | 'dark' | 'system')[] = ['light', 'dark', 'system'];
-              const nextIdx = (modes.indexOf(themeMode) + 1) % modes.length;
-              setThemeMode(modes[nextIdx]);
-            }} last />
+            onPress={() => setShowAppearance(true)} last />
         </View>
 
         {/* ── SUPPORT Section ── */}
@@ -224,11 +239,11 @@ export const LawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigation 
           <MenuItem icon="chatbubble-outline" label="AI Legal Assistant"
             onPress={() => navigation.navigate('AiChat')} />
           <MenuItem icon="help-circle-outline" label="Help Center"
-            onPress={() => Alert.alert('Help Center', 'Contact support@lawsoft.app for assistance.')} />
+            onPress={() => navigation.navigate('HelpCenter')} />
           <MenuItem icon="information-circle-outline" label="About LawSoft"
-            onPress={() => Alert.alert('About', 'LawSoft v1.0.0\nYour Legal Companion')} />
+            onPress={() => navigation.navigate('About')} />
           <MenuItem icon="document-text-outline" label="Privacy Policy & Terms" subtitle="Legal information"
-            onPress={() => Alert.alert('Privacy Policy', 'View our privacy policy at lawsoft.app/privacy')} last />
+            onPress={() => navigation.navigate('PrivacyTerms')} last />
         </View>
 
         {/* ── Logout ── */}
@@ -246,7 +261,7 @@ export const LawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigation 
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Security</Text>
-              <TouchableOpacity onPress={() => { setShowSecurity(false); setPwOtpSent(false); setPwOtp(''); setNewPassword(''); }}>
+              <TouchableOpacity onPress={() => { setShowSecurity(false); setPwOtpSent(false); setOtpDigits(['', '', '']); setNewPassword(''); setConfirmPassword(''); }}>
                 <Ionicons name="close" size={24} color={COLORS.text} />
               </TouchableOpacity>
             </View>
@@ -271,12 +286,57 @@ export const LawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigation 
                 <Button title="Send OTP" onPress={handleSendPwOtp} loading={pwLoading} size="lg" />
               ) : (
                 <>
-                  <Input label="OTP Code" value={pwOtp} onChangeText={setPwOtp} placeholder="Enter 6-digit OTP" keyboardType="number-pad" maxLength={6} icon={<Ionicons name="key-outline" size={20} color={COLORS.textMuted} />} />
+                  <Text style={styles.fieldLabel}>Enter OTP</Text>
+                  <View style={styles.otpRow}>
+                    {otpDigits.map((digit, i) => (
+                      <TextInput
+                        key={i}
+                        ref={otpRefs[i]}
+                        style={[styles.otpBox, digit ? styles.otpBoxFilled : null]}
+                        value={digit}
+                        onChangeText={(t) => handleOtpChange(t, i)}
+                        onKeyPress={(e) => handleOtpKeyPress(e, i)}
+                        keyboardType="number-pad"
+                        maxLength={1}
+                        textAlign="center"
+                      />
+                    ))}
+                  </View>
                   <Input label="New Password" value={newPassword} onChangeText={setNewPassword} placeholder="Min 8 characters" secureTextEntry icon={<Ionicons name="lock-closed-outline" size={20} color={COLORS.textMuted} />} />
+                  <Input label="Confirm Password" value={confirmPassword} onChangeText={setConfirmPassword} placeholder="Re-enter password" secureTextEntry icon={<Ionicons name="lock-closed-outline" size={20} color={COLORS.textMuted} />} />
                   <Button title="Change Password" onPress={handleChangePassword} loading={pwLoading} size="lg" />
                 </>
               )}
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Appearance Modal ── */}
+      <Modal visible={showAppearance} transparent animationType="slide" onRequestClose={() => setShowAppearance(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Appearance</Text>
+              <TouchableOpacity onPress={() => setShowAppearance(false)}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ padding: SPACING.xl }}>
+              {([['light', 'sunny-outline', 'Light'], ['dark', 'moon-outline', 'Dark'], ['system', 'phone-portrait-outline', 'System Default']] as const).map(([mode, icon, label]) => (
+                <TouchableOpacity
+                  key={mode}
+                  style={[styles.appearanceOption, themeMode === mode && styles.appearanceOptionActive]}
+                  onPress={() => { setThemeMode(mode); setShowAppearance(false); }}
+                >
+                  <View style={styles.appearanceIconWrap}>
+                    <Ionicons name={icon} size={22} color={themeMode === mode ? COLORS.primary : COLORS.textSecondary} />
+                  </View>
+                  <Text style={[styles.appearanceLabel, themeMode === mode && styles.appearanceLabelActive]}>{label}</Text>
+                  {themeMode === mode && <Ionicons name="checkmark-circle" size={22} color={COLORS.primary} />}
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         </View>
       </Modal>
@@ -403,6 +463,27 @@ const styles = StyleSheet.create({
   statusBadgeText: { fontSize: FONT_SIZE.xs, fontWeight: '700' },
   securitySectionTitle: { fontSize: FONT_SIZE.lg, fontWeight: '700', color: COLORS.text, marginBottom: SPACING.sm },
   securityHint: { fontSize: FONT_SIZE.sm, color: COLORS.textSecondary, lineHeight: 20, marginBottom: SPACING.lg },
+  fieldLabel: { fontSize: FONT_SIZE.sm, fontWeight: '600', color: COLORS.text, marginBottom: SPACING.sm, marginTop: SPACING.sm },
+  otpRow: { flexDirection: 'row', justifyContent: 'center', gap: SPACING.lg, marginBottom: SPACING.xl },
+  otpBox: {
+    width: 56, height: 56, borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 2, borderColor: COLORS.border, backgroundColor: COLORS.surfaceAlt,
+    fontSize: FONT_SIZE.xxl, fontWeight: '800', color: COLORS.text, textAlign: 'center',
+  },
+  otpBoxFilled: { borderColor: COLORS.primary, backgroundColor: COLORS.primaryLight + '10' },
+  appearanceOption: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.lg,
+    paddingVertical: SPACING.lg, paddingHorizontal: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl, marginBottom: SPACING.sm,
+    borderWidth: 1, borderColor: COLORS.border,
+  },
+  appearanceOptionActive: { borderColor: COLORS.primary, backgroundColor: COLORS.primaryLight + '10' },
+  appearanceIconWrap: {
+    width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.surfaceAlt,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  appearanceLabel: { flex: 1, fontSize: FONT_SIZE.md, fontWeight: '600', color: COLORS.text },
+  appearanceLabelActive: { color: COLORS.primary },
 
   // Full photo
   fullPhotoOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },

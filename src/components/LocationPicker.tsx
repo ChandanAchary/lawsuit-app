@@ -154,32 +154,17 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ value, onChange,
       </View>
       {pincodeError ? <Text style={styles.errorText}>{pincodeError}</Text> : null}
 
-      {/* Inline place picker when post offices available */}
+      {/* Area/City Dropdown after pincode lookup */}
       {postOffices.length > 0 && (
-        <View style={styles.placePickerBox}>
-          <Text style={styles.fieldLabel}>Select Area / Post Office</Text>
-          {postOffices.map((po, i) => (
-            <TouchableOpacity
-              key={`${po.name}-${i}`}
-              style={[
-                styles.placeOption,
-                (value.city === po.name || value.postOfficeName === po.name) && styles.placeOptionActive,
-              ]}
-              onPress={() => selectPlace(po)}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={[
-                  styles.placeOptionText,
-                  (value.city === po.name || value.postOfficeName === po.name) && styles.placeOptionTextActive,
-                ]}>{po.name}</Text>
-                <Text style={styles.placeOptionSub}>{po.district}, {po.state}</Text>
-              </View>
-              {(value.city === po.name || value.postOfficeName === po.name) && (
-                <Ionicons name="checkmark-circle" size={20} color={COLORS.primary} />
-              )}
-            </TouchableOpacity>
-          ))}
-        </View>
+        <>
+          <Text style={styles.fieldLabel}>Area / City</Text>
+          <TouchableOpacity style={styles.dropdown} onPress={() => setShowPlacePicker(true)}>
+            <Text style={value.city || value.postOfficeName ? styles.dropdownText : styles.dropdownPlaceholder}>
+              {value.city || value.postOfficeName || 'Select area / city'}
+            </Text>
+            <Ionicons name="chevron-down" size={18} color={COLORS.textMuted} />
+          </TouchableOpacity>
+        </>
       )}
 
       {/* House / Flat */}

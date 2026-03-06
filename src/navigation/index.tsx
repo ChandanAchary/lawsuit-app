@@ -47,6 +47,10 @@ import { ChatListScreen } from '../screens/shared/ChatListScreen';
 import { NotificationsScreen } from '../components/NotificationsScreen';
 import { ReferralScreen } from '../screens/shared/ReferralScreen';
 import { BankAccountsScreen } from '../screens/shared/BankAccountsScreen';
+import { AboutScreen } from '../screens/shared/AboutScreen';
+import { HelpCenterScreen } from '../screens/shared/HelpCenterScreen';
+import { PrivacyTermsScreen } from '../screens/shared/PrivacyTermsScreen';
+import { AvailabilityScreen } from '../screens/lawyer/AvailabilityScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -208,6 +212,10 @@ export const MainStack = () => {
       <Stack.Screen name="EditLawyerProfile" component={EditLawyerProfileScreen} />
       <Stack.Screen name="LawyerTemplates" component={LawyerTemplatesScreen} />
       <Stack.Screen name="ProSubscription" component={ProSubscriptionScreen} />
+      <Stack.Screen name="About" component={AboutScreen} />
+      <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
+      <Stack.Screen name="PrivacyTerms" component={PrivacyTermsScreen} />
+      <Stack.Screen name="Availability" component={AvailabilityScreen} />
     </Stack.Navigator>
   );
 };

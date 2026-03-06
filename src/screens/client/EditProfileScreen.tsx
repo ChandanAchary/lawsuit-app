@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, Dimensions,
-  ActivityIndicator, StatusBar,
+  ActivityIndicator, StatusBar, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -121,7 +121,8 @@ export const EditProfileScreen: React.FC<{ navigation: any }> = ({ navigation })
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {/* Avatar */}
         <View style={styles.avatarSection}>
           <TouchableOpacity onPress={pickAndUploadAvatar} style={styles.avatarWrap}>
@@ -211,6 +212,7 @@ export const EditProfileScreen: React.FC<{ navigation: any }> = ({ navigation })
           <Button title="Cancel" variant="ghost" onPress={() => navigation.goBack()} size="lg" />
         </View>
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 };
