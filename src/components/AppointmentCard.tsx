@@ -1,0 +1,247 @@
+import React from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+  ViewStyle,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS, APPOINTMENT_STATUS_COLORS } from '../constants';
+import { Appointment, AppointmentStatus } from '../types';
+import { formatDate, formatTime } from '../utils/date';
+
+interface AppointmentCardProps {
+  appointment: Appointment;
+  role: 'CLIENT' | 'LAWYER';
+  onPress?: () => void;
+  onAttend?: () => void;
+  onCancel?: () => void;
+  onChat?: () => void;
+  onViewAgreement?: () => void;
+  onCreateCase?: () => void;
+  style?: ViewStyle;
+}
+
+export const AppointmentCard: React.FC<AppointmentCardProps> = ({
+  appointment,
+  role,
+  onPress,
+  onAttend,
+  onCancel,
+  onChat,
+  onViewAgreement,
+  onCreateCase,
+  style,
+}) => {
+  const person = role === 'CLIENT' ? appointment.lawyer : appointment.client;
+  const statusColor = APPOINTMENT_STATUS_COLORS[appointment.status] || APPOINTMENT_STATUS_COLORS.PENDING;
+  const isUpcoming =
+    appointment.status === AppointmentStatus.CONFIRMED ||
+    appointment.status === AppointmentStatus.PENDING;
+  const isAttended = appointment.status === AppointmentStatus.ATTENDED ||
+    appointment.status === AppointmentStatus.COMPLETED;
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.7}
+      onPress={onPress}
+      style={[styles.card, style]}
+    >
+      <View style={styles.header}>
+        <View style={styles.personRow}>
+          <View style={styles.avatarContainer}>
+            {person?.avatar ? (
+              <Image source={{ uri: person.avatar }} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                <Ionicons name="person" size={20} color={COLORS.textMuted} />
+              </View>
+            )}
+            <View style={[styles.statusDot, { backgroundColor: statusColor.text }]} />
+          </View>
+          <View style={styles.personInfo}>
+            <Text style={styles.name} numberOfLines={1}>
+              {person?.name || 'Unknown'}
+            </Text>
+            {role === 'CLIENT' && appointment.lawyer?.specialization?.[0] && (
+              <Text style={styles.specialization}>{appointment.lawyer.specialization[0]}</Text>
+            )}
+          </View>
+        </View>
+        <View style={[styles.statusBadge, { backgroundColor: statusColor.bg }]}>
+          <Text style={[styles.statusText, { color: statusColor.text }]}>
+            {appointment.status}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.detailsRow}>
+        <View style={styles.detailItem}>
+          <Ionicons name="calendar-outline" size={14} color={COLORS.textSecondary} />
+          <Text style={styles.detailText}>{formatDate(appointment.scheduledAt)}</Text>
+        </View>
+        <View style={styles.detailItem}>
+          <Ionicons name="time-outline" size={14} color={COLORS.textSecondary} />
+          <Text style={styles.detailText}>{formatTime(appointment.scheduledAt)}</Text>
+        </View>
+        <View style={styles.detailItem}>
+          <Ionicons name="timer-outline" size={14} color={COLORS.textSecondary} />
+          <Text style={styles.detailText}>{appointment.durationMins} min</Text>
+        </View>
+      </View>
+
+      {(isUpcoming || isAttended) && (
+        <View style={styles.actions}>
+          {isUpcoming && onAttend && (
+            <TouchableOpacity style={[styles.actionBtn, styles.actionPrimary]} onPress={onAttend}>
+              <Ionicons name="videocam" size={14} color={COLORS.white} />
+              <Text style={styles.actionTextWhite}>Join</Text>
+            </TouchableOpacity>
+          )}
+          {isUpcoming && onCancel && (
+            <TouchableOpacity style={[styles.actionBtn, styles.actionOutline]} onPress={onCancel}>
+              <Text style={styles.actionTextPrimary}>Cancel</Text>
+            </TouchableOpacity>
+          )}
+          {isAttended && onViewAgreement && appointment.agreementUrl && (
+            <TouchableOpacity style={[styles.actionBtn, styles.actionOutline]} onPress={onViewAgreement}>
+              <Ionicons name="document-text" size={14} color={COLORS.primary} />
+              <Text style={styles.actionTextPrimary}>Agreement</Text>
+            </TouchableOpacity>
+          )}
+          {isAttended && onChat && (
+            <TouchableOpacity style={[styles.actionBtn, styles.actionOutline]} onPress={onChat}>
+              <Ionicons name="chatbubble" size={14} color={COLORS.primary} />
+              <Text style={styles.actionTextPrimary}>Chat</Text>
+            </TouchableOpacity>
+          )}
+          {isAttended && onCreateCase && role === 'LAWYER' && !appointment.caseId && (
+            <TouchableOpacity style={[styles.actionBtn, styles.actionPrimary]} onPress={onCreateCase}>
+              <Ionicons name="briefcase" size={14} color={COLORS.white} />
+              <Text style={styles.actionTextWhite}>Create Case</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+};
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.lg,
+    marginBottom: SPACING.md,
+    ...SHADOWS.md,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: SPACING.md,
+  },
+  personRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  avatarContainer: {
+    position: 'relative',
+  },
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+  },
+  avatarPlaceholder: {
+    backgroundColor: COLORS.surfaceAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusDot: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: COLORS.white,
+  },
+  personInfo: {
+    marginLeft: SPACING.md,
+    flex: 1,
+  },
+  name: {
+    fontSize: FONT_SIZE.lg,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  specialization: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  statusBadge: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    borderRadius: BORDER_RADIUS.full,
+  },
+  statusText: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '700',
+    textTransform: 'capitalize',
+  },
+  detailsRow: {
+    flexDirection: 'row',
+    gap: SPACING.lg,
+    paddingTop: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.borderLight,
+  },
+  detailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+  },
+  detailText: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textSecondary,
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    marginTop: SPACING.md,
+    paddingTop: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.borderLight,
+  },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+  },
+  actionPrimary: {
+    backgroundColor: COLORS.primary,
+  },
+  actionOutline: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  actionTextWhite: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+    color: COLORS.white,
+  },
+  actionTextPrimary: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+    color: COLORS.primary,
+  },
+});
