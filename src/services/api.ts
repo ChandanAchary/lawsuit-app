@@ -40,7 +40,9 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Skip token refresh for auth endpoints (login, register, etc.)
+    const isAuthEndpoint = originalRequest?.url?.startsWith('/auth/');
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({
@@ -94,6 +96,10 @@ export const authApi = {
 export const lawyersApi = {
   getAll: (params?: Record<string, unknown>) => api.get('/lawyers', { params }),
   getById: (id: string) => api.get(`/lawyers/${encodeURIComponent(id)}`),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/lawyers/${encodeURIComponent(id)}`, data),
+  apply: (data: Record<string, unknown>) => api.post('/lawyers/apply', data),
+  getReviews: (id: string, params?: Record<string, unknown>) => api.get(`/lawyers/${encodeURIComponent(id)}/reviews`, { params }),
+  postReview: (id: string, data: { rating: number; comment?: string }) => api.post(`/lawyers/${encodeURIComponent(id)}/reviews`, data),
 };
 
 // ─── Appointments API ───────────────────────────────────────
@@ -110,11 +116,17 @@ export const appointmentsApi = {
   cancel: (id: string) => api.put(`/appointments/${encodeURIComponent(id)}/cancel`),
   updateStatus: (id: string, status: string) =>
     api.put(`/appointments/${encodeURIComponent(id)}/status`, { status }),
-  attend: (id: string) => api.post(`/appointments/${encodeURIComponent(id)}/attend`),
+  attend: (id: string, attended?: boolean) => api.post(`/appointments/${encodeURIComponent(id)}/attend`, { attended }),
   availability: (data: { lawyerId: string; date: string }) =>
     api.post('/appointments/availability', data),
-  updateAgreementUrl: (data: { appointmentId: string; agreementUrl: string }) =>
+  updateAgreementUrl: (data: { appointmentId: string; aggrementUrl: string }) =>
     api.post('/appointments/update-agreement-url', data),
+  accept: (id: string) => api.post(`/appointments/${encodeURIComponent(id)}/accept`),
+  reject: (id: string, reason?: string) => api.post(`/appointments/${encodeURIComponent(id)}/reject`, { reason }),
+  complete: (id: string) => api.post(`/appointments/${encodeURIComponent(id)}/complete`),
+  confirmRazorpay: (id: string, data: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) =>
+    api.post(`/appointments/${encodeURIComponent(id)}/confirm-payment`, data),
+  getAllAppointments: () => api.get('/appointments/getall'),
 };
 
 // ─── Cases API ──────────────────────────────────────────────
@@ -135,8 +147,25 @@ export const casesApi = {
   getDocuments: (id: string) => api.get(`/cases/${encodeURIComponent(id)}/documents`),
   uploadDocument: (id: string, data: { fileurl: string; fileName: string; mimeType: string; size?: number }) =>
     api.post(`/cases/${encodeURIComponent(id)}/documents`, data),
-  getPresignedUrl: (caseId: string, fileName: string, mimeType: string) =>
-    api.post(`/cases/${encodeURIComponent(caseId)}/documents/presigned-url`, { fileName, mimeType }),
+  getPresignedUrl: (caseId: string, fileName?: string, mimeType?: string) =>
+    api.get(`/cases/${encodeURIComponent(caseId)}/getpresignedUrl`, { params: { fileName, mimeType } }),
+  saveDocuments: (caseId: string, documents: { filename: string; url: string; mimeType: string; size?: number }[]) =>
+    api.post(`/cases/${encodeURIComponent(caseId)}/saveDocuments`, { documents }),
+  getTasks: (caseId: string) => api.get(`/cases/${encodeURIComponent(caseId)}/tasks`),
+  createTask: (caseId: string, data: { title: string; description?: string; assignedToId?: string; dueDate?: string }) =>
+    api.post(`/cases/${encodeURIComponent(caseId)}/tasks`, data),
+  updateTask: (taskId: string, data: Record<string, unknown>) =>
+    api.put(`/cases/tasks/${encodeURIComponent(taskId)}`, data),
+  closeCase: (caseId: string, data: { settlementAmount?: number; settlementTerms?: string; closureNotes?: string }) =>
+    api.post(`/cases/${encodeURIComponent(caseId)}/close`, data),
+  getAllCases: () => api.get('/cases/getall/cases'),
+  createByLawyer: (data: Record<string, unknown>) => api.post('/cases/create/case/details/lawyer', data),
+  acceptCase: (caseId: string) => api.post(`/cases/accept/case/${encodeURIComponent(caseId)}`),
+  getCaseDetails: (caseId: string) => api.get(`/cases/get/details/${encodeURIComponent(caseId)}`),
+  addTimelineEvent: (caseId: string, data: { title: string; description?: string; eventDate: string }) =>
+    api.post(`/cases/add/timeline/event/${encodeURIComponent(caseId)}`, data),
+  getTimelineEvents: (caseId: string) => api.get(`/cases/timeline/events/${encodeURIComponent(caseId)}`),
+  getCaseHearings: (caseId: string) => api.get(`/cases/hearings/${encodeURIComponent(caseId)}`),
 };
 
 // ─── Users API ──────────────────────────────────────────────
@@ -150,17 +179,20 @@ export const usersApi = {
   postClientInformation: (data: Record<string, unknown>) => api.post('/users/client-information', data),
   getLawyerInformation: () => api.get('/users/lawyer-information'),
   postLawyerInformation: (data: Record<string, unknown>) => api.post('/users/lawyer-information', data),
+  registerFcmToken: (token: string) => api.post('/users/fcm-token', { token }),
+  removeFcmToken: (token: string) => api.delete('/users/fcm-token', { data: { token } }),
+  getUserById: (id: string) => api.get(`/users/${encodeURIComponent(id)}`),
 };
 
 // ─── Chat API ───────────────────────────────────────────────
 export const chatApi = {
-  createChat: (otherUserId: string, caseId?: string) => api.post('/chats', { otherUserId, caseId }),
-  getChats: () => api.get('/chats'),
+  createChat: (otherUserId: string, caseId?: string) => api.post('/chat', { otherUserId, caseId }),
+  getChats: () => api.get('/chat'),
   getMessages: (chatId: string, params?: Record<string, unknown>) =>
-    api.get(`/chats/${encodeURIComponent(chatId)}/messages`, { params }),
+    api.get(`/chat/${encodeURIComponent(chatId)}/messages`, { params }),
   sendMessage: (chatId: string, data: { text: string; attachments?: string[] }) =>
-    api.post(`/chats/${encodeURIComponent(chatId)}/messages`, data),
-  getParticipants: (chatId: string) => api.get(`/chats/${encodeURIComponent(chatId)}/participants`),
+    api.post(`/chat/${encodeURIComponent(chatId)}/messages`, data),
+  getParticipants: (chatId: string) => api.get(`/chat/${encodeURIComponent(chatId)}/participants`),
 };
 
 // ─── Notifications API ──────────────────────────────────────
@@ -205,15 +237,25 @@ export const agreementTemplatesApi = {
 
 // ─── Admin API ──────────────────────────────────────────────
 export const adminApi = {
+  getDashboard: () => api.get('/admin/dashboard'),
   getUsers: (params?: Record<string, unknown>) =>
     api.get('/admin/users', { params }),
-  getNotVerifiedClients: (params?: Record<string, unknown>) =>
-    api.get('/admin/not-verified-clients', { params }),
-  getNotVerifiedLawyers: (params?: Record<string, unknown>) =>
-    api.get('/admin/not-verified-lawyers', { params }),
-  verifyClient: (userId: string) => api.put(`/admin/verify-client/${encodeURIComponent(userId)}`),
-  verifyLawyer: (userId: string) => api.put(`/admin/verify-lawyer/${encodeURIComponent(userId)}`),
-  getDashboardStats: () => api.get('/admin/dashboard-stats'),
+  getUserById: (id: string) => api.get(`/admin/users/${encodeURIComponent(id)}`),
+  toggleVerification: (id: string, isVerified: boolean) =>
+    api.put(`/admin/users/${encodeURIComponent(id)}/verification`, { isVerified }),
+  getPayments: (params?: Record<string, unknown>) =>
+    api.get('/admin/payments', { params }),
+  getWallets: () => api.get('/admin/wallets'),
+  getWithdrawals: () => api.get('/admin/wallets/withdrawals'),
+  reverseWithdrawal: (id: string) => api.put(`/admin/wallets/withdrawals/${encodeURIComponent(id)}/reverse`),
+  creditWallet: (userId: string, amount: number, reason: string) =>
+    api.post('/admin/wallets/credit', { userId, amount, reason }),
+  debitWallet: (userId: string, amount: number, reason: string) =>
+    api.post('/admin/wallets/debit', { userId, amount, reason }),
+  getNotVerifiedClients: () => api.get('/admin/not-verified-client'),
+  getNotVerifiedLawyers: () => api.get('/admin/not-verified-lawyers'),
+  verifyLawyer: (id: string) => api.put(`/admin/${encodeURIComponent(id)}/verifylawyer`),
+  verifyClient: (id: string) => api.put(`/admin/${encodeURIComponent(id)}/verifyclient`),
 };
 
 // ─── Storage API ────────────────────────────────────────────
@@ -227,9 +269,9 @@ export const storageApi = {
 // ─── Reviews API ────────────────────────────────────────────
 export const reviewsApi = {
   getByLawyer: (lawyerId: string, params?: Record<string, unknown>) =>
-    api.get(`/reviews/lawyer/${encodeURIComponent(lawyerId)}`, { params }),
-  create: (data: { lawyerId: string; rating: number; comment?: string }) =>
-    api.post('/reviews', data),
+    api.get(`/lawyers/${encodeURIComponent(lawyerId)}/reviews`, { params }),
+  create: (lawyerId: string, data: { rating: number; comment?: string }) =>
+    api.post(`/lawyers/${encodeURIComponent(lawyerId)}/reviews`, data),
 };
 
 // ─── Address API ────────────────────────────────────────────
@@ -270,6 +312,42 @@ export const subscriptionApi = {
 export const dashboardApi = {
   lawyerDashboard: () => api.get('/appointments/dashboard/lawyer'),
   clientDashboard: () => api.get('/appointments/dashboard/client'),
+};
+
+// ─── Video / Meetings API ───────────────────────────────────
+export const videoApi = {
+  createMeeting: (data: { appointmentId: string; meetingType?: string }) =>
+    api.post('/video/meeting', data),
+  getIceServers: () => api.get('/video/ice-servers'),
+  getMeeting: (appointmentId: string) =>
+    api.get(`/video/meeting/${encodeURIComponent(appointmentId)}`),
+  endMeeting: (appointmentId: string) =>
+    api.post(`/video/meeting/${encodeURIComponent(appointmentId)}/end`),
+};
+
+// ─── Payments API ───────────────────────────────────────────
+export const paymentsApi = {
+  getAll: (params?: Record<string, unknown>) => api.get('/payments', { params }),
+  getById: (id: string) => api.get(`/payments/${encodeURIComponent(id)}`),
+  refund: (id: string, reason?: string) => api.post(`/payments/${encodeURIComponent(id)}/refund`, { reason }),
+};
+
+// ─── Court Admin API ────────────────────────────────────────
+export const courtAdminApi = {
+  login: (email: string, password: string) => api.post('/court-admin/login', { email, password }),
+  createCourt: (data: Record<string, unknown>) => api.post('/court-admin/courts', data),
+  getCourts: () => api.get('/court-admin/courts'),
+  getCourtById: (id: string) => api.get(`/court-admin/courts/${encodeURIComponent(id)}`),
+  updateCourt: (id: string, data: Record<string, unknown>) => api.put(`/court-admin/courts/${encodeURIComponent(id)}`, data),
+  deleteCourt: (id: string) => api.delete(`/court-admin/courts/${encodeURIComponent(id)}`),
+  createAdmin: (data: Record<string, unknown>) => api.post('/court-admin/admins', data),
+  getAdmins: () => api.get('/court-admin/admins'),
+  getAdminById: (id: string) => api.get(`/court-admin/admins/${encodeURIComponent(id)}`),
+  updateAdminStatus: (id: string, status: string) => api.put(`/court-admin/admins/${encodeURIComponent(id)}/status`, { status }),
+  getPendingVerifications: () => api.get('/court-admin/verifications/pending'),
+  getMyVerifications: () => api.get('/court-admin/verifications'),
+  verifyLawyer: (lawyerId: string, data: { status: string; remarks?: string }) =>
+    api.post(`/court-admin/verify/${encodeURIComponent(lawyerId)}`, data),
 };
 
 export default api;

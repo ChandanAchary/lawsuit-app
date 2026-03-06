@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, Modal, Dimensions,
-  ActivityIndicator,
+  ActivityIndicator, StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { useAuthStore } from '../../stores/authStore';
 import { useUserStore } from '../../stores/userStore';
-import { usersApi, storageApi, authApi } from '../../services/api';
+import { usersApi, storageApi, authApi, dashboardApi } from '../../services/api';
 import { useThemeStore } from '../../stores/themeStore';
 import { Loading } from '../../components/Common';
 import { Button } from '../../components/Button';
@@ -23,8 +24,8 @@ export const LawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigation 
   const [uploading, setUploading] = useState(false);
   const [showFullPhoto, setShowFullPhoto] = useState(false);
   const [lawyerInfo, setLawyerInfo] = useState<Record<string, any> | null>(null);
+  const [stats, setStats] = useState({ casesWon: 0, clients: 0, rating: 0 });
   const [showSecurity, setShowSecurity] = useState(false);
-  const [showAppearance, setShowAppearance] = useState(false);
 
   // Change password state
   const [pwOtpSent, setPwOtpSent] = useState(false);
@@ -32,12 +33,23 @@ export const LawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigation 
   const [newPassword, setNewPassword] = useState('');
   const [pwLoading, setPwLoading] = useState(false);
 
-  useEffect(() => { getUser(); fetchLawyerInfo(); }, []);
+  useEffect(() => { getUser(); fetchLawyerInfo(); fetchStats(); }, []);
 
   const fetchLawyerInfo = async () => {
     try {
       const { data } = await usersApi.getLawyerInformation();
       if (data.lawyer) setLawyerInfo(data.lawyer);
+    } catch {}
+  };
+
+  const fetchStats = async () => {
+    try {
+      const { data } = await dashboardApi.lawyerDashboard();
+      setStats({
+        casesWon: data?.stats?.casesWon ?? data?.casesWon ?? 0,
+        clients: data?.stats?.totalClients ?? data?.totalClients ?? 0,
+        rating: data?.stats?.rating ?? data?.rating ?? 0,
+      });
     } catch {}
   };
 
@@ -66,7 +78,6 @@ export const LawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigation 
       if (uploadData.secure_url) {
         await updateUser({ avatarUrl: uploadData.secure_url });
         await getUser();
-        Alert.alert('Success', 'Profile photo updated');
       } else Alert.alert('Error', 'Upload failed');
     } catch (err: any) {
       Alert.alert('Error', err.message || 'Failed to upload photo');
@@ -80,7 +91,7 @@ export const LawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigation 
     try {
       await authApi.requestOtp(email);
       setPwOtpSent(true);
-      Alert.alert('OTP Sent', 'Check your email for the verification code');
+      Alert.alert('OTP Sent', 'Check your email');
     } catch (err: any) {
       Alert.alert('Error', err.response?.data?.error || 'Failed to send OTP');
     } finally { setPwLoading(false); }
@@ -89,7 +100,7 @@ export const LawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigation 
   const handleChangePassword = async () => {
     const email = (user || authUser)?.email;
     if (!email || !pwOtp || !newPassword) return;
-    if (newPassword.length < 8) { Alert.alert('Error', 'Password must be at least 8 characters'); return; }
+    if (newPassword.length < 8) { Alert.alert('Error', 'Min 8 characters'); return; }
     setPwLoading(true);
     try {
       await authApi.restorePassword(email, pwOtp, newPassword);
@@ -111,146 +122,138 @@ export const LawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigation 
   const displayUser = user || authUser;
   const avatarUrl = getAvatarUrl();
   const info = lawyerInfo;
+  const displayRating = info?.rating ? Number(info.rating).toFixed(1) : (stats.rating ? stats.rating.toFixed(1) : '—');
 
   return (
     <>
+      <StatusBar barStyle="light-content" />
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }}>
-        {/* Header */}
-        <View style={styles.headerBar}>
-          <Text style={styles.headerTitle}>Profile</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('EditLawyerProfile')}>
-            <Ionicons name="create-outline" size={22} color={COLORS.text} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Profile Card */}
-        <View style={styles.profileCard}>
-          <TouchableOpacity onPress={() => avatarUrl ? setShowFullPhoto(true) : pickAndUploadAvatar()} style={styles.avatarWrap}>
-            {avatarUrl ? <Image source={{ uri: avatarUrl }} style={styles.avatar} />
-            : <View style={[styles.avatar, styles.avatarPH]}><Ionicons name="person" size={36} color={COLORS.textMuted} /></View>}
-            <View style={styles.cameraIcon}>
-              {uploading ? <ActivityIndicator size="small" color={COLORS.white} /> : <Ionicons name="camera" size={12} color={COLORS.white} />}
-            </View>
-          </TouchableOpacity>
-          <View style={styles.profileInfo}>
+        {/* ── Gradient Header with Avatar ── */}
+        <LinearGradient colors={[COLORS.primaryDark, COLORS.primary, COLORS.primaryLight]} style={styles.headerGradient}>
+          <View style={styles.avatarSection}>
+            <TouchableOpacity onPress={() => avatarUrl ? setShowFullPhoto(true) : pickAndUploadAvatar()} style={styles.avatarWrap}>
+              {avatarUrl ? (
+                <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+              ) : (
+                <View style={[styles.avatar, styles.avatarPH]}>
+                  <Ionicons name="person" size={44} color={COLORS.textMuted} />
+                </View>
+              )}
+              <TouchableOpacity style={styles.cameraIcon} onPress={pickAndUploadAvatar}>
+                {uploading ? <ActivityIndicator size="small" color={COLORS.white} /> : <Ionicons name="camera" size={14} color={COLORS.white} />}
+              </TouchableOpacity>
+            </TouchableOpacity>
             <Text style={styles.profileName}>{displayUser?.name || 'Lawyer'}</Text>
             <Text style={styles.profileEmail}>{displayUser?.email || ''}</Text>
-            <View style={styles.verifiedBadge}>
-              <Ionicons name={displayUser?.isVerified ? 'checkmark-circle' : 'alert-circle'} size={14}
-                color={displayUser?.isVerified ? COLORS.success : COLORS.warning} />
-              <Text style={[styles.verifiedText, { color: displayUser?.isVerified ? COLORS.success : COLORS.warning }]}>
-                {displayUser?.isVerified ? 'Verified' : 'Pending Verification'}
-              </Text>
+            <View style={styles.roleBadge}>
+              <Text style={styles.roleBadgeText}>LAWYER</Text>
             </View>
           </View>
-        </View>
+        </LinearGradient>
 
-        {/* Stats Row */}
-        <View style={styles.statsRow}>
+        {/* ── Stats Row ── */}
+        <View style={styles.statsCard}>
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{info?.experienceYears || 0}</Text>
-            <Text style={styles.statLabel}>Years Exp.</Text>
+            <Ionicons name="trophy-outline" size={22} color={COLORS.textSecondary} />
+            <Text style={styles.statValue}>{stats.casesWon}</Text>
+            <Text style={styles.statLabel}>Cases Won</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{info?.totalReviews || 0}</Text>
-            <Text style={styles.statLabel}>Reviews</Text>
+            <Ionicons name="people-outline" size={22} color={COLORS.textSecondary} />
+            <Text style={styles.statValue}>{stats.clients}</Text>
+            <Text style={styles.statLabel}>Clients</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: COLORS.accent }]}>
-              {info?.rating ? `${Number(info.rating).toFixed(1)}` : '—'}
-            </Text>
+            <Ionicons name="star-outline" size={22} color={COLORS.textSecondary} />
+            <Text style={styles.statValue}>{displayRating}</Text>
             <Text style={styles.statLabel}>Rating</Text>
           </View>
         </View>
 
-        {/* AVAILABILITY */}
+        {/* ── AVAILABILITY Section ── */}
         <Text style={styles.sectionLabel}>AVAILABILITY</Text>
         <View style={styles.menuCard}>
+          <MenuItem icon="time-outline" label="Set Availability" subtitle="Manage your schedule"
+            onPress={() => navigation.navigate('EditLawyerProfile')} />
           <MenuItem icon="cash-outline" label="Consultation Fees" subtitle={info?.feePerConsultation ? `₹${info.feePerConsultation}` : 'Set your fee'}
             onPress={() => navigation.navigate('EditLawyerProfile')} last />
         </View>
 
-        {/* TOOLS */}
+        {/* ── TOOLS Section ── */}
         <Text style={styles.sectionLabel}>TOOLS</Text>
         <View style={styles.menuCard}>
-          <MenuItem icon="document-text-outline" label="Agreement Templates"
-            onPress={() => navigation.navigate('MainTabs', { screen: 'LawyerTemplates' })} />
-          <MenuItem icon="gift-outline" label="Referral Program"
+          <MenuItem icon="document-text-outline" label="Agreement Templates" subtitle="Manage templates"
+            onPress={() => navigation.navigate('LawyerTemplates')} />
+          <MenuItem icon="gift-outline" label="Referral Program" subtitle="Earn ₹5,000 per referral"
             onPress={() => navigation.navigate('ReferralProgram')} />
-          <MenuItem icon="diamond-outline" label="Pro Subscription"
+          <MenuItem icon="diamond-outline" label="Pro Subscription" subtitle="Unlock premium features"
             onPress={() => navigation.navigate('ProSubscription')} last />
         </View>
 
-        {/* ACCOUNT */}
+        {/* ── ACCOUNT Section ── */}
         <Text style={styles.sectionLabel}>ACCOUNT</Text>
         <View style={styles.menuCard}>
-          <MenuItem icon="person-outline" label="Edit Profile"
+          <MenuItem icon="person-outline" label="Edit Profile" subtitle="Name, specializations, experience"
             onPress={() => navigation.navigate('EditLawyerProfile')} />
-          <MenuItem icon="wallet-outline" label="Wallet"
+          <MenuItem icon="wallet-outline" label="Wallet" subtitle="Balance & transactions"
             onPress={() => navigation.navigate('Wallet')} />
-          <MenuItem icon="card-outline" label="Bank & UPI Accounts"
+          <MenuItem icon="card-outline" label="Bank & UPI Accounts" subtitle="Manage withdrawal accounts"
             onPress={() => navigation.navigate('BankAccounts')} />
-          <MenuItem icon="shield-checkmark-outline" label="Security"
+          <MenuItem icon="shield-checkmark-outline" label="Security" subtitle="Password, 2FA"
             onPress={() => setShowSecurity(true)} last />
         </View>
 
-        {/* PREFERENCES */}
+        {/* ── PREFERENCES Section ── */}
         <Text style={styles.sectionLabel}>PREFERENCES</Text>
         <View style={styles.menuCard}>
-          <MenuItem icon="notifications-outline" label="Notifications"
+          <MenuItem icon="notifications-outline" label="Notifications" subtitle="View alerts"
             onPress={() => navigation.navigate('Notifications')} />
-          <MenuItem icon="color-palette-outline" label="Appearance"
-            onPress={() => setShowAppearance(!showAppearance)} last />
+          <MenuItem icon="contrast-outline" label="Appearance" subtitle={themeMode.charAt(0).toUpperCase() + themeMode.slice(1)}
+            onPress={() => {
+              const modes: ('light' | 'dark' | 'system')[] = ['light', 'dark', 'system'];
+              const nextIdx = (modes.indexOf(themeMode) + 1) % modes.length;
+              setThemeMode(modes[nextIdx]);
+            }} last />
         </View>
-        {showAppearance && (
-          <View style={styles.themeCard}>
-            {(['light', 'dark', 'system'] as const).map((m) => (
-              <TouchableOpacity key={m} style={[styles.themeBtn, themeMode === m && styles.themeBtnActive]} onPress={() => setThemeMode(m)}>
-                <Ionicons name={m === 'light' ? 'sunny-outline' : m === 'dark' ? 'moon-outline' : 'phone-portrait-outline'} size={20} color={themeMode === m ? COLORS.white : COLORS.textSecondary} />
-                <Text style={[styles.themeBtnText, themeMode === m && styles.themeBtnTextActive]}>{m === 'system' ? 'System' : m.charAt(0).toUpperCase() + m.slice(1)}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
 
-        {/* SUPPORT */}
+        {/* ── SUPPORT Section ── */}
         <Text style={styles.sectionLabel}>SUPPORT</Text>
         <View style={styles.menuCard}>
           <MenuItem icon="chatbubble-outline" label="AI Legal Assistant"
             onPress={() => navigation.navigate('AiChat')} />
           <MenuItem icon="help-circle-outline" label="Help Center"
-            onPress={() => Alert.alert('Help Center', 'Contact support@lawsuit.app for assistance.')} />
-          <MenuItem icon="information-circle-outline" label="About"
-            onPress={() => Alert.alert('About', 'Lawsuit v1.0.0\nYour Legal Companion')} />
-          <MenuItem icon="document-lock-outline" label="Privacy Policy"
-            onPress={() => Alert.alert('Privacy Policy', 'View our privacy policy at lawsuit.app/privacy')} last />
+            onPress={() => Alert.alert('Help Center', 'Contact support@lawsoft.app for assistance.')} />
+          <MenuItem icon="information-circle-outline" label="About LawSoft"
+            onPress={() => Alert.alert('About', 'LawSoft v1.0.0\nYour Legal Companion')} />
+          <MenuItem icon="document-text-outline" label="Privacy Policy & Terms" subtitle="Legal information"
+            onPress={() => Alert.alert('Privacy Policy', 'View our privacy policy at lawsoft.app/privacy')} last />
         </View>
 
-        {/* Logout */}
+        {/* ── Logout ── */}
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
           <Ionicons name="log-out-outline" size={20} color={COLORS.error} />
-          <Text style={styles.logoutText}>Log Out</Text>
+          <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
+
+        <Text style={styles.versionText}>LawSoft for Lawyers · v1.0.0</Text>
       </ScrollView>
 
-      {/* Security Modal */}
+      {/* ── Security Modal ── */}
       <Modal visible={showSecurity} transparent animationType="slide" onRequestClose={() => setShowSecurity(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Account Security</Text>
+              <Text style={styles.modalTitle}>Security</Text>
               <TouchableOpacity onPress={() => { setShowSecurity(false); setPwOtpSent(false); setPwOtp(''); setNewPassword(''); }}>
                 <Ionicons name="close" size={24} color={COLORS.text} />
               </TouchableOpacity>
             </View>
-
             <ScrollView style={{ paddingHorizontal: SPACING.xl }} contentContainerStyle={{ paddingBottom: SPACING.xxl }}>
-              {/* Verification Status */}
               <View style={styles.securityInfo}>
                 <View style={styles.securityInfoRow}>
-                  <Text style={styles.securityInfoLabel}>Verification Status</Text>
+                  <Text style={styles.securityInfoLabel}>Verification</Text>
                   <View style={[styles.statusBadge, { backgroundColor: displayUser?.isVerified ? COLORS.successLight : COLORS.warningLight }]}>
                     <Text style={[styles.statusBadgeText, { color: displayUser?.isVerified ? COLORS.success : COLORS.warning }]}>
                       {displayUser?.isVerified ? 'Verified' : 'Pending'}
@@ -258,30 +261,18 @@ export const LawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigation 
                   </View>
                 </View>
                 <View style={styles.securityInfoRow}>
-                  <Text style={styles.securityInfoLabel}>Email Verified</Text>
-                  <Text style={[styles.securityInfoValue, { color: displayUser?.isVerified ? COLORS.success : COLORS.error }]}>
-                    {displayUser?.isVerified ? 'Yes ✓' : 'No'}
-                  </Text>
-                </View>
-                <View style={styles.securityInfoRow}>
                   <Text style={styles.securityInfoLabel}>Role</Text>
                   <Text style={styles.securityInfoValue}>LAWYER</Text>
                 </View>
               </View>
-
-              {/* Change Password */}
               <Text style={styles.securitySectionTitle}>Change Password</Text>
-              <Text style={styles.securityHint}>We'll send a one-time code to your registered email to verify your identity.</Text>
-              <Text style={styles.securityEmail}>{displayUser?.email || ''}</Text>
-
+              <Text style={styles.securityHint}>We'll send a verification code to {displayUser?.email}</Text>
               {!pwOtpSent ? (
                 <Button title="Send OTP" onPress={handleSendPwOtp} loading={pwLoading} size="lg" />
               ) : (
                 <>
-                  <Input label="OTP Code" value={pwOtp} onChangeText={setPwOtp} placeholder="Enter 6-digit OTP" keyboardType="number-pad" maxLength={6}
-                    icon={<Ionicons name="key-outline" size={20} color={COLORS.textMuted} />} />
-                  <Input label="New Password" value={newPassword} onChangeText={setNewPassword} placeholder="Min 8 characters" secureTextEntry
-                    icon={<Ionicons name="lock-closed-outline" size={20} color={COLORS.textMuted} />} />
+                  <Input label="OTP Code" value={pwOtp} onChangeText={setPwOtp} placeholder="Enter 6-digit OTP" keyboardType="number-pad" maxLength={6} icon={<Ionicons name="key-outline" size={20} color={COLORS.textMuted} />} />
+                  <Input label="New Password" value={newPassword} onChangeText={setNewPassword} placeholder="Min 8 characters" secureTextEntry icon={<Ionicons name="lock-closed-outline" size={20} color={COLORS.textMuted} />} />
                   <Button title="Change Password" onPress={handleChangePassword} loading={pwLoading} size="lg" />
                 </>
               )}
@@ -290,7 +281,7 @@ export const LawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigation 
         </View>
       </Modal>
 
-      {/* Full Photo Modal */}
+      {/* ── Full Photo Modal ── */}
       <Modal visible={showFullPhoto} transparent animationType="fade" onRequestClose={() => setShowFullPhoto(false)}>
         <View style={styles.fullPhotoOverlay}>
           <TouchableOpacity style={styles.fullPhotoClose} onPress={() => setShowFullPhoto(false)}>
@@ -303,15 +294,15 @@ export const LawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigation 
   );
 };
 
-/* ─── Menu Item Component ─── */
+/* ─── Menu Item ─── */
 const MenuItem = ({ icon, label, subtitle, onPress, last }: { icon: string; label: string; subtitle?: string; onPress: () => void; last?: boolean }) => (
   <TouchableOpacity style={[styles.menuItem, !last && styles.menuItemBorder]} onPress={onPress}>
     <View style={styles.menuIconWrap}>
       <Ionicons name={icon as any} size={20} color={COLORS.primary} />
     </View>
-    <View style={styles.menuContent}>
+    <View style={styles.menuContentArea}>
       <Text style={styles.menuLabel}>{label}</Text>
-      {subtitle && <Text style={styles.menuSub}>{subtitle}</Text>}
+      {subtitle ? <Text style={styles.menuSub}>{subtitle}</Text> : null}
     </View>
     <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
   </TouchableOpacity>
@@ -319,44 +310,42 @@ const MenuItem = ({ icon, label, subtitle, onPress, last }: { icon: string; labe
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  headerBar: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: SPACING.xl, paddingTop: SPACING.huge, paddingBottom: SPACING.md,
-    backgroundColor: COLORS.white, ...SHADOWS.sm,
-  },
-  headerTitle: { fontSize: FONT_SIZE.xxl, fontWeight: '900', color: COLORS.text },
 
-  // Profile card
-  profileCard: {
-    flexDirection: 'row', alignItems: 'center', gap: SPACING.lg,
-    backgroundColor: COLORS.white, marginHorizontal: SPACING.xl, marginTop: SPACING.xl,
-    borderRadius: BORDER_RADIUS.xl, padding: SPACING.xl, ...SHADOWS.sm,
+  // Header gradient
+  headerGradient: {
+    paddingTop: 50, paddingBottom: 30, alignItems: 'center',
+    borderBottomLeftRadius: BORDER_RADIUS.xxl,
+    borderBottomRightRadius: BORDER_RADIUS.xxl,
   },
-  avatarWrap: { position: 'relative' },
-  avatar: { width: 72, height: 72, borderRadius: 36, borderWidth: 2, borderColor: COLORS.primary },
+  avatarSection: { alignItems: 'center' },
+  avatarWrap: { position: 'relative', marginBottom: SPACING.md },
+  avatar: { width: 100, height: 100, borderRadius: 50, borderWidth: 3, borderColor: COLORS.white },
   avatarPH: { backgroundColor: COLORS.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
   cameraIcon: {
-    position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: 13,
-    backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: COLORS.white,
+    position: 'absolute', bottom: 2, right: 2, width: 30, height: 30, borderRadius: 15,
+    backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: COLORS.white,
   },
-  profileInfo: { flex: 1 },
-  profileName: { fontSize: FONT_SIZE.xl, fontWeight: '800', color: COLORS.text },
-  profileEmail: { fontSize: FONT_SIZE.sm, color: COLORS.textSecondary, marginTop: 2 },
-  verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs, marginTop: SPACING.sm },
-  verifiedText: { fontSize: FONT_SIZE.xs, fontWeight: '600' },
+  profileName: { fontSize: FONT_SIZE.xxl, fontWeight: '800', color: COLORS.white, marginTop: SPACING.xs },
+  profileEmail: { fontSize: FONT_SIZE.sm, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
+  roleBadge: {
+    marginTop: SPACING.sm, paddingHorizontal: SPACING.lg, paddingVertical: SPACING.xs,
+    backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: BORDER_RADIUS.full,
+  },
+  roleBadgeText: { fontSize: FONT_SIZE.xs, fontWeight: '700', color: COLORS.white, letterSpacing: 1 },
 
   // Stats
-  statsRow: {
+  statsCard: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around',
-    backgroundColor: COLORS.white, marginHorizontal: SPACING.xl, marginTop: SPACING.md,
-    borderRadius: BORDER_RADIUS.xl, paddingVertical: SPACING.xl, ...SHADOWS.sm,
+    backgroundColor: COLORS.white, marginHorizontal: SPACING.xl, marginTop: -20,
+    borderRadius: BORDER_RADIUS.xl, paddingVertical: SPACING.xl, ...SHADOWS.md,
   },
   statItem: { alignItems: 'center', flex: 1 },
-  statValue: { fontSize: FONT_SIZE.xxl, fontWeight: '900', color: COLORS.text },
-  statLabel: { fontSize: FONT_SIZE.xs, color: COLORS.textMuted, marginTop: SPACING.xs },
-  statDivider: { width: 1, height: 32, backgroundColor: COLORS.borderLight },
+  statValue: { fontSize: FONT_SIZE.xxl, fontWeight: '900', color: COLORS.text, marginTop: SPACING.xs },
+  statLabel: { fontSize: FONT_SIZE.xs, color: COLORS.textMuted, marginTop: 2 },
+  statDivider: { width: 1, height: 40, backgroundColor: COLORS.borderLight },
 
-  // Section
+  // Sections
   sectionLabel: {
     fontSize: FONT_SIZE.xs, fontWeight: '700', color: COLORS.textMuted,
     marginHorizontal: SPACING.xl + SPACING.sm, marginTop: SPACING.xl, marginBottom: SPACING.sm,
@@ -375,29 +364,21 @@ const styles = StyleSheet.create({
     width: 36, height: 36, borderRadius: 10, backgroundColor: COLORS.primaryLight + '15',
     alignItems: 'center', justifyContent: 'center',
   },
-  menuContent: { flex: 1 },
+  menuContentArea: { flex: 1 },
   menuLabel: { fontSize: FONT_SIZE.md, fontWeight: '600', color: COLORS.text },
   menuSub: { fontSize: FONT_SIZE.xs, color: COLORS.textMuted, marginTop: 1 },
-
-  // Theme
-  themeCard: {
-    flexDirection: 'row', gap: SPACING.sm, marginHorizontal: SPACING.xl, marginTop: SPACING.sm,
-  },
-  themeBtn: {
-    flex: 1, alignItems: 'center', paddingVertical: SPACING.md, borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surfaceAlt, gap: SPACING.xs,
-  },
-  themeBtnActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  themeBtnText: { fontSize: FONT_SIZE.xs, fontWeight: '600', color: COLORS.textSecondary },
-  themeBtnTextActive: { color: COLORS.white },
 
   // Logout
   logoutBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.sm,
     marginHorizontal: SPACING.xl, marginTop: SPACING.xl, paddingVertical: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xl, borderWidth: 1, borderColor: COLORS.error,
+    borderRadius: BORDER_RADIUS.xl, backgroundColor: COLORS.errorLight,
   },
   logoutText: { fontSize: FONT_SIZE.md, fontWeight: '700', color: COLORS.error },
+  versionText: {
+    textAlign: 'center', fontSize: FONT_SIZE.xs, color: COLORS.textMuted,
+    marginTop: SPACING.lg, marginBottom: SPACING.xxl,
+  },
 
   // Security Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
@@ -415,17 +396,13 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surfaceAlt, borderRadius: BORDER_RADIUS.lg,
     padding: SPACING.lg, marginTop: SPACING.lg, marginBottom: SPACING.xl,
   },
-  securityInfoRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingVertical: SPACING.sm,
-  },
+  securityInfoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: SPACING.sm },
   securityInfoLabel: { fontSize: FONT_SIZE.md, color: COLORS.textSecondary },
   securityInfoValue: { fontSize: FONT_SIZE.md, fontWeight: '700', color: COLORS.text },
   statusBadge: { paddingHorizontal: SPACING.sm, paddingVertical: 2, borderRadius: BORDER_RADIUS.sm },
   statusBadgeText: { fontSize: FONT_SIZE.xs, fontWeight: '700' },
   securitySectionTitle: { fontSize: FONT_SIZE.lg, fontWeight: '700', color: COLORS.text, marginBottom: SPACING.sm },
-  securityHint: { fontSize: FONT_SIZE.sm, color: COLORS.textSecondary, lineHeight: 20, marginBottom: SPACING.md },
-  securityEmail: { fontSize: FONT_SIZE.md, fontWeight: '600', color: COLORS.text, marginBottom: SPACING.lg },
+  securityHint: { fontSize: FONT_SIZE.sm, color: COLORS.textSecondary, lineHeight: 20, marginBottom: SPACING.lg },
 
   // Full photo
   fullPhotoOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },

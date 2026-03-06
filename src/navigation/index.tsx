@@ -23,6 +23,7 @@ import { WalletScreen } from '../screens/client/WalletScreen';
 import { CasesScreen } from '../screens/client/CasesScreen';
 import { CaseDetailScreen } from '../screens/client/CaseDetailScreen';
 import { ProfileScreen } from '../screens/client/ProfileScreen';
+import { EditProfileScreen } from '../screens/client/EditProfileScreen';
 import { AiChatScreen } from '../screens/client/AiChatScreen';
 import { LexRatesScreen } from '../screens/client/LexRatesScreen';
 
@@ -42,6 +43,7 @@ import { AdminUsersScreen } from '../screens/admin/AdminUsersScreen';
 
 // Shared screens
 import { ChatScreen } from '../screens/shared/ChatScreen';
+import { ChatListScreen } from '../screens/shared/ChatListScreen';
 import { NotificationsScreen } from '../components/NotificationsScreen';
 import { ReferralScreen } from '../screens/shared/ReferralScreen';
 import { BankAccountsScreen } from '../screens/shared/BankAccountsScreen';
@@ -126,7 +128,7 @@ const LawyerTabs = () => (
           Dashboard: focused ? 'grid' : 'grid-outline',
           LawyerAppointments: focused ? 'calendar' : 'calendar-outline',
           LawyerCases: focused ? 'briefcase' : 'briefcase-outline',
-          LawyerTemplates: focused ? 'document-text' : 'document-text-outline',
+          LawyerChats: focused ? 'chatbubbles' : 'chatbubbles-outline',
           LawyerProfile: focused ? 'person' : 'person-outline',
         };
         return <Ionicons name={icons[route.name] as any} size={22} color={color} />;
@@ -136,7 +138,7 @@ const LawyerTabs = () => (
     <Tab.Screen name="Dashboard" component={LawyerDashboardScreen} />
     <Tab.Screen name="LawyerAppointments" component={LawyerAppointmentsScreen} options={{ title: 'Appointments' }} />
     <Tab.Screen name="LawyerCases" component={LawyerCasesScreen} options={{ title: 'Cases' }} />
-    <Tab.Screen name="LawyerTemplates" component={LawyerTemplatesScreen} options={{ title: 'Templates' }} />
+    <Tab.Screen name="LawyerChats" component={ChatListScreen} options={{ title: 'Chats' }} />
     <Tab.Screen name="LawyerProfile" component={LawyerProfileScreen} options={{ title: 'Profile' }} />
   </Tab.Navigator>
 );
@@ -202,7 +204,9 @@ export const MainStack = () => {
       <Stack.Screen name="LexRates" component={LexRatesScreen} />
       <Stack.Screen name="ReferralProgram" component={ReferralScreen} />
       <Stack.Screen name="BankAccounts" component={BankAccountsScreen} />
+      <Stack.Screen name="EditProfile" component={EditProfileScreen} />
       <Stack.Screen name="EditLawyerProfile" component={EditLawyerProfileScreen} />
+      <Stack.Screen name="LawyerTemplates" component={LawyerTemplatesScreen} />
       <Stack.Screen name="ProSubscription" component={ProSubscriptionScreen} />
     </Stack.Navigator>
   );
