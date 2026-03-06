@@ -39,7 +39,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await storage.setUser(user);
       set({ user, token, isAuthenticated: true, isLoading: false });
     } catch (err: any) {
-      set({ error: err.response?.data?.message || 'Login failed', isLoading: false });
+      const msg = err.response?.data?.error || err.response?.data?.message || 'Login failed';
+      set({ error: msg, isLoading: false });
       throw err;
     }
   },

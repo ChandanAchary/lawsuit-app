@@ -17,16 +17,20 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const [showPassword, setShowPassword] = useState(false);
   const { login, isLoading, error, clearError } = useAuthStore();
 
+  const [localError, setLocalError] = useState('');
+
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please fill in all fields');
+      setLocalError('Please fill in all fields');
       return;
     }
+    setLocalError('');
     clearError();
     try {
       await login(email.trim(), password);
     } catch (err: any) {
-      Alert.alert('Login Failed', err.response?.data?.message || err.response?.data?.error || 'Invalid credentials');
+      const msg = err.response?.data?.error || err.response?.data?.message || 'Invalid credentials';
+      setLocalError(msg);
     }
   };
 
@@ -149,6 +153,13 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             <Text style={styles.forgotText}>Forgot password?</Text>
           </TouchableOpacity>
 
+          {(localError || error) ? (
+            <View style={styles.errorBox}>
+              <Ionicons name="alert-circle" size={16} color={COLORS.error} />
+              <Text style={styles.errorText}>{localError || error}</Text>
+            </View>
+          ) : null}
+
           <Button title="Sign In" onPress={handleLogin} loading={isLoading} size="lg" />
 
           <View style={styles.divider}>
@@ -247,6 +258,21 @@ const styles = StyleSheet.create({
   welcome: { fontSize: FONT_SIZE.hero, fontWeight: '900', color: COLORS.text, letterSpacing: -0.5 },
   subtitle: { fontSize: FONT_SIZE.lg, color: COLORS.textSecondary, marginTop: SPACING.sm },
   form: {},
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.error + '12',
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.md,
+    marginBottom: SPACING.lg,
+    gap: SPACING.sm,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.error,
+    fontWeight: '500',
+  },
   forgotBtn: { alignSelf: 'flex-end', marginBottom: SPACING.xxl, marginTop: -SPACING.sm },
   forgotText: { fontSize: FONT_SIZE.sm, fontWeight: '600', color: COLORS.primary },
   divider: {
