@@ -185,7 +185,7 @@ export const EditProfileScreen: React.FC<{ navigation: any }> = ({ navigation })
           <MultiSelectChips
             label="Gender"
             items={[...GENDER_OPTIONS]}
-            selected={clientInfo.gender ? [clientInfo.gender] : []}
+            selected={clientInfo.gender ? [clientInfo.gender === 'PREFER_NOT_TO_SAY' ? 'PREFER NOT TO SAY' : clientInfo.gender] : []}
             onToggle={(g) => setClientInfo((prev) => ({ ...prev, gender: g === 'PREFER NOT TO SAY' ? 'PREFER_NOT_TO_SAY' : g }))}
           />
 

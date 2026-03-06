@@ -29,8 +29,8 @@ export const ProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
   const [showSecurity, setShowSecurity] = useState(false);
   const [showAppearance, setShowAppearance] = useState(false);
   const [pwOtpSent, setPwOtpSent] = useState(false);
-  const [otpDigits, setOtpDigits] = useState(['', '', '']);
-  const otpRefs = [useRef<TextInput>(null), useRef<TextInput>(null), useRef<TextInput>(null)];
+  const [otpDigits, setOtpDigits] = useState(Array(6).fill(''));
+  const otpRefs = Array.from({ length: 6 }, () => useRef<TextInput>(null));
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [pwLoading, setPwLoading] = useState(false);
@@ -97,7 +97,7 @@ export const ProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
     const next = [...otpDigits];
     next[index] = digit;
     setOtpDigits(next);
-    if (digit && index < 2) otpRefs[index + 1].current?.focus();
+    if (digit && index < 5) otpRefs[index + 1].current?.focus();
   };
 
   const handleOtpKeyPress = (e: any, index: number) => {
@@ -109,7 +109,7 @@ export const ProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
   const handleChangePassword = async () => {
     const email = (user || authUser)?.email;
     const otp = otpDigits.join('');
-    if (!email || otp.length < 3 || !newPassword) return;
+    if (!email || otp.length < 6 || !newPassword) return;
     if (newPassword.length < 8) { Alert.alert('Error', 'Min 8 characters'); return; }
     if (newPassword !== confirmPassword) { Alert.alert('Error', 'Passwords do not match'); return; }
     setPwLoading(true);
