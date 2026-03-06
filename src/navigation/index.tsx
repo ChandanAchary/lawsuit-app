@@ -11,6 +11,7 @@ import { LandingScreen } from '../screens/auth/LandingScreen';
 import { LoginScreen } from '../screens/auth/LoginScreen';
 import { RegisterScreen } from '../screens/auth/RegisterScreen';
 import { OtpVerifyScreen } from '../screens/auth/OtpVerifyScreen';
+import { ForgotPasswordScreen } from '../screens/auth/ForgotPasswordScreen';
 import { AdminLoginScreen } from '../screens/auth/AdminLoginScreen';
 
 // Client screens
@@ -31,7 +32,9 @@ import { LawyerAppointmentsScreen } from '../screens/lawyer/LawyerAppointmentsSc
 import { LawyerCasesScreen } from '../screens/lawyer/LawyerCasesScreen';
 import { LawyerCaseDetailScreen } from '../screens/lawyer/LawyerCaseDetailScreen';
 import { LawyerProfileScreen } from '../screens/lawyer/LawyerProfileScreen';
+import { EditLawyerProfileScreen } from '../screens/lawyer/EditLawyerProfileScreen';
 import { LawyerTemplatesScreen } from '../screens/lawyer/LawyerTemplatesScreen';
+import { ProSubscriptionScreen } from '../screens/lawyer/ProSubscriptionScreen';
 
 // Admin screens
 import { AdminDashboardScreen } from '../screens/admin/AdminDashboardScreen';
@@ -40,6 +43,8 @@ import { AdminUsersScreen } from '../screens/admin/AdminUsersScreen';
 // Shared screens
 import { ChatScreen } from '../screens/shared/ChatScreen';
 import { NotificationsScreen } from '../components/NotificationsScreen';
+import { ReferralScreen } from '../screens/shared/ReferralScreen';
+import { BankAccountsScreen } from '../screens/shared/BankAccountsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -51,6 +56,7 @@ export const AuthStack = () => (
     <Stack.Screen name="Login" component={LoginScreen} />
     <Stack.Screen name="Register" component={RegisterScreen} />
     <Stack.Screen name="OtpVerify" component={OtpVerifyScreen} />
+    <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
     <Stack.Screen name="AdminLogin" component={AdminLoginScreen} />
   </Stack.Navigator>
 );
@@ -194,6 +200,10 @@ export const MainStack = () => {
       <Stack.Screen name="Wallet" component={WalletScreen} />
       <Stack.Screen name="AiChat" component={AiChatScreen} />
       <Stack.Screen name="LexRates" component={LexRatesScreen} />
+      <Stack.Screen name="ReferralProgram" component={ReferralScreen} />
+      <Stack.Screen name="BankAccounts" component={BankAccountsScreen} />
+      <Stack.Screen name="EditLawyerProfile" component={EditLawyerProfileScreen} />
+      <Stack.Screen name="ProSubscription" component={ProSubscriptionScreen} />
     </Stack.Navigator>
   );
 };

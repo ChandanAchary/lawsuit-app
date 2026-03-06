@@ -7,7 +7,7 @@ interface TemplateState {
   loading: boolean;
   error: string | null;
   fetchTemplates: () => Promise<void>;
-  createTemplate: (data: { title: string; description?: string; content: string; category: string }) => Promise<void>;
+  createTemplate: (data: { title: string; description?: string; content: string; category?: string }) => Promise<void>;
   updateTemplate: (id: string, data: Record<string, unknown>) => Promise<void>;
   deleteTemplate: (id: string) => Promise<void>;
 }
@@ -21,7 +21,8 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
     set({ loading: true });
     try {
       const { data } = await agreementTemplatesApi.getAll();
-      set({ templates: data.templates || data.items || data || [], loading: false });
+      const list = data.data || data.templates || data.items || [];
+      set({ templates: Array.isArray(list) ? list : [], loading: false });
     } catch (err: any) {
       set({ error: err.message, loading: false });
     }

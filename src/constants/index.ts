@@ -116,6 +116,16 @@ export const TEMPLATE_CATEGORIES = [
   'Partnership', 'Lease', 'Other',
 ];
 
+export const INDIAN_LANGUAGES = [
+  'English', 'Hindi', 'Tamil', 'Telugu', 'Kannada',
+  'Malayalam', 'Bengali', 'Marathi', 'Gujarati', 'Punjabi',
+  'Odia', 'Urdu', 'Assamese', 'Maithili', 'Sanskrit',
+];
+
+export const GENDER_OPTIONS = ['MALE', 'FEMALE', 'OTHER', 'PREFER NOT TO SAY'] as const;
+
+export const CASTE_OPTIONS = ['GENERAL', 'OBC', 'SC', 'ST', 'EWS', 'OTHER'] as const;
+
 export const LEX_RATES = [
   { category: 'Criminal Law', min: 5000, max: 50000, avg: 15000 },
   { category: 'Divorce / Family', min: 3000, max: 30000, avg: 10000 },

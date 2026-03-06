@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { authApi } from '../services/api';
+import { authApi, referralApi } from '../services/api';
 import { storage } from '../services/storage';
 import { User, UserRole } from '../types';
 
@@ -11,8 +11,10 @@ interface AuthState {
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
   register: (data: { name: string; email: string; phone: string; password: string; role: string }) => Promise<void>;
-  verifyOtp: (identifier: string, otp: string) => Promise<void>;
+  verifyOtp: (identifier: string, code: string) => Promise<void>;
   requestOtp: (identifier: string) => Promise<void>;
+  resetPassword: (identifier: string, code: string, password: string) => Promise<void>;
+  applyReferral: (code: string) => Promise<void>;
   logout: () => Promise<void>;
   restoreSession: () => Promise<void>;
   setUser: (user: User) => void;
@@ -80,6 +82,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ isLoading: false });
     } catch (err: any) {
       set({ error: err.response?.data?.message || 'Failed to send OTP', isLoading: false });
+      throw err;
+    }
+  },
+
+  resetPassword: async (identifier, code, password) => {
+    set({ isLoading: true, error: null });
+    try {
+      await authApi.restorePassword(identifier, code, password);
+      set({ isLoading: false });
+    } catch (err: any) {
+      set({ error: err.response?.data?.message || 'Password reset failed', isLoading: false });
+      throw err;
+    }
+  },
+
+  applyReferral: async (code) => {
+    set({ isLoading: true, error: null });
+    try {
+      await referralApi.apply(code);
+      set({ isLoading: false });
+    } catch (err: any) {
+      set({ error: err.response?.data?.message || err.response?.data?.error || 'Failed to apply referral', isLoading: false });
       throw err;
     }
   },

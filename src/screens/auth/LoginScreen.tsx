@@ -3,12 +3,15 @@ import {
   View, Text, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, StatusBar, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING } from '../../constants';
+import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { useAuthStore } from '../../stores/authStore';
 
+type RoleChoice = 'CLIENT' | 'LAWYER';
+
 export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const [selectedRole, setSelectedRole] = useState<RoleChoice | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -23,10 +26,69 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     try {
       await login(email.trim(), password);
     } catch (err: any) {
-      Alert.alert('Login Failed', err.response?.data?.message || 'Invalid credentials');
+      Alert.alert('Login Failed', err.response?.data?.message || err.response?.data?.error || 'Invalid credentials');
     }
   };
 
+  // ─── Role Selection Screen ────────────────────────────
+  if (!selectedRole) {
+    return (
+      <View style={styles.container}>
+        <StatusBar barStyle="dark-content" />
+        <View style={styles.roleScreen}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+          </TouchableOpacity>
+
+          <View style={styles.roleHeader}>
+            <Text style={styles.roleTitle}>Sign in as</Text>
+            <Text style={styles.roleSubtitle}>Choose how you want to continue</Text>
+          </View>
+
+          <View style={styles.roleCards}>
+            <TouchableOpacity
+              style={styles.roleCard}
+              activeOpacity={0.7}
+              onPress={() => setSelectedRole('CLIENT')}
+            >
+              <View style={[styles.roleCardIcon, { backgroundColor: COLORS.primary + '12' }]}>
+                <Ionicons name="person" size={32} color={COLORS.primary} />
+              </View>
+              <Text style={styles.roleCardTitle}>Client</Text>
+              <Text style={styles.roleCardDesc}>Find lawyers & manage your legal matters</Text>
+              <View style={styles.roleCardArrow}>
+                <Ionicons name="arrow-forward" size={20} color={COLORS.primary} />
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.roleCard}
+              activeOpacity={0.7}
+              onPress={() => setSelectedRole('LAWYER')}
+            >
+              <View style={[styles.roleCardIcon, { backgroundColor: COLORS.midnight + '12' }]}>
+                <Ionicons name="briefcase" size={32} color={COLORS.midnight} />
+              </View>
+              <Text style={styles.roleCardTitle}>Lawyer</Text>
+              <Text style={styles.roleCardDesc}>Manage appointments, cases & clients</Text>
+              <View style={styles.roleCardArrow}>
+                <Ionicons name="arrow-forward" size={20} color={COLORS.midnight} />
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>Don't have an account? </Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Register')}>
+              <Text style={styles.footerLink}>Sign Up</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  // ─── Login Form Screen ────────────────────────────────
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -38,13 +100,18 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => setSelectedRole(null)}>
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
 
         <View style={styles.headerSection}>
           <Text style={styles.welcome}>Welcome back</Text>
-          <Text style={styles.subtitle}>Sign in to continue with Lawsuit</Text>
+          <Text style={styles.subtitle}>
+            Sign in as{' '}
+            <Text style={{ fontWeight: '700', color: COLORS.primary }}>
+              {selectedRole === 'CLIENT' ? 'Client' : 'Lawyer'}
+            </Text>
+          </Text>
         </View>
 
         <View style={styles.form}>
@@ -75,7 +142,10 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             }
           />
 
-          <TouchableOpacity style={styles.forgotBtn}>
+          <TouchableOpacity
+            style={styles.forgotBtn}
+            onPress={() => navigation.navigate('ForgotPassword')}
+          >
             <Text style={styles.forgotText}>Forgot password?</Text>
           </TouchableOpacity>
 
@@ -111,6 +181,68 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // ── Role Selection ──
+  roleScreen: {
+    flex: 1,
+    paddingHorizontal: SPACING.xxl,
+  },
+  roleHeader: {
+    marginTop: SPACING.xxxl,
+    marginBottom: SPACING.xxxl,
+  },
+  roleTitle: {
+    fontSize: FONT_SIZE.hero,
+    fontWeight: '900',
+    color: COLORS.text,
+    letterSpacing: -0.5,
+  },
+  roleSubtitle: {
+    fontSize: FONT_SIZE.lg,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.sm,
+  },
+  roleCards: {
+    gap: SPACING.lg,
+  },
+  roleCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.xxl,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    ...SHADOWS.md,
+  },
+  roleCardIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: BORDER_RADIUS.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.md,
+  },
+  roleCardTitle: {
+    fontSize: FONT_SIZE.xl,
+    fontWeight: '800',
+    color: COLORS.text,
+  },
+  roleCardDesc: {
+    fontSize: FONT_SIZE.md,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.xs,
+    lineHeight: 20,
+  },
+  roleCardArrow: {
+    position: 'absolute',
+    top: SPACING.xxl,
+    right: SPACING.xxl,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // ── Login Form ──
   headerSection: { marginTop: SPACING.xxxl, marginBottom: SPACING.xxxl },
   welcome: { fontSize: FONT_SIZE.hero, fontWeight: '900', color: COLORS.text, letterSpacing: -0.5 },
   subtitle: { fontSize: FONT_SIZE.lg, color: COLORS.textSecondary, marginTop: SPACING.sm },

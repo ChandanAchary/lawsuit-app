@@ -1,12 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, LinkingOptions } from '@react-navigation/native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuthStore } from './src/stores/authStore';
 import { useNotificationStore } from './src/stores/notificationStore';
 import { AuthStack, MainStack } from './src/navigation';
 import { COLORS } from './src/constants';
+
+const linking: LinkingOptions<any> = {
+  prefixes: ['lawsuit://', 'https://lawsuit-app.com'],
+  config: {
+    screens: {
+      Register: {
+        path: 'register',
+        parse: { referralCode: (ref: string) => ref },
+      },
+    },
+  },
+};
 
 export default function App() {
   const { isAuthenticated, restoreSession } = useAuthStore();
@@ -38,7 +50,7 @@ export default function App() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <NavigationContainer>
+      <NavigationContainer linking={linking}>
         <StatusBar style={isAuthenticated ? 'dark' : 'light'} />
         {isAuthenticated ? <MainStack /> : <AuthStack />}
       </NavigationContainer>

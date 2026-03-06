@@ -72,10 +72,11 @@ export const authApi = {
   login: (email: string, password: string) => api.post('/auth/login', { email, password }),
   register: (data: { name: string; email: string; phone: string; password: string; role: string }) =>
     api.post('/auth/register', data),
-  verifyOtp: (identifier: string, otp: string) => api.post('/auth/verify-otp', { identifier, otp }),
+  verifyOtp: (identifier: string, code: string) => api.post('/auth/verify-otp', { identifier, code }),
   requestOtp: (identifier: string) => api.post('/auth/request-otp', { identifier }),
   getMe: () => api.get('/auth/me'),
-  restorePassword: (email: string) => api.post('/auth/restore-password', { email }),
+  restorePassword: (identifier: string, code: string, password: string) =>
+    api.put('/auth/restore-password', { identifier, code, password }),
   logout: () => api.post('/auth/logout'),
 };
 
@@ -134,7 +135,7 @@ export const usersApi = {
   updateMe: (data: Record<string, unknown>) => api.put('/users/me', data),
   getPresignedUrl: (fileName: string, mimeType: string) =>
     api.post('/users/presigned-url', { fileName, mimeType }),
-  getUploadSignature: () => api.get('/storage/cloudinary-signature'),
+  getUploadSignature: () => api.get('/users/me/upload-signature'),
   getClientInformation: () => api.get('/users/client-information'),
   postClientInformation: (data: Record<string, unknown>) => api.post('/users/client-information', data),
   getLawyerInformation: () => api.get('/users/lawyer-information'),
@@ -185,7 +186,7 @@ export const modelChatApi = {
 export const agreementTemplatesApi = {
   getAll: () => api.get('/agreement-templates'),
   getById: (id: string) => api.get(`/agreement-templates/${encodeURIComponent(id)}`),
-  create: (data: { title: string; description?: string; content: string; category: string }) =>
+  create: (data: { title: string; description?: string; content: string; category?: string }) =>
     api.post('/agreement-templates', data),
   update: (id: string, data: Record<string, unknown>) =>
     api.put(`/agreement-templates/${encodeURIComponent(id)}`, data),
@@ -209,7 +210,8 @@ export const adminApi = {
 export const storageApi = {
   getPresignedUrl: (fileName: string, mimeType: string) =>
     api.post('/storage/presigned-url', { fileName, mimeType }),
-  getCloudinarySignature: () => api.get('/storage/cloudinary-signature'),
+  getCloudinarySignature: (folder: string = 'profiles') =>
+    api.get('/storage/sign', { params: { folder } }),
 };
 
 // ─── Reviews API ────────────────────────────────────────────
@@ -220,11 +222,44 @@ export const reviewsApi = {
     api.post('/reviews', data),
 };
 
+// ─── Address API ────────────────────────────────────────────
+export const addressApi = {
+  getStates: () => api.get('/address/states'),
+  lookupPincode: (pincode: string) => api.get(`/address/pincode/${encodeURIComponent(pincode)}`),
+};
+
 // ─── Bank Account API ───────────────────────────────────────
 export const bankAccountApi = {
   getAll: () => api.get('/bank-accounts'),
+  getById: (id: string) => api.get(`/bank-accounts/${encodeURIComponent(id)}`),
   create: (data: Record<string, unknown>) => api.post('/bank-accounts', data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/bank-accounts/${encodeURIComponent(id)}`, data),
   delete: (id: string) => api.delete(`/bank-accounts/${encodeURIComponent(id)}`),
+  verifyUpi: (upiId: string) => api.post('/bank-accounts/verify-upi', { upiId }),
+  lookupIfsc: (code: string) => api.get(`/bank-accounts/ifsc/${encodeURIComponent(code)}`),
+};
+
+// ─── Referral API ───────────────────────────────────────────
+export const referralApi = {
+  getCode: () => api.get('/referral/code'),
+  apply: (code: string) => api.post('/referral/apply', { code }),
+  getInfo: () => api.get('/referral/info'),
+};
+
+// ─── Subscription API ──────────────────────────────────────
+export const subscriptionApi = {
+  get: () => api.get('/subscription'),
+  subscribe: () => api.post('/subscription/subscribe'),
+  confirm: (data: { paymentId: string; razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) =>
+    api.post('/subscription/confirm', data),
+  subscribeFromWallet: () => api.post('/subscription/subscribe-wallet'),
+  cancel: () => api.post('/subscription/cancel'),
+};
+
+// ─── Dashboard API ──────────────────────────────────────────
+export const dashboardApi = {
+  lawyerDashboard: () => api.get('/appointments/dashboard/lawyer'),
+  clientDashboard: () => api.get('/appointments/dashboard/client'),
 };
 
 export default api;

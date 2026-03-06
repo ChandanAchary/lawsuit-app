@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator, Platform, StatusBar } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../constants';
 import { Notification, NotificationType } from '../types';
@@ -22,6 +23,7 @@ const NOTIFICATION_ICONS: Record<string, { icon: string; color: string }> = {
 };
 
 export const NotificationsScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const {
     notifications, isLoading, unreadCount, hasMore,
     fetchNotifications, fetchNextPage, markRead, markAllRead, deleteNotification,
@@ -61,7 +63,7 @@ export const NotificationsScreen: React.FC = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Notifications</Text>
         {unreadCount > 0 && (
@@ -75,8 +77,8 @@ export const NotificationsScreen: React.FC = () => {
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
-        onEndReached={() => { if (hasMore) fetchNextPage(); }}
-        onEndReachedThreshold={0.5}
+        onEndReached={() => { if (hasMore && notifications.length > 0 && !isLoading) fetchNextPage(); }}
+        onEndReachedThreshold={0.3}
         ListFooterComponent={isLoading ? <ActivityIndicator color={COLORS.primary} style={{ padding: SPACING.lg }} /> : null}
         ListEmptyComponent={
           !isLoading ? (
@@ -100,6 +102,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.xl,
     paddingTop: SPACING.md,
     paddingBottom: SPACING.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: COLORS.border,
   },
   headerTitle: { fontSize: FONT_SIZE.xxl, fontWeight: '800', color: COLORS.text },
   markAll: { fontSize: FONT_SIZE.sm, fontWeight: '600', color: COLORS.primary },

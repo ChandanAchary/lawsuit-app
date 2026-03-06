@@ -26,19 +26,34 @@ export const useLawyerStore = create<LawyerState>((set) => ({
   fetchLawyers: async (filters, page = 1, limit = 10) => {
     set({ loading: true, error: null });
     try {
-      const params: Record<string, unknown> = { page, limit, ...filters };
+      // Map filter keys to backend query params
+      const params: Record<string, unknown> = { page, limit };
+      if (filters?.search) params.q = filters.search;
+      if (filters?.specialization) params.specialization = filters.specialization;
+      if (filters?.location) params.city = filters.location;
+      if (filters?.maxFee) params.maxFee = filters.maxFee;
+      if (filters?.language) params.languages = filters.language;
+      if (filters?.sortBy) params.sortBy = filters.sortBy;
+      if (filters?.sortOrder) params.order = filters.sortOrder;
       const { data } = await lawyersApi.getAll(params);
       const items = data.items || data.lawyers || [];
       const specs = new Set<string>();
       const locs = new Set<string>();
       const langs = new Set<string>();
-      items.forEach((l: Lawyer) => {
-        l.specialization?.forEach((s: string) => specs.add(s));
+      items.forEach((l: any) => {
+        (l.specializations || l.specialization || []).forEach((s: string) => specs.add(s));
+        if (l.city) locs.add(l.city);
         if (l.location) locs.add(l.location);
-        l.languages?.forEach((lang: string) => langs.add(lang));
+        (l.languages || []).forEach((lang: string) => langs.add(lang));
       });
       set({
-        lawyers: items,
+        lawyers: items.map((l: any) => ({
+          ...l,
+          specialization: l.specializations || l.specialization || [],
+          location: l.city || l.location || '',
+          fee: l.feePerConsultation || l.fee || 0,
+          reviewsCount: l.totalReviews || l.reviewsCount || 0,
+        })),
         total: data.total || items.length,
         page,
         limit,

@@ -16,18 +16,19 @@ export const LawyerTemplatesScreen: React.FC<{ navigation: any }> = ({ navigatio
   const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { fetchTemplates(); }, []);
 
   const openCreate = () => {
-    setEditingId(null); setTitle(''); setContent(''); setCategory('');
+    setEditingId(null); setTitle(''); setContent(''); setDescription(''); setCategory('');
     setShowForm(true);
   };
 
   const openEdit = (t: AgreementTemplate) => {
-    setEditingId(t.id); setTitle(t.title); setContent(t.content); setCategory(t.category || '');
+    setEditingId(t.id); setTitle(t.title); setContent(t.content); setDescription((t as any).description || ''); setCategory(t.category || '');
     setShowForm(true);
   };
 
@@ -36,13 +37,13 @@ export const LawyerTemplatesScreen: React.FC<{ navigation: any }> = ({ navigatio
     setSaving(true);
     try {
       if (editingId) {
-        await updateTemplate(editingId, { title, content, category });
+        await updateTemplate(editingId, { title, description: description || undefined, content, category: category || undefined });
       } else {
-        await createTemplate({ title, content, category });
+        await createTemplate({ title, description: description || undefined, content, category: category || undefined });
       }
       setShowForm(false);
     } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.message || 'Save failed');
+      Alert.alert('Error', err.response?.data?.error || err.response?.data?.message || 'Save failed');
     } finally { setSaving(false); }
   };
 
@@ -99,6 +100,7 @@ export const LawyerTemplatesScreen: React.FC<{ navigation: any }> = ({ navigatio
 
       <BottomSheet visible={showForm} onClose={() => setShowForm(false)} title={editingId ? 'Edit Template' : 'New Template'}>
         <TextInput style={styles.input} placeholder="Template Title" value={title} onChangeText={setTitle} placeholderTextColor={COLORS.textMuted} />
+        <TextInput style={styles.input} placeholder="Description (optional)" value={description} onChangeText={setDescription} placeholderTextColor={COLORS.textMuted} />
         <TextInput style={styles.input} placeholder="Category (optional)" value={category} onChangeText={setCategory} placeholderTextColor={COLORS.textMuted} />
         <TextInput
           style={[styles.input, { height: 150, textAlignVertical: 'top' }]}

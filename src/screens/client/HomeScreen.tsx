@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Dimensions,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Dimensions, Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -36,8 +36,33 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         <View style={styles.heroDecor2} />
         
         <View style={styles.heroContent}>
-          <Text style={styles.greeting}>Hello, {user?.name?.split(' ')[0] || 'there'} 👋</Text>
-          <Text style={styles.heroSubtitle}>Find the best legal assistance</Text>
+          <View style={styles.greetingRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.greeting}>Hello, {user?.name?.split(' ')[0] || 'there'} 👋</Text>
+              <Text style={styles.heroSubtitle}>Find the best legal assistance</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <TouchableOpacity
+              style={styles.alertIconBtn}
+              onPress={() => navigation.navigate('Notifications')}
+            >
+              <Ionicons name="notifications-outline" size={22} color={COLORS.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.profileIconBtn}
+              onPress={() => navigation.navigate('Profile')}
+            >
+              {(user as any)?.avatarUrl || user?.avatar ? (
+                <Image
+                  source={{ uri: (user as any)?.avatarUrl || user?.avatar }}
+                  style={styles.profileIconImg}
+                />
+              ) : (
+                <Ionicons name="person" size={22} color={COLORS.primary} />
+              )}
+            </TouchableOpacity>
+            </View>
+          </View>
           
           <TouchableOpacity
             style={styles.searchBar}
@@ -140,6 +165,34 @@ const styles = StyleSheet.create({
     left: -30,
   },
   heroContent: {},
+  greetingRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
+  alertIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...SHADOWS.sm,
+  },
+  profileIconBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...SHADOWS.sm,
+  },
+  profileIconImg: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+  },
   greeting: {
     fontSize: FONT_SIZE.xxxl,
     fontWeight: '900',
