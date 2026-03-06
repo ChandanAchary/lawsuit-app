@@ -80,7 +80,7 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
         setShowBooking(false);
       }
     } catch (err: any) {
-      Alert.alert('Booking Failed', err.response?.data?.message || 'Please try again');
+      Alert.alert('Booking Failed', err.response?.data?.error || err.response?.data?.message || 'Please try again');
     } finally {
       setBooking(false);
     }

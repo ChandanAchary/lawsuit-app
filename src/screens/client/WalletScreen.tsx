@@ -49,14 +49,42 @@ export const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     setSubmitting(true);
     try {
       const order = await addMoney(num);
-      // In production, open Razorpay checkout here with order.id
-      Alert.alert('Success', 'Money added successfully');
-      setShowAdd(false);
-      setAmount('');
-      fetchBalance();
-      fetchTransactions(1);
+      const orderId = order?.order?.id || order?.orderId || order?.id;
+      const paymentId = order?.payment?.id || order?.paymentId;
+      if (!orderId) {
+        Alert.alert('Error', 'Could not create payment order');
+        return;
+      }
+      // Open Razorpay checkout on web
+      if (typeof window !== 'undefined' && (window as any).Razorpay) {
+        const rzp = new (window as any).Razorpay({
+          key: order.key || order.razorpayKey,
+          amount: num * 100,
+          currency: 'INR',
+          order_id: orderId,
+          name: 'Law Marketplace',
+          description: 'Add money to wallet',
+          handler: async (response: any) => {
+            try {
+              await confirmAddMoney({
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_signature: response.razorpay_signature,
+              });
+              Alert.alert('Success', 'Money added successfully');
+              setShowAdd(false);
+              setAmount('');
+            } catch {
+              Alert.alert('Error', 'Payment verification failed');
+            }
+          },
+        });
+        rzp.open();
+      } else {
+        Alert.alert('Notice', 'Razorpay checkout is not available. Payment order created — complete payment via the Razorpay dashboard.');
+      }
     } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.message || 'Failed to add money');
+      Alert.alert('Error', err.response?.data?.error || err.response?.data?.message || 'Failed to add money');
     } finally {
       setSubmitting(false);
     }
@@ -73,7 +101,7 @@ export const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       setShowWithdraw(false);
       setAmount('');
     } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.message || 'Failed to withdraw');
+      Alert.alert('Error', err.response?.data?.error || err.response?.data?.message || 'Failed to withdraw');
     } finally {
       setSubmitting(false);
     }

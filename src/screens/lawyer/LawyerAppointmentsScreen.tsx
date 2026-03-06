@@ -35,7 +35,7 @@ export const LawyerAppointmentsScreen: React.FC<{ navigation: any }> = ({ naviga
     if (showLoader) setLoading(true);
     try {
       const { data } = await appointmentsApi.getAll({ status: statusMap[tab] });
-      setAppointments(data.appointments || data || []);
+      setAppointments(data.items || data.appointments || data || []);
     } catch {
       setAppointments([]);
     } finally {
@@ -73,7 +73,7 @@ export const LawyerAppointmentsScreen: React.FC<{ navigation: any }> = ({ naviga
       });
       Alert.alert('Success', 'Case created');
     } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.message || 'Failed to create case');
+      Alert.alert('Error', err.response?.data?.error || err.response?.data?.message || 'Failed to create case');
     }
   };
 
@@ -83,7 +83,7 @@ export const LawyerAppointmentsScreen: React.FC<{ navigation: any }> = ({ naviga
       role="LAWYER"
       onCancel={item.status === AppointmentStatus.CONFIRMED ? () => handleCancel(item.id) : undefined}
       onAttend={item.status === AppointmentStatus.CONFIRMED ? () => handleAttend(item.id) : undefined}
-      onChat={() => navigation.navigate('ChatScreen', { appointmentId: item.id, name: item.client?.name })}
+      onChat={() => navigation.navigate('ChatScreen', { otherUserId: item.clientId, name: item.client?.name })}
       onCreateCase={item.status === AppointmentStatus.ATTENDED ? () => handleCreateCase(item) : undefined}
     />
   );

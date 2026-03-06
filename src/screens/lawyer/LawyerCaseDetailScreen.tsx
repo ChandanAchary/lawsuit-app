@@ -58,10 +58,10 @@ export const LawyerCaseDetailScreen: React.FC<{ navigation: any; route: any }> =
     catch { Alert.alert('Error', 'Failed to load case'); navigation.goBack(); }
     finally { setLoading(false); }
   };
-  const fetchTimeline = async () => { try { const { data } = await casesApi.getTimeline(caseId); setTimeline(data.timeline || data || []); } catch {} };
-  const fetchHearings = async () => { try { const { data } = await casesApi.getHearings(caseId); setHearings(data.hearings || data || []); } catch {} };
-  const fetchDocuments = async () => { try { const { data } = await casesApi.getDocuments(caseId); setDocuments(data.documents || data || []); } catch {} };
-  const fetchChat = async () => { try { const { data } = await chatApi.getChats(); const f = (data.chats || data || []).find((c: any) => c.caseId === caseId); if (f) setChatId(f.id); } catch {} };
+  const fetchTimeline = async () => { try { const { data } = await casesApi.getTimeline(caseId); setTimeline(data.items || data.timeline || []); } catch {} };
+  const fetchHearings = async () => { try { const { data } = await casesApi.getHearings(caseId); setHearings(data.items || data.hearings || []); } catch {} };
+  const fetchDocuments = async () => { try { const { data } = await casesApi.getDocuments(caseId); setDocuments(data.items || data.documents || []); } catch {} };
+  const fetchChat = async () => { try { const { data } = await chatApi.getChats(); const f = (data.items || data.chats || []).find((c: any) => c.caseId === caseId); if (f) setChatId(f.id); } catch {} };
 
   const addTimelineEvent = async () => {
     if (!eventTitle.trim()) return Alert.alert('Required', 'Please enter a title');

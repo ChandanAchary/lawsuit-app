@@ -50,7 +50,7 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             returnKeyType="search"
           />
           {search.length > 0 && (
-            <TouchableOpacity onPress={() => { setSearch(''); handleSearch(); }}>
+            <TouchableOpacity onPress={() => { setSearch(''); fetchLawyers({ ...filters, search: '', sortBy, sortOrder: 'desc' }); }}>
               <Ionicons name="close-circle" size={18} color={COLORS.textMuted} />
             </TouchableOpacity>
           )}

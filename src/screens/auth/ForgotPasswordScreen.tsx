@@ -8,6 +8,7 @@ import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING } from '../../constants';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { useAuthStore } from '../../stores/authStore';
+import { authApi } from '../../services/api';
 
 type Step = 'email' | 'otp' | 'newPassword';
 
@@ -72,13 +73,19 @@ export const ForgotPasswordScreen: React.FC<{ navigation: any }> = ({ navigation
     }
   };
 
-  const handleVerifyOtp = () => {
+  const handleVerifyOtp = async () => {
     const code = otp.join('');
     if (code.length < 6) {
       Alert.alert('Error', 'Please enter the complete OTP');
       return;
     }
-    setStep('newPassword');
+    try {
+      // Verify OTP server-side before proceeding to password step
+      await authApi.verifyOtp(email.trim(), code);
+      setStep('newPassword');
+    } catch (err: any) {
+      Alert.alert('Invalid OTP', err.response?.data?.message || err.response?.data?.error || 'The OTP you entered is incorrect');
+    }
   };
 
   const handleResendOtp = async () => {
@@ -87,7 +94,9 @@ export const ForgotPasswordScreen: React.FC<{ navigation: any }> = ({ navigation
       setTimer(30);
       setOtp(['', '', '', '', '', '']);
       Alert.alert('Success', 'OTP resent successfully');
-    } catch {}
+    } catch (err: any) {
+      Alert.alert('Error', err.response?.data?.message || 'Failed to resend OTP');
+    }
   };
 
   const handleResetPassword = async () => {

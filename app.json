@@ -22,7 +22,8 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.msdchandan.lawsuitapp"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -33,7 +34,19 @@
       "@react-native-community/datetimepicker"
     ],
     "updates": {
-      "enabled": false
-    }
+      "enabled": false,
+      "checkAutomatically": "NEVER",
+      "fallbackToCacheTimeout": 0,
+      "url": ""
+    },
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "956f6ba1-7b2d-4b2a-94d5-7c97c615d396"
+      }
+    },
+    "owner": "msdchandan"
   }
 }

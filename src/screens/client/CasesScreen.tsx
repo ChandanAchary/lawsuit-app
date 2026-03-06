@@ -29,7 +29,7 @@ export const CasesScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       const params: any = {};
       if (tab !== 'all') params.status = tab;
       const { data } = await casesApi.getAll(params);
-      setCases(data.cases || data || []);
+      setCases(data.items || data.cases || []);
     } catch {
       setCases([]);
     } finally {

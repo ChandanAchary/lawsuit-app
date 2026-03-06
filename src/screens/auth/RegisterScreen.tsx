@@ -98,17 +98,8 @@ export const RegisterScreen: React.FC<{ navigation: any; route: any }> = ({ navi
     try {
       await register({ name: name.trim(), email: email.trim(), phone: phone.trim(), password, role });
 
-      // Apply referral code after registration if provided
-      if (referralCode.trim()) {
-        try {
-          await applyReferral(referralCode.trim());
-        } catch {
-          // Non-blocking — referral might fail but registration succeeded
-        }
-      }
-
-      // Backend already sends OTP during registration — do NOT call requestOtp again
-      navigation.navigate('OtpVerify', { identifier: email.trim() });
+      // Pass referral code to OTP screen — it will be applied after verification when auth token exists
+      navigation.navigate('OtpVerify', { identifier: email.trim(), referralCode: referralCode.trim() || undefined });
     } catch (err: any) {
       Alert.alert('Registration Failed', err.response?.data?.message || err.response?.data?.error || 'Please try again');
     }

@@ -56,28 +56,28 @@ export const CaseDetailScreen: React.FC<{ navigation: any; route: any }> = ({ na
   const fetchTimeline = async () => {
     try {
       const { data } = await casesApi.getTimeline(caseId);
-      setTimeline(data.timeline || data || []);
+      setTimeline(data.items || data.timeline || []);
     } catch {}
   };
 
   const fetchHearings = async () => {
     try {
       const { data } = await casesApi.getHearings(caseId);
-      setHearings(data.hearings || data || []);
+      setHearings(data.items || data.hearings || []);
     } catch {}
   };
 
   const fetchDocuments = async () => {
     try {
       const { data } = await casesApi.getDocuments(caseId);
-      setDocuments(data.documents || data || []);
+      setDocuments(data.items || data.documents || []);
     } catch {}
   };
 
   const fetchChat = async () => {
     try {
       const { data } = await chatApi.getChats();
-      const found = (data.chats || data || []).find((c: any) => c.caseId === caseId);
+      const found = (data.items || data.chats || []).find((c: any) => c.caseId === caseId);
       if (found) setChatId(found.id);
     } catch {}
   };

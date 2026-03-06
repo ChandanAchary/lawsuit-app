@@ -21,7 +21,8 @@ export const storage = {
   },
   getUser: async (): Promise<Record<string, unknown> | null> => {
     const data = await SecureStore.getItemAsync(KEYS.USER);
-    return data ? JSON.parse(data) : null;
+    if (!data) return null;
+    try { return JSON.parse(data); } catch { return null; }
   },
   setUser: async (user: Record<string, unknown>): Promise<void> => {
     await SecureStore.setItemAsync(KEYS.USER, JSON.stringify(user));

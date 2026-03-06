@@ -51,7 +51,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await authApi.register(data);
       set({ isLoading: false });
     } catch (err: any) {
-      set({ error: err.response?.data?.message || 'Registration failed', isLoading: false });
+      set({ error: err.response?.data?.error || err.response?.data?.message || 'Registration failed', isLoading: false });
       throw err;
     }
   },
@@ -71,7 +71,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ isLoading: false });
       }
     } catch (err: any) {
-      set({ error: err.response?.data?.message || 'OTP verification failed', isLoading: false });
+      set({ error: err.response?.data?.error || err.response?.data?.message || 'OTP verification failed', isLoading: false });
       throw err;
     }
   },
@@ -82,7 +82,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await authApi.requestOtp(identifier);
       set({ isLoading: false });
     } catch (err: any) {
-      set({ error: err.response?.data?.message || 'Failed to send OTP', isLoading: false });
+      set({ error: err.response?.data?.error || err.response?.data?.message || 'Failed to send OTP', isLoading: false });
       throw err;
     }
   },
@@ -93,7 +93,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await authApi.restorePassword(identifier, code, password);
       set({ isLoading: false });
     } catch (err: any) {
-      set({ error: err.response?.data?.message || 'Password reset failed', isLoading: false });
+      set({ error: err.response?.data?.error || err.response?.data?.message || 'Password reset failed', isLoading: false });
       throw err;
     }
   },
@@ -104,7 +104,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await referralApi.apply(code);
       set({ isLoading: false });
     } catch (err: any) {
-      set({ error: err.response?.data?.message || err.response?.data?.error || 'Failed to apply referral', isLoading: false });
+      set({ error: err.response?.data?.error || err.response?.data?.message || 'Failed to apply referral', isLoading: false });
       throw err;
     }
   },

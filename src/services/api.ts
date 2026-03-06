@@ -4,6 +4,15 @@ import { storage } from './storage';
 
 let isRefreshing = false;
 let failedQueue: { resolve: (token: string) => void; reject: (err: unknown) => void }[] = [];
+// Lazy reference to auth store to avoid circular import
+let _resetAuth: (() => void) | null = null;
+const getResetAuth = () => {
+  if (!_resetAuth) {
+    const { useAuthStore } = require('../stores/authStore');
+    _resetAuth = () => useAuthStore.getState().logout();
+  }
+  return _resetAuth;
+};
 
 const processQueue = (error: unknown, token: string | null = null) => {
   failedQueue.forEach(({ resolve, reject }) => {
@@ -58,6 +67,7 @@ api.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError, null);
         await storage.clear();
+        try { getResetAuth()(); } catch {}
         throw refreshError;
       } finally {
         isRefreshing = false;
@@ -144,7 +154,7 @@ export const usersApi = {
 
 // ─── Chat API ───────────────────────────────────────────────
 export const chatApi = {
-  createChat: (participantId: string) => api.post('/chats', { participantId }),
+  createChat: (otherUserId: string, caseId?: string) => api.post('/chats', { otherUserId, caseId }),
   getChats: () => api.get('/chats'),
   getMessages: (chatId: string, params?: Record<string, unknown>) =>
     api.get(`/chats/${encodeURIComponent(chatId)}/messages`, { params }),

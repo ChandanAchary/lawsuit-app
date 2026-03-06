@@ -22,7 +22,7 @@ export const AdminLoginScreen: React.FC<{ navigation: any }> = ({ navigation }) 
     try {
       await login(email.trim(), password);
     } catch (err: any) {
-      Alert.alert('Login Failed', err.response?.data?.message || 'Invalid credentials');
+      Alert.alert('Login Failed', err.response?.data?.error || err.response?.data?.message || 'Invalid credentials');
     }
   };
 

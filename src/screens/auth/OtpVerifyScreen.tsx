@@ -9,10 +9,11 @@ import { useAuthStore } from '../../stores/authStore';
 
 export const OtpVerifyScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
   const identifier = route.params?.identifier || '';
+  const referralCode = route.params?.referralCode;
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [timer, setTimer] = useState(30);
   const inputs = useRef<(TextInput | null)[]>([]);
-  const { verifyOtp, requestOtp, isLoading } = useAuthStore();
+  const { verifyOtp, requestOtp, applyReferral, isLoading } = useAuthStore();
 
   useEffect(() => {
     if (timer > 0) {
@@ -43,8 +44,12 @@ export const OtpVerifyScreen: React.FC<{ navigation: any; route: any }> = ({ nav
     }
     try {
       await verifyOtp(identifier, code);
+      // Apply referral code after successful verification (user is now authenticated)
+      if (referralCode) {
+        try { await applyReferral(referralCode); } catch {}
+      }
     } catch (err: any) {
-      Alert.alert('Verification Failed', err.response?.data?.message || 'Invalid OTP');
+      Alert.alert('Verification Failed', err.response?.data?.message || err.response?.data?.error || 'Invalid OTP');
     }
   };
 
@@ -54,7 +59,9 @@ export const OtpVerifyScreen: React.FC<{ navigation: any; route: any }> = ({ nav
       setTimer(30);
       setOtp(['', '', '', '', '', '']);
       Alert.alert('Success', 'OTP sent successfully');
-    } catch {}
+    } catch (err: any) {
+      Alert.alert('Error', err.response?.data?.message || 'Failed to resend OTP');
+    }
   };
 
   return (

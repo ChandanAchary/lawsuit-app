@@ -1,12 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, LogBox } from 'react-native';
 import { NavigationContainer, LinkingOptions } from '@react-navigation/native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuthStore } from './src/stores/authStore';
 import { useNotificationStore } from './src/stores/notificationStore';
 import { AuthStack, MainStack } from './src/navigation';
 import { COLORS } from './src/constants';
+
+// Suppress Expo OTA update errors permanently — we don't use OTA updates
+LogBox.ignoreLogs(['Failed to download remote update']);
+if (typeof ErrorUtils !== 'undefined') {
+  const origHandler = ErrorUtils.getGlobalHandler();
+  ErrorUtils.setGlobalHandler((error: any, isFatal?: boolean) => {
+    if (error?.message?.includes?.('Failed to download remote update')) return;
+    origHandler(error, isFatal);
+  });
+}
 
 const linking: LinkingOptions<any> = {
   prefixes: ['lawsuit://', 'https://lawsuit-app.com'],

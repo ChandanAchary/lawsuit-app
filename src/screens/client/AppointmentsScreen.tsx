@@ -34,7 +34,7 @@ export const AppointmentsScreen: React.FC<{ navigation: any }> = ({ navigation }
     if (showLoader) setLoading(true);
     try {
       const { data } = await appointmentsApi.getAll({ status: statusMap[tab] });
-      setAppointments(data.appointments || data || []);
+      setAppointments(data.items || data.appointments || data || []);
     } catch {
       setAppointments([]);
     } finally {
@@ -68,7 +68,7 @@ export const AppointmentsScreen: React.FC<{ navigation: any }> = ({ navigation }
       appointment={item}
       role="CLIENT"
       onCancel={() => handleCancel(item.id)}
-      onChat={() => navigation.navigate('ChatScreen', { appointmentId: item.id, name: item.lawyer?.name })}
+      onChat={() => navigation.navigate('ChatScreen', { otherUserId: item.lawyerId, name: item.lawyer?.name })}
       onViewAgreement={item.agreementUrl ? () => {} : undefined}
     />
   );
