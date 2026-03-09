@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, StyleSheet, LogBox } from 'react-native';
-import { NavigationContainer, LinkingOptions } from '@react-navigation/native';
+import { NavigationContainer, LinkingOptions, DefaultTheme, DarkTheme, Theme } from '@react-navigation/native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuthStore } from './src/stores/authStore';
-import { useThemeStore } from './src/stores/themeStore';
+import { useThemeStore, DARK_COLORS } from './src/stores/themeStore';
+import { COLORS } from './src/constants';
 import { useNotificationStore } from './src/stores/notificationStore';
 import { AuthStack, MainStack } from './src/navigation';
-import { COLORS } from './src/constants';
 
 // Suppress Expo OTA update errors permanently — we don't use OTA updates
 LogBox.ignoreLogs(['Failed to download remote update']);
@@ -38,6 +38,32 @@ export default function App() {
   const initTheme = useThemeStore(state => state.init);
   const isDark = useThemeStore(state => state.isDark);
 
+  const navTheme: Theme = isDark
+    ? {
+        ...DarkTheme,
+        colors: {
+          ...DarkTheme.colors,
+          background: DARK_COLORS.background,
+          card: DARK_COLORS.surface,
+          text: DARK_COLORS.text,
+          border: DARK_COLORS.border,
+          primary: DARK_COLORS.primary,
+          notification: DARK_COLORS.primary,
+        },
+      }
+    : {
+        ...DefaultTheme,
+        colors: {
+          ...DefaultTheme.colors,
+          background: COLORS.background,
+          card: COLORS.surface,
+          text: COLORS.text,
+          border: COLORS.border,
+          primary: COLORS.primary,
+          notification: COLORS.primary,
+        },
+      };
+
   useEffect(() => {
     const init = async () => {
       await Promise.all([restoreSession(), initTheme()]);
@@ -63,7 +89,7 @@ export default function App() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <NavigationContainer linking={linking}>
+      <NavigationContainer linking={linking} theme={navTheme}>
         <StatusBar style={isDark ? 'light' : 'dark'} />
         {isAuthenticated ? <MainStack /> : <AuthStack />}
       </NavigationContainer>

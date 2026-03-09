@@ -121,12 +121,8 @@ export const AppointmentsScreen: React.FC<{ navigation: any }> = ({ navigation }
     <View style={styles.container}>
       <View style={styles.headerBar}>
         <Text style={styles.headerTitle}>Appointments</Text>
+        <TabBar tabs={TABS} active={tab} onSelect={setTab} variant="filter" />
       </View>
-      <TabBar
-        tabs={TABS}
-        active={tab}
-        onSelect={setTab}
-      />
       {loading ? (
         <Loading />
       ) : (
@@ -180,7 +176,7 @@ const styles = StyleSheet.create({
   headerBar: {
     paddingHorizontal: SPACING.xl,
     paddingTop: SPACING.huge,
-    paddingBottom: SPACING.md,
+    paddingBottom: 0,
     backgroundColor: COLORS.white,
     ...SHADOWS.sm,
   },

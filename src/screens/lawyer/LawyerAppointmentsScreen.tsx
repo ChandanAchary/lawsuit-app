@@ -165,8 +165,8 @@ export const LawyerAppointmentsScreen: React.FC<{ navigation: any }> = ({ naviga
     <View style={styles.container}>
       <View style={styles.headerBar}>
         <Text style={styles.headerTitle}>Appointments</Text>
+        <TabBar tabs={TABS} active={tab} onSelect={setTab} variant="filter" />
       </View>
-      <TabBar tabs={TABS} active={tab} onSelect={setTab} />
       {loading ? <Loading /> : (
         <FlatList
           data={appointments}
@@ -216,7 +216,7 @@ export const LawyerAppointmentsScreen: React.FC<{ navigation: any }> = ({ naviga
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   headerBar: {
-    paddingHorizontal: SPACING.xl, paddingTop: SPACING.huge, paddingBottom: SPACING.md,
+    paddingHorizontal: SPACING.xl, paddingTop: SPACING.huge, paddingBottom: 0,
     backgroundColor: COLORS.white, ...SHADOWS.sm,
   },
   headerTitle: { fontSize: FONT_SIZE.xxl, fontWeight: '900', color: COLORS.text },

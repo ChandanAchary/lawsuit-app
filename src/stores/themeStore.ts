@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Appearance } from 'react-native';
+import { COLORS } from '../constants';
 
 type ThemeMode = 'light' | 'dark' | 'system';
 
@@ -67,4 +68,10 @@ export const DARK_COLORS = {
   pending: '#8B5CF6',
   pendingLight: '#3B1F7E',
   overlay: 'rgba(0,0,0,0.7)',
+};
+
+// ─── Theme-aware colors hook ──────────────────────────────
+export const useColors = () => {
+  const isDark = useThemeStore((s) => s.isDark);
+  return isDark ? DARK_COLORS : COLORS;
 };
