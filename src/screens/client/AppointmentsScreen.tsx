@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Alert,
+  View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Alert, TextInput, Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
@@ -9,6 +9,11 @@ import { Appointment, AppointmentStatus } from '../../types';
 import { AppointmentCard } from '../../components/AppointmentCard';
 import { Loading, EmptyState } from '../../components/Common';
 import { TabBar } from '../../components/TabBar';
+import { BottomSheet } from '../../components/Modals';
+import { Button } from '../../components/Button';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { format } from 'date-fns';
+import { formatErrorMessage } from '../../utils/formatError';
 
 const TABS = [
   { key: 'upcoming', label: 'Upcoming' },
@@ -29,6 +34,13 @@ export const AppointmentsScreen: React.FC<{ navigation: any }> = ({ navigation }
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  // Reschedule state
+  const [showReschedule, setShowReschedule] = useState(false);
+  const [rescheduleId, setRescheduleId] = useState<string>('');
+  const [rescheduleDate, setRescheduleDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [rescheduling, setRescheduling] = useState(false);
 
   const fetchAppointments = useCallback(async (showLoader = true) => {
     if (showLoader) setLoading(true);
@@ -63,13 +75,45 @@ export const AppointmentsScreen: React.FC<{ navigation: any }> = ({ navigation }
     ]);
   };
 
+  const openReschedule = (id: string) => {
+    setRescheduleId(id);
+    setRescheduleDate(new Date());
+    setShowReschedule(true);
+  };
+
+  const handleReschedule = async () => {
+    setRescheduling(true);
+    try {
+      await appointmentsApi.reschedule(rescheduleId, rescheduleDate.toISOString());
+      Alert.alert('Success', 'Appointment rescheduled');
+      setShowReschedule(false);
+      fetchAppointments(false);
+    } catch (err: any) {
+      Alert.alert('Error', formatErrorMessage(err.response?.data || err) || 'Failed to reschedule');
+    } finally {
+      setRescheduling(false);
+    }
+  };
+
+  const handleViewAgreement = (url: string) => {
+    Linking.openURL(url).catch(() => Alert.alert('Error', 'Could not open agreement'));
+  };
+
   const renderItem = ({ item }: { item: Appointment }) => (
     <AppointmentCard
       appointment={item}
       role="CLIENT"
       onCancel={() => handleCancel(item.id)}
       onChat={() => navigation.navigate('ChatScreen', { otherUserId: item.lawyerId, name: item.lawyer?.name })}
-      onViewAgreement={item.agreementUrl ? () => {} : undefined}
+      onViewAgreement={item.agreementUrl ? () => handleViewAgreement(item.agreementUrl!) : undefined}
+      onReschedule={
+        item.status === AppointmentStatus.CONFIRMED || item.status === AppointmentStatus.MISSED
+          ? () => openReschedule(item.id) : undefined
+      }
+      onJoinVideo={
+        item.status === AppointmentStatus.CONFIRMED
+          ? () => navigation.navigate('VideoCall', { appointmentId: item.id }) : undefined
+      }
     />
   );
 
@@ -95,6 +139,38 @@ export const AppointmentsScreen: React.FC<{ navigation: any }> = ({ navigation }
           ListEmptyComponent={<EmptyState icon="📅" title="No Appointments" message={`You don't have any ${tab} appointments yet.`} />}
         />
       )}
+
+      {/* Reschedule Modal */}
+      <BottomSheet visible={showReschedule} onClose={() => setShowReschedule(false)} title="Reschedule Appointment">
+        <View style={styles.rescheduleContent}>
+          <Text style={styles.rescheduleLabel}>Select new date & time</Text>
+          <TouchableOpacity style={styles.datePickerBtn} onPress={() => setShowDatePicker(true)}>
+            <Ionicons name="calendar-outline" size={18} color={COLORS.primary} />
+            <Text style={styles.datePickerText}>{format(rescheduleDate, 'dd MMM yyyy')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.datePickerBtn} onPress={() => setShowTimePicker(true)}>
+            <Ionicons name="time-outline" size={18} color={COLORS.primary} />
+            <Text style={styles.datePickerText}>{format(rescheduleDate, 'hh:mm a')}</Text>
+          </TouchableOpacity>
+          {showDatePicker && (
+            <DateTimePicker
+              value={rescheduleDate}
+              mode="date"
+              minimumDate={new Date()}
+              onChange={(_, date) => { setShowDatePicker(false); if (date) setRescheduleDate(date); }}
+            />
+          )}
+          {showTimePicker && (
+            <DateTimePicker
+              value={rescheduleDate}
+              mode="time"
+              minuteInterval={30}
+              onChange={(_, date) => { setShowTimePicker(false); if (date) setRescheduleDate(date); }}
+            />
+          )}
+          <Button title="Confirm Reschedule" onPress={handleReschedule} loading={rescheduling} size="lg" />
+        </View>
+      </BottomSheet>
     </View>
   );
 };
@@ -110,4 +186,12 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: FONT_SIZE.xxl, fontWeight: '900', color: COLORS.text },
   list: { padding: SPACING.xl, paddingBottom: 100 },
+  rescheduleContent: { paddingBottom: SPACING.xl },
+  rescheduleLabel: { fontSize: FONT_SIZE.md, fontWeight: '600', color: COLORS.text, marginBottom: SPACING.lg },
+  datePickerBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.md,
+    backgroundColor: COLORS.surfaceAlt, borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg, marginBottom: SPACING.md,
+  },
+  datePickerText: { fontSize: FONT_SIZE.md, fontWeight: '600', color: COLORS.text },
 });

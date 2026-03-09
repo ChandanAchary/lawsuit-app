@@ -23,6 +23,8 @@ interface AppointmentCardProps {
   onChat?: () => void;
   onViewAgreement?: () => void;
   onCreateCase?: () => void;
+  onReschedule?: () => void;
+  onJoinVideo?: () => void;
   style?: ViewStyle;
 }
 
@@ -37,6 +39,8 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
   onChat,
   onViewAgreement,
   onCreateCase,
+  onReschedule,
+  onJoinVideo,
   style,
 }) => {
   const person = role === 'CLIENT' ? appointment.lawyer : appointment.client;
@@ -96,7 +100,7 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
         </View>
       </View>
 
-      {(isUpcoming || isAttended || appointment.status === AppointmentStatus.PENDING) && (
+      {(isUpcoming || isAttended || appointment.status === AppointmentStatus.PENDING || appointment.status === AppointmentStatus.MISSED) && (
         <View style={styles.actions}>
           {appointment.status === AppointmentStatus.PENDING && role === 'LAWYER' && (
             <>
@@ -113,10 +117,22 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
               )}
             </>
           )}
-          {isUpcoming && onAttend && (
-            <TouchableOpacity style={[styles.actionBtn, styles.actionPrimary]} onPress={onAttend}>
+          {isUpcoming && onJoinVideo && (
+            <TouchableOpacity style={[styles.actionBtn, styles.actionPrimary]} onPress={onJoinVideo}>
               <Ionicons name="videocam" size={14} color={COLORS.white} />
               <Text style={styles.actionTextWhite}>Join</Text>
+            </TouchableOpacity>
+          )}
+          {isUpcoming && onAttend && !onJoinVideo && (
+            <TouchableOpacity style={[styles.actionBtn, styles.actionPrimary]} onPress={onAttend}>
+              <Ionicons name="checkmark-circle" size={14} color={COLORS.white} />
+              <Text style={styles.actionTextWhite}>Attend</Text>
+            </TouchableOpacity>
+          )}
+          {isUpcoming && onReschedule && (
+            <TouchableOpacity style={[styles.actionBtn, styles.actionOutline]} onPress={onReschedule}>
+              <Ionicons name="calendar" size={14} color={COLORS.primary} />
+              <Text style={styles.actionTextPrimary}>Reschedule</Text>
             </TouchableOpacity>
           )}
           {isUpcoming && onCancel && (
@@ -140,6 +156,17 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
             <TouchableOpacity style={[styles.actionBtn, styles.actionPrimary]} onPress={onCreateCase}>
               <Ionicons name="briefcase" size={14} color={COLORS.white} />
               <Text style={styles.actionTextWhite}>Create Case</Text>
+            </TouchableOpacity>
+          )}
+          {appointment.status === AppointmentStatus.MISSED && onReschedule && (
+            <TouchableOpacity style={[styles.actionBtn, styles.actionPrimary]} onPress={onReschedule}>
+              <Ionicons name="calendar" size={14} color={COLORS.white} />
+              <Text style={styles.actionTextWhite}>Reschedule</Text>
+            </TouchableOpacity>
+          )}
+          {appointment.status === AppointmentStatus.MISSED && onCancel && (
+            <TouchableOpacity style={[styles.actionBtn, styles.actionOutline]} onPress={onCancel}>
+              <Text style={styles.actionTextPrimary}>Cancel</Text>
             </TouchableOpacity>
           )}
         </View>

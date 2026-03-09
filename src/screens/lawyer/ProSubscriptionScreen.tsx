@@ -7,7 +7,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { subscriptionApi } from '../../services/api';
 import { useWalletStore } from '../../stores/walletStore';
+import { useAuthStore } from '../../stores/authStore';
 import { format } from 'date-fns';
+import { RazorpayCheckout } from '../../components/RazorpayCheckout';
+import { RazorpayOrderOptions, RazorpayPaymentResult } from '../../utils/razorpay';
 
 const PRO_FEATURES = [
   { icon: 'star', title: 'Priority Listing', desc: 'Appear at the top of search results' },
@@ -23,6 +26,9 @@ export const ProSubscriptionScreen: React.FC<{ navigation: any }> = ({ navigatio
   const [loading, setLoading] = useState(true);
   const [subscribing, setSubscribing] = useState(false);
   const { balance, fetchBalance } = useWalletStore();
+  const user = useAuthStore((s) => s.user);
+  const [showRazorpay, setShowRazorpay] = useState(false);
+  const [razorpayOrder, setRazorpayOrder] = useState<RazorpayOrderOptions | null>(null);
 
   useEffect(() => {
     fetchSubscription();
@@ -68,12 +74,42 @@ export const ProSubscriptionScreen: React.FC<{ navigation: any }> = ({ navigatio
     setSubscribing(true);
     try {
       const res = await subscriptionApi.subscribe();
-      const data = res.data?.data;
-      // In production, open Razorpay checkout with data.payment
-      Alert.alert('Payment Initiated', 'Complete payment via Razorpay to activate Pro subscription');
+      const data = res.data?.data || res.data;
+      const orderId = data?.payment?.razorpayOrderId || data?.orderId || data?.order?.id;
+      if (!orderId) {
+        Alert.alert('Error', 'Could not create payment order');
+        return;
+      }
+      setRazorpayOrder({
+        orderId,
+        amount: 999 * 100,
+        name: 'LawSuit Pro',
+        description: 'Pro Subscription - ₹999/month',
+        prefillEmail: user?.email || '',
+        prefillPhone: user?.phone || '',
+        prefillName: user?.name || '',
+      });
+      setShowRazorpay(true);
     } catch (err: any) {
       Alert.alert('Error', err.response?.data?.error || 'Failed to initiate payment');
     } finally { setSubscribing(false); }
+  };
+
+  const handleRazorpaySuccess = async (result: RazorpayPaymentResult) => {
+    setShowRazorpay(false);
+    try {
+      await subscriptionApi.confirm({
+        paymentId: result.razorpay_payment_id,
+        razorpay_order_id: result.razorpay_order_id,
+        razorpay_payment_id: result.razorpay_payment_id,
+        razorpay_signature: result.razorpay_signature,
+      });
+      Alert.alert('Success', 'You are now a Pro member!');
+      fetchSubscription();
+      fetchBalance();
+    } catch {
+      Alert.alert('Error', 'Payment received but verification failed. Contact support.');
+    }
   };
 
   const handleCancel = () => {
@@ -175,6 +211,17 @@ export const ProSubscriptionScreen: React.FC<{ navigation: any }> = ({ navigatio
             <Text style={styles.cancelText}>Cancel Subscription</Text>
           </TouchableOpacity>
         </View>
+      )}
+
+      {/* Razorpay Checkout */}
+      {razorpayOrder && (
+        <RazorpayCheckout
+          visible={showRazorpay}
+          orderOptions={razorpayOrder}
+          onSuccess={handleRazorpaySuccess}
+          onCancel={() => { setShowRazorpay(false); Alert.alert('Cancelled', 'Payment was cancelled'); }}
+          onError={(err) => { setShowRazorpay(false); Alert.alert('Payment Failed', err.description || 'Please try again'); }}
+        />
       )}
     </ScrollView>
   );

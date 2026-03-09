@@ -13,6 +13,9 @@ import { Button } from '../../components/Button';
 import { BottomSheet } from '../../components/Modals';
 import { TabBar } from '../../components/TabBar';
 import { EmptyState, Loading } from '../../components/Common';
+import { RazorpayCheckout } from '../../components/RazorpayCheckout';
+import { RazorpayOrderOptions, RazorpayPaymentResult } from '../../utils/razorpay';
+import { useAuthStore } from '../../stores/authStore';
 
 const QUICK_AMOUNTS = [500, 1000, 2000, 5000];
 
@@ -25,15 +28,22 @@ const TX_TABS = [
 export const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const {
     balance, transactions, totalTransactions, currentPage, loading,
-    fetchBalance, fetchTransactions, addMoney, confirmAddMoney, withdraw,
+    fetchBalance, fetchTransactions, addMoney, confirmAddMoney, withdraw, transfer,
   } = useWalletStore();
+  const user = useAuthStore((s) => s.user);
 
   const [txTab, setTxTab] = useState('all');
   const [showAdd, setShowAdd] = useState(false);
   const [showWithdraw, setShowWithdraw] = useState(false);
+  const [showTransfer, setShowTransfer] = useState(false);
   const [amount, setAmount] = useState('');
+  const [transferUserId, setTransferUserId] = useState('');
+  const [transferDesc, setTransferDesc] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  // Razorpay state
+  const [showRazorpay, setShowRazorpay] = useState(false);
+  const [razorpayOrder, setRazorpayOrder] = useState<RazorpayOrderOptions | null>(null);
 
   useEffect(() => {
     fetchBalance();
@@ -51,43 +61,42 @@ export const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     try {
       const order = await addMoney(num);
       const orderId = order?.order?.id || order?.orderId || order?.id;
-      const paymentId = order?.payment?.id || order?.paymentId;
       if (!orderId) {
         Alert.alert('Error', 'Could not create payment order');
         return;
       }
-      // Open Razorpay checkout on web
-      if (typeof window !== 'undefined' && (window as any).Razorpay) {
-        const rzp = new (window as any).Razorpay({
-          key: order.key || order.razorpayKey,
-          amount: num * 100,
-          currency: 'INR',
-          order_id: orderId,
-          name: 'Law Marketplace',
-          description: 'Add money to wallet',
-          handler: async (response: any) => {
-            try {
-              await confirmAddMoney({
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_signature: response.razorpay_signature,
-              });
-              Alert.alert('Success', 'Money added successfully');
-              setShowAdd(false);
-              setAmount('');
-            } catch {
-              Alert.alert('Error', 'Payment verification failed');
-            }
-          },
-        });
-        rzp.open();
-      } else {
-        Alert.alert('Notice', 'Razorpay checkout is not available. Payment order created — complete payment via the Razorpay dashboard.');
-      }
+      setRazorpayOrder({
+        orderId,
+        amount: num * 100,
+        name: 'LawSuit',
+        description: 'Add money to wallet',
+        prefillEmail: user?.email || '',
+        prefillPhone: user?.phone || '',
+        prefillName: user?.name || '',
+      });
+      setShowAdd(false);
+      setShowRazorpay(true);
     } catch (err: any) {
       Alert.alert('Error', formatErrorMessage(err.response?.data || err) || 'Failed to add money');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleRazorpaySuccess = async (result: RazorpayPaymentResult) => {
+    setShowRazorpay(false);
+    try {
+      await confirmAddMoney({
+        razorpay_payment_id: result.razorpay_payment_id,
+        razorpay_order_id: result.razorpay_order_id,
+        razorpay_signature: result.razorpay_signature,
+      });
+      Alert.alert('Success', 'Money added successfully');
+      setAmount('');
+      fetchBalance();
+      fetchTransactions(1);
+    } catch {
+      Alert.alert('Error', 'Payment verification failed. Contact support if money was deducted.');
     }
   };
 
@@ -103,6 +112,28 @@ export const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       setAmount('');
     } catch (err: any) {
       Alert.alert('Error', formatErrorMessage(err.response?.data || err) || 'Failed to withdraw');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleTransfer = async () => {
+    const num = Number(amount);
+    if (!num || num < 1) return Alert.alert('Invalid', 'Enter a valid amount');
+    if (num > balance) return Alert.alert('Insufficient', 'Amount exceeds wallet balance');
+    if (!transferUserId.trim()) return Alert.alert('Invalid', 'Enter user ID to transfer to');
+    setSubmitting(true);
+    try {
+      await transfer(transferUserId.trim(), num, transferDesc.trim() || undefined);
+      Alert.alert('Success', 'Transfer completed successfully');
+      setShowTransfer(false);
+      setAmount('');
+      setTransferUserId('');
+      setTransferDesc('');
+      fetchBalance();
+      fetchTransactions(1);
+    } catch (err: any) {
+      Alert.alert('Error', formatErrorMessage(err.response?.data || err) || 'Transfer failed');
     } finally {
       setSubmitting(false);
     }
@@ -155,6 +186,10 @@ export const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           <TouchableOpacity style={styles.actionBtn} onPress={() => { setAmount(''); setShowWithdraw(true); }}>
             <Ionicons name="download" size={22} color={COLORS.white} />
             <Text style={styles.actionText}>Withdraw</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionBtn} onPress={() => { setAmount(''); setTransferUserId(''); setTransferDesc(''); setShowTransfer(true); }}>
+            <Ionicons name="swap-horizontal" size={22} color={COLORS.white} />
+            <Text style={styles.actionText}>Transfer</Text>
           </TouchableOpacity>
         </View>
       </LinearGradient>
@@ -220,6 +255,51 @@ export const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           <Button title="Withdraw" onPress={handleWithdraw} loading={submitting} size="lg" />
         </View>
       </BottomSheet>
+
+      {/* Transfer Modal */}
+      <BottomSheet visible={showTransfer} onClose={() => setShowTransfer(false)} title="Transfer Money">
+        <View style={styles.modalContent}>
+          <View style={styles.amountInput}>
+            <Text style={styles.rupee}>₹</Text>
+            <TextInput
+              style={styles.amountField}
+              keyboardType="number-pad"
+              value={amount}
+              onChangeText={setAmount}
+              placeholder="0"
+              placeholderTextColor={COLORS.textMuted}
+            />
+          </View>
+          <TextInput
+            style={styles.transferInput}
+            value={transferUserId}
+            onChangeText={setTransferUserId}
+            placeholder="Recipient User ID"
+            placeholderTextColor={COLORS.textMuted}
+            autoCapitalize="none"
+          />
+          <TextInput
+            style={styles.transferInput}
+            value={transferDesc}
+            onChangeText={setTransferDesc}
+            placeholder="Description (optional)"
+            placeholderTextColor={COLORS.textMuted}
+          />
+          <Text style={styles.availNote}>Available: ₹{balance.toLocaleString('en-IN')}</Text>
+          <Button title="Transfer" onPress={handleTransfer} loading={submitting} size="lg" />
+        </View>
+      </BottomSheet>
+
+      {/* Razorpay Checkout */}
+      {razorpayOrder && (
+        <RazorpayCheckout
+          visible={showRazorpay}
+          orderOptions={razorpayOrder}
+          onSuccess={handleRazorpaySuccess}
+          onCancel={() => { setShowRazorpay(false); Alert.alert('Cancelled', 'Payment was cancelled'); }}
+          onError={(err) => { setShowRazorpay(false); Alert.alert('Payment Failed', err.description || 'Please try again'); }}
+        />
+      )}
     </View>
   );
 };
@@ -277,4 +357,13 @@ const styles = StyleSheet.create({
   },
   quickText: { fontSize: FONT_SIZE.sm, fontWeight: '600', color: COLORS.textSecondary },
   availNote: { fontSize: FONT_SIZE.sm, color: COLORS.textMuted, marginBottom: SPACING.xl, textAlign: 'center' },
+  transferInput: {
+    backgroundColor: COLORS.surfaceAlt,
+    borderRadius: BORDER_RADIUS.lg,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    fontSize: FONT_SIZE.md,
+    color: COLORS.text,
+    marginBottom: SPACING.md,
+  },
 });

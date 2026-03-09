@@ -10,9 +10,12 @@ import { Lawyer, AvailabilitySlot } from '../../types';
 import { lawyersApi, appointmentsApi } from '../../services/api';
 import { API_URL } from '../../constants';
 import { useWalletStore } from '../../stores/walletStore';
+import { useAuthStore } from '../../stores/authStore';
 import { format, addDays } from 'date-fns';
 import { Button } from '../../components/Button';
 import { BottomSheet } from '../../components/Modals';
+import { RazorpayCheckout } from '../../components/RazorpayCheckout';
+import { RazorpayOrderOptions, RazorpayPaymentResult } from '../../utils/razorpay';
 
 const { width } = Dimensions.get('window');
 
@@ -28,6 +31,11 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
   const [booking, setBooking] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'razorpay'>('wallet');
   const balance = useWalletStore((s) => s.balance);
+  const user = useAuthStore((s) => s.user);
+  // Razorpay state
+  const [showRazorpay, setShowRazorpay] = useState(false);
+  const [razorpayOrder, setRazorpayOrder] = useState<RazorpayOrderOptions | null>(null);
+  const [pendingAppointmentId, setPendingAppointmentId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchLawyer();
@@ -118,28 +126,68 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
     setBooking(true);
     try {
       let scheduledAt = '';
-      // if selectedSlot already looks like an ISO datetime, use it
       if (selectedSlot.includes('T') && !/^\d{2}:\d{2}$/.test(selectedSlot)) {
         try { scheduledAt = new Date(selectedSlot).toISOString(); } catch { scheduledAt = selectedSlot; }
       } else {
-        // assume selectedSlot is a time like HH:mm
         scheduledAt = new Date(`${format(selectedDate, 'yyyy-MM-dd')}T${selectedSlot}`).toISOString();
       }
+      const { data } = await appointmentsApi.book({ lawyerId: lawyer.id, scheduledAt });
+      const appointment = data.appointment || data.data || data;
+      const appointmentId = appointment?.id || data?.id;
+
       if (paymentMethod === 'wallet') {
-        await appointmentsApi.book({ lawyerId: lawyer.id, scheduledAt });
         Alert.alert('Success', 'Appointment booked successfully!');
         setShowBooking(false);
         navigation.goBack();
       } else {
-        const { data } = await appointmentsApi.book({ lawyerId: lawyer.id, scheduledAt });
-        // Razorpay flow would open here in production
-        Alert.alert('Booking Created', 'Complete payment to confirm your appointment');
+        // Razorpay payment flow
+        const orderId = appointment?.payment?.razorpayOrderId || data?.orderId || data?.order?.id;
+        if (!orderId) {
+          Alert.alert('Booked', 'Appointment created. Payment order unavailable — pay from wallet or try again.');
+          setShowBooking(false);
+          return;
+        }
+        setPendingAppointmentId(appointmentId);
+        setRazorpayOrder({
+          orderId,
+          amount: (lawyer.fee || 0) * 100,
+          name: 'LawSuit',
+          description: `Consultation with ${lawyer.name}`,
+          prefillEmail: user?.email || '',
+          prefillPhone: user?.phone || '',
+          prefillName: user?.name || '',
+        });
         setShowBooking(false);
+        setShowRazorpay(true);
       }
     } catch (err: any) {
       Alert.alert('Booking Failed', formatErrorMessage(err.response?.data || err) || 'Please try again');
     } finally {
       setBooking(false);
+    }
+  };
+
+  const handleRazorpaySuccess = async (result: RazorpayPaymentResult) => {
+    setShowRazorpay(false);
+    try {
+      if (pendingAppointmentId) {
+        await appointmentsApi.confirmRazorpay(pendingAppointmentId, {
+          razorpay_order_id: result.razorpay_order_id,
+          razorpay_payment_id: result.razorpay_payment_id,
+          razorpay_signature: result.razorpay_signature,
+        });
+      } else {
+        await appointmentsApi.confirmPayment({
+          appointmentId: pendingAppointmentId || '',
+          razorpay_payment_id: result.razorpay_payment_id,
+          razorpay_order_id: result.razorpay_order_id,
+          razorpay_signature: result.razorpay_signature,
+        });
+      }
+      Alert.alert('Success', 'Payment confirmed! Appointment booked.');
+      navigation.goBack();
+    } catch {
+      Alert.alert('Error', 'Payment received but verification failed. Contact support.');
     }
   };
 
@@ -364,6 +412,17 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
           <Button title="Confirm & Pay" onPress={handleBook} loading={booking} size="lg" />
         </View>
       </BottomSheet>
+
+      {/* Razorpay Checkout */}
+      {razorpayOrder && (
+        <RazorpayCheckout
+          visible={showRazorpay}
+          orderOptions={razorpayOrder}
+          onSuccess={handleRazorpaySuccess}
+          onCancel={() => { setShowRazorpay(false); Alert.alert('Cancelled', 'Payment was cancelled. Appointment is pending payment.'); }}
+          onError={(err) => { setShowRazorpay(false); Alert.alert('Payment Failed', err.description || 'Please try again'); }}
+        />
+      )}
     </View>
   );
 };
