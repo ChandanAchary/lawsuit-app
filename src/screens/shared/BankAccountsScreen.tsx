@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
+import { formatErrorMessage } from '../../utils/formatError';
 import { bankAccountApi } from '../../services/api';
 
 interface BankAccount {
@@ -110,7 +111,7 @@ export const BankAccountsScreen: React.FC<{ navigation: any }> = ({ navigation }
       setModalVisible(false);
       fetchAccounts();
     } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.message || 'Failed to add account');
+      Alert.alert('Error', formatErrorMessage(err.response?.data?.message || err.response?.data || err));
     } finally { setSaving(false); }
   };
 

@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS, GENDER_OPTIONS, CASTE_OPTIONS } from '../../constants';
+import { formatErrorMessage } from '../../utils/formatError';
 import { useAuthStore } from '../../stores/authStore';
 import { useUserStore } from '../../stores/userStore';
 import { usersApi, storageApi } from '../../services/api';
@@ -91,7 +92,7 @@ export const EditProfileScreen: React.FC<{ navigation: any }> = ({ navigation })
       }
       Alert.alert('Success', 'Profile updated', [{ text: 'OK', onPress: () => navigation.goBack() }]);
     } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.error || 'Failed to update');
+      Alert.alert('Error', formatErrorMessage(err.response?.data || err));
     } finally { setSaving(false); }
   };
 

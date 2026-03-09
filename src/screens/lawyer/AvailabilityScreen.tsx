@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
+import { formatErrorMessage } from '../../utils/formatError';
 import { usersApi } from '../../services/api';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
@@ -65,7 +66,7 @@ export const AvailabilityScreen: React.FC<{ navigation: any }> = ({ navigation }
       });
       Alert.alert('Success', 'Availability updated', [{ text: 'OK', onPress: () => navigation.goBack() }]);
     } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.error || 'Failed to update');
+      Alert.alert('Error', formatErrorMessage(err.response?.data || err));
     } finally { setSaving(false); }
   };
 

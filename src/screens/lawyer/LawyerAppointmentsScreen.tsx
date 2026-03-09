@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, FlatList, RefreshControl, Alert,
 } from 'react-native';
 import { COLORS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
+import { formatErrorMessage } from '../../utils/formatError';
 import { appointmentsApi, casesApi } from '../../services/api';
 import { Appointment, AppointmentStatus } from '../../types';
 import { AppointmentCard } from '../../components/AppointmentCard';
@@ -73,7 +74,7 @@ export const LawyerAppointmentsScreen: React.FC<{ navigation: any }> = ({ naviga
       });
       Alert.alert('Success', 'Case created');
     } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.error || err.response?.data?.message || 'Failed to create case');
+      Alert.alert('Error', formatErrorMessage(err.response?.data || err));
     }
   };
 

@@ -5,6 +5,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
+import { formatErrorMessage } from '../../utils/formatError';
 import { Lawyer, AvailabilitySlot } from '../../types';
 import { lawyersApi, appointmentsApi } from '../../services/api';
 import { useWalletStore } from '../../stores/walletStore';
@@ -39,8 +40,8 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
     try {
       const { data } = await lawyersApi.getById(lawyerId);
       setLawyer(data.lawyer || data);
-    } catch {
-      Alert.alert('Error', 'Failed to load lawyer details');
+    } catch (err: any) {
+      Alert.alert('Error', formatErrorMessage(err?.response?.data || err) || 'Failed to load lawyer details');
       navigation.goBack();
     } finally {
       setLoading(false);
@@ -56,7 +57,7 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
         date: format(selectedDate, 'yyyy-MM-dd'),
       });
       setSlots(data.slots || []);
-    } catch {
+    } catch (err: any) {
       setSlots([]);
     } finally {
       setSlotsLoading(false);
@@ -80,7 +81,7 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
         setShowBooking(false);
       }
     } catch (err: any) {
-      Alert.alert('Booking Failed', err.response?.data?.error || err.response?.data?.message || 'Please try again');
+      Alert.alert('Booking Failed', formatErrorMessage(err.response?.data || err) || 'Please try again');
     } finally {
       setBooking(false);
     }

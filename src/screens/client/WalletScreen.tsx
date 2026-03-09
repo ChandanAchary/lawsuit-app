@@ -5,6 +5,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
+import { formatErrorMessage } from '../../utils/formatError';
 import { useWalletStore } from '../../stores/walletStore';
 import { TransactionType, WalletTransaction } from '../../types';
 import { formatDate, formatTime } from '../../utils/date';
@@ -84,7 +85,7 @@ export const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         Alert.alert('Notice', 'Razorpay checkout is not available. Payment order created — complete payment via the Razorpay dashboard.');
       }
     } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.error || err.response?.data?.message || 'Failed to add money');
+      Alert.alert('Error', formatErrorMessage(err.response?.data || err) || 'Failed to add money');
     } finally {
       setSubmitting(false);
     }
@@ -101,7 +102,7 @@ export const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       setShowWithdraw(false);
       setAmount('');
     } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.error || err.response?.data?.message || 'Failed to withdraw');
+      Alert.alert('Error', formatErrorMessage(err.response?.data || err) || 'Failed to withdraw');
     } finally {
       setSubmitting(false);
     }

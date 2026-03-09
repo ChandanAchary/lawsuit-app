@@ -6,6 +6,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS, LEGAL_CATEGORIES, INDIAN_LANGUAGES } from '../../constants';
+import { formatErrorMessage } from '../../utils/formatError';
 import { useAuthStore } from '../../stores/authStore';
 import { useUserStore } from '../../stores/userStore';
 import { usersApi, storageApi } from '../../services/api';
@@ -82,7 +83,7 @@ export const EditLawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigat
       Alert.alert('Success', 'Profile updated');
       navigation.goBack();
     } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.error || err.response?.data?.message || 'Update failed');
+      Alert.alert('Error', formatErrorMessage(err.response?.data || err));
     } finally { setSaving(false); }
   };
 

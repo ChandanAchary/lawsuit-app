@@ -154,8 +154,8 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ value, onChange,
       </View>
       {pincodeError ? <Text style={styles.errorText}>{pincodeError}</Text> : null}
 
-      {/* Area/City Dropdown after pincode lookup */}
-      {postOffices.length > 0 && (
+      {/* Area/City Dropdown after pincode lookup or when city already selected */}
+      {(postOffices.length > 0 || value.city) && (
         <>
           <Text style={styles.fieldLabel}>Area / City</Text>
           <TouchableOpacity style={styles.dropdown} onPress={() => setShowPlacePicker(true)}>
@@ -232,18 +232,31 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ value, onChange,
                 <Ionicons name="close" size={24} color={COLORS.text} />
               </TouchableOpacity>
             </View>
-            <FlatList
-              data={postOffices}
-              keyExtractor={(item, i) => `${item.name}-${i}`}
-              renderItem={({ item }) => (
-                <TouchableOpacity style={styles.listItem} onPress={() => selectPlace(item)}>
-                  <View>
-                    <Text style={styles.listItemText}>{item.name}</Text>
-                    <Text style={styles.listItemSub}>{item.district}, {item.state}</Text>
-                  </View>
-                </TouchableOpacity>
-              )}
-            />
+            {postOffices.length > 0 ? (
+              <FlatList
+                data={postOffices}
+                keyExtractor={(item, i) => `${item.name}-${i}`}
+                renderItem={({ item }) => (
+                  <TouchableOpacity style={styles.listItem} onPress={() => selectPlace(item)}>
+                    <View>
+                      <Text style={styles.listItemText}>{item.name}</Text>
+                      <Text style={styles.listItemSub}>{item.district}, {item.state}</Text>
+                    </View>
+                  </TouchableOpacity>
+                )}
+              />
+            ) : value.city ? (
+              <TouchableOpacity style={[styles.placeOption, styles.placeOptionActive]} onPress={() => selectPlace({ name: value.city, district: value.district, state: value.state })}>
+                <View>
+                  <Text style={styles.placeOptionText}>{value.city}</Text>
+                  <Text style={styles.placeOptionSub}>{value.district}, {value.state}</Text>
+                </View>
+              </TouchableOpacity>
+            ) : (
+              <View style={{ padding: SPACING.xl }}>
+                <Text style={styles.listItemSub}>No areas found for this PIN code.</Text>
+              </View>
+            )}
           </View>
         </View>
       </Modal>

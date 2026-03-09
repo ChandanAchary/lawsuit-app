@@ -1,5 +1,6 @@
-import React from 'react';
-import { TextInput, View, Text, StyleSheet, TextInputProps, ViewStyle } from 'react-native';
+import React, { useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { TextInput, View, Text, StyleSheet, TextInputProps, ViewStyle, TouchableOpacity } from 'react-native';
 import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../constants';
 
 interface InputProps extends TextInputProps {
@@ -17,8 +18,12 @@ export const Input: React.FC<InputProps> = ({
   icon,
   rightIcon,
   style,
+  secureTextEntry,
   ...props
 }) => {
+  const [showPassword, setShowPassword] = useState(false);
+  const isPassword = secureTextEntry !== undefined;
+  const showInternalEye = isPassword && !rightIcon;
   return (
     <View style={[styles.container, containerStyle]}>
       {label && <Text style={styles.label}>{label}</Text>}
@@ -27,9 +32,18 @@ export const Input: React.FC<InputProps> = ({
         <TextInput
           style={[styles.input, icon ? styles.inputWithIcon : undefined, style]}
           placeholderTextColor={COLORS.textMuted}
+          secureTextEntry={
+            // If parent provided a rightIcon (likely controlling visibility externally), respect parent's secureTextEntry
+            rightIcon ? (secureTextEntry as boolean | undefined) : (isPassword ? !showPassword : undefined)
+          }
           {...props}
         />
-        {rightIcon && <View style={styles.rightIcon}>{rightIcon}</View>}
+        {showInternalEye && (
+          <TouchableOpacity style={styles.rightIcon} onPress={() => setShowPassword((v) => !v)}>
+            <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color={COLORS.textMuted} />
+          </TouchableOpacity>
+        )}
+        {!showInternalEye && rightIcon && <View style={styles.rightIcon}>{rightIcon}</View>}
       </View>
       {error && <Text style={styles.error}>{error}</Text>}
     </View>
@@ -63,6 +77,10 @@ const styles = StyleSheet.create({
   },
   rightIcon: {
     paddingRight: SPACING.lg,
+    paddingLeft: SPACING.md,
+    minWidth: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   input: {
     flex: 1,
