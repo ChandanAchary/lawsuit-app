@@ -38,8 +38,8 @@ export const AvailabilityScreen: React.FC<{ navigation: any }> = ({ navigation }
       if (data.lawyer) {
         const l = data.lawyer;
         setIsAvailable(l.isAvailable !== false);
-        // feePerConsultation is stored in paise on the backend; convert to rupees for display
-        setFee(String(l.feePerConsultation ? Number(l.feePerConsultation) / 100 : ''));
+        // Always show fee in rupees
+        setFee(String(l.feePerConsultation ? Math.round(Number(l.feePerConsultation) / 100) : ''));
         // support both legacy object-shaped `experience` and new array-shaped `experience`
         const exp = l.experience;
         if (Array.isArray(exp)) {
@@ -68,8 +68,8 @@ export const AvailabilityScreen: React.FC<{ navigation: any }> = ({ navigation }
   };
 
   const handleSave = async () => {
-    if (!fee.trim() || Number(fee) <= 0) {
-      Alert.alert('Error', 'Please set a valid consultation fee');
+    if (!fee.trim() || Number(fee) < 10) {
+      Alert.alert('Error', 'Please set a valid consultation fee (minimum ₹10)');
       return;
     }
     setSaving(true);
@@ -82,7 +82,7 @@ export const AvailabilityScreen: React.FC<{ navigation: any }> = ({ navigation }
         to: endTime,
         description: JSON.stringify({ workingDays }),
       };
-      // convert rupees -> paise for backend
+      // Always send fee in paise (multiply by 100)
       await usersApi.postLawyerInformation({
         isAvailable,
         feePerConsultation: Math.round(Number(fee) * 100),

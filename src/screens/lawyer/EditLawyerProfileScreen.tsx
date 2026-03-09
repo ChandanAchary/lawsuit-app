@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, Modal, Dimensions,
-  ActivityIndicator, KeyboardAvoidingView, Platform,
+  ActivityIndicator, KeyboardAvoidingView, Platform, Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS, LEGAL_CATEGORIES, INDIAN_LANGUAGES } from '../../constants';
 import { formatErrorMessage } from '../../utils/formatError';
 import { useAuthStore } from '../../stores/authStore';
@@ -32,6 +33,8 @@ export const EditLawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigat
   });
   const [selectedSpecs, setSelectedSpecs] = useState<string[]>([]);
   const [selectedLangs, setSelectedLangs] = useState<string[]>([]);
+  const [docUrls, setDocUrls] = useState<{ licenseProofUrl: string; barCouncilProofUrl: string }>({ licenseProofUrl: '', barCouncilProofUrl: '' });
+  const [uploadingDoc, setUploadingDoc] = useState<{ licenseProofUrl: boolean; barCouncilProofUrl: boolean }>({ licenseProofUrl: false, barCouncilProofUrl: false });
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [showFullPhoto, setShowFullPhoto] = useState(false);
@@ -44,38 +47,94 @@ export const EditLawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigat
       if (data.lawyer) {
         const l = data.lawyer;
         setForm({
-          name: l.name || user?.name || '', phone: l.phone || user?.phone || '',
+          name: l.name || user?.name || '',
+          phone: l.phone || user?.phone || '',
           bio: l.bio || '',
-          // backend stores paise; convert to rupees for the input field
-          feePerConsultation: l.feePerConsultation ? String(Number(l.feePerConsultation) / 100) : '',
+          // Always show fee in rupees
+          feePerConsultation: l.feePerConsultation ? String(Math.round(Number(l.feePerConsultation) / 100)) : '',
           experienceYears: String(l.experienceYears || ''),
-          barCouncilId: l.barCouncilId || '', licenseNumber: l.licenseNumber || '',
-          barCouncil: l.barCouncil || '', organisation: l.organisation || '',
+          barCouncilId: l.barCouncilId || '',
+          licenseNumber: l.licenseNumber || '',
+          barCouncil: l.barCouncil || '',
+          organisation: l.organisation || '',
           address: l.address || '',
         });
         setLocationData({
-          country: l.country || 'India', state: l.state || '', pincode: l.pincode || '',
-          district: l.district || '', city: l.city || '', postOfficeName: l.postOfficeName || '',
-          houseNameOrNumber: l.houseNameOrNumber || '', streetName: l.streetName || '',
+          country: l.country || 'India',
+          state: l.state || '',
+          pincode: l.pincode || '',
+          district: l.district || '',
+          city: l.city || '',
+          postOfficeName: l.postOfficeName || '',
+          houseNameOrNumber: l.houseNameOrNumber || '',
+          streetName: l.streetName || '',
         });
         setSelectedSpecs(l.specializations || []);
         setSelectedLangs(l.languages || []);
+        setDocUrls({
+          licenseProofUrl: l.licenseProofUrl || '',
+          barCouncilProofUrl: l.barCouncilProofUrl || '',
+        });
       }
     } catch {}
   };
 
+  const uploadDocument = async (docKey: 'licenseProofUrl' | 'barCouncilProofUrl') => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['image/*', 'application/pdf'],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+      setUploadingDoc((prev) => ({ ...prev, [docKey]: true }));
+      const asset = result.assets[0];
+      const { data: signData } = await storageApi.getCloudinarySignature('lawyer-docs');
+      const formData = new FormData();
+      formData.append('file', { uri: asset.uri, type: asset.mimeType || 'application/octet-stream', name: asset.name || 'doc' } as any);
+      formData.append('timestamp', String(signData.timestamp));
+      formData.append('signature', signData.signature);
+      formData.append('api_key', signData.apiKey);
+      formData.append('folder', signData.folder);
+      const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${encodeURIComponent(signData.cloudName)}/auto/upload`, { method: 'POST', body: formData });
+      const uploadData = await uploadRes.json();
+      if (uploadData.secure_url) {
+        setDocUrls((prev) => ({ ...prev, [docKey]: uploadData.secure_url }));
+        Alert.alert('Uploaded', 'Document uploaded. Save your profile to confirm.');
+      } else {
+        Alert.alert('Error', 'Upload failed');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to upload document');
+    } finally {
+      setUploadingDoc((prev) => ({ ...prev, [docKey]: false }));
+    }
+  };
+
+  const removeDocument = (docKey: 'licenseProofUrl' | 'barCouncilProofUrl') => {
+    Alert.alert('Remove Document', 'Are you sure you want to remove this document?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: () => setDocUrls((prev) => ({ ...prev, [docKey]: '' })) },
+    ]);
+  };
+
   const handleSave = async () => {
+    if (!form.feePerConsultation || Number(form.feePerConsultation) < 10) {
+      Alert.alert('Error', 'Please set a valid consultation fee (minimum ₹10)');
+      return;
+    }
     setSaving(true);
     try {
       await updateUser({ name: form.name, phone: form.phone });
       await usersApi.postLawyerInformation({
         bio: form.bio,
-        // convert rupees -> paise for backend storage
+        // Always send fee in paise (multiply by 100)
         feePerConsultation: Math.round(Number(form.feePerConsultation) * 100) || 0,
         experienceYears: Number(form.experienceYears) || 0,
         barCouncilId: form.barCouncilId, licenseNumber: form.licenseNumber,
         barCouncil: form.barCouncil, organisation: form.organisation,
         address: form.address,
+        licenseProofUrl: docUrls.licenseProofUrl || undefined,
+        barCouncilProofUrl: docUrls.barCouncilProofUrl || undefined,
         country: locationData.country, state: locationData.state,
         pincode: locationData.pincode, district: locationData.district,
         city: locationData.city, postOfficeName: locationData.postOfficeName,
@@ -164,7 +223,62 @@ export const EditLawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigat
           <Text style={styles.sTitle}>Professional Details</Text>
           <Input label="Bio" value={form.bio} onChangeText={(v) => setForm({ ...form, bio: v })} multiline icon={<Ionicons name="document-text-outline" size={20} color={COLORS.textMuted} />} />
           <Input label="Bar Council ID" value={form.barCouncilId} onChangeText={(v) => setForm({ ...form, barCouncilId: v })} icon={<Ionicons name="id-card-outline" size={20} color={COLORS.textMuted} />} />
+          <View style={styles.inlineDocRow}>
+            <Text style={styles.inlineDocLabel}>Bar Council Certificate Proof</Text>
+            <View style={styles.inlineDocBtns}>
+              {docUrls.barCouncilProofUrl ? (
+                <>
+                  <TouchableOpacity style={styles.viewDocBtn} onPress={() => Linking.openURL(docUrls.barCouncilProofUrl)}>
+                    <Ionicons name="eye-outline" size={13} color={COLORS.primary} />
+                    <Text style={styles.viewDocBtnText}>View</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.removeDocBtn} onPress={() => removeDocument('barCouncilProofUrl')}>
+                    <Ionicons name="trash-outline" size={13} color="#e74c3c" />
+                    <Text style={styles.removeDocBtnText}>Remove</Text>
+                  </TouchableOpacity>
+                </>
+              ) : null}
+              <TouchableOpacity
+                style={[styles.inlineUploadBtn, docUrls.barCouncilProofUrl ? styles.inlineUploadBtnDone : null]}
+                onPress={() => void uploadDocument('barCouncilProofUrl')}
+                disabled={uploadingDoc.barCouncilProofUrl}
+              >
+                {uploadingDoc.barCouncilProofUrl
+                  ? <ActivityIndicator size="small" color={COLORS.white} />
+                  : <><Ionicons name={docUrls.barCouncilProofUrl ? 'refresh-outline' : 'cloud-upload-outline'} size={13} color={COLORS.white} /><Text style={styles.inlineUploadBtnText}>{docUrls.barCouncilProofUrl ? 'Re-upload' : 'Upload'}</Text></>
+                }
+              </TouchableOpacity>
+            </View>
+          </View>
           <Input label="License Number" value={form.licenseNumber} onChangeText={(v) => setForm({ ...form, licenseNumber: v })} icon={<Ionicons name="document-outline" size={20} color={COLORS.textMuted} />} />
+          <View style={styles.inlineDocRow}>
+            <Text style={styles.inlineDocLabel}>License / Registration Proof</Text>
+            <View style={styles.inlineDocBtns}>
+              {docUrls.licenseProofUrl ? (
+                <>
+                  <TouchableOpacity style={styles.viewDocBtn} onPress={() => Linking.openURL(docUrls.licenseProofUrl)}>
+                    <Ionicons name="eye-outline" size={13} color={COLORS.primary} />
+                    <Text style={styles.viewDocBtnText}>View</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.removeDocBtn} onPress={() => removeDocument('licenseProofUrl')}>
+                    <Ionicons name="trash-outline" size={13} color="#e74c3c" />
+                    <Text style={styles.removeDocBtnText}>Remove</Text>
+                  </TouchableOpacity>
+                </>
+              ) : null}
+              <TouchableOpacity
+                style={[styles.inlineUploadBtn, docUrls.licenseProofUrl ? styles.inlineUploadBtnDone : null]}
+                onPress={() => void uploadDocument('licenseProofUrl')}
+                disabled={uploadingDoc.licenseProofUrl}
+              >
+                {uploadingDoc.licenseProofUrl
+                  ? <ActivityIndicator size="small" color={COLORS.white} />
+                  : <><Ionicons name={docUrls.licenseProofUrl ? 'refresh-outline' : 'cloud-upload-outline'} size={13} color={COLORS.white} /><Text style={styles.inlineUploadBtnText}>{docUrls.licenseProofUrl ? 'Re-upload' : 'Upload'}</Text></>
+                }
+              </TouchableOpacity>
+              {/* Styles for removeDocBtn are now in StyleSheet below */}
+            </View>
+          </View>
           <Input label="Bar Council" value={form.barCouncil} onChangeText={(v) => setForm({ ...form, barCouncil: v })} icon={<Ionicons name="ribbon-outline" size={20} color={COLORS.textMuted} />} />
           <Input label="Organisation" value={form.organisation} onChangeText={(v) => setForm({ ...form, organisation: v })} icon={<Ionicons name="business-outline" size={20} color={COLORS.textMuted} />} />
           <View style={styles.twoCol}>
@@ -219,6 +333,8 @@ export const EditLawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigat
 };
 
 const styles = StyleSheet.create({
+    removeDocBtn: { flexDirection: 'row', alignItems: 'center', gap: 3, borderWidth: 1, borderColor: '#e74c3c', paddingVertical: 4, paddingHorizontal: SPACING.sm, borderRadius: BORDER_RADIUS.md },
+    removeDocBtnText: { color: '#e74c3c', fontSize: FONT_SIZE.xs, fontWeight: '600' },
   container: { flex: 1, backgroundColor: COLORS.background },
   headerBar: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
@@ -237,6 +353,14 @@ const styles = StyleSheet.create({
   sTitle: { fontSize: FONT_SIZE.lg, fontWeight: '700', color: COLORS.text, marginBottom: SPACING.lg },
   twoCol: { flexDirection: 'row', gap: SPACING.md },
   saveRow: { paddingHorizontal: SPACING.xl, gap: SPACING.sm, marginBottom: SPACING.lg },
+  inlineDocRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: -SPACING.sm, marginBottom: SPACING.md, paddingHorizontal: 2 },
+  inlineDocLabel: { fontSize: FONT_SIZE.xs, color: COLORS.textMuted, flex: 1 },
+  inlineDocBtns: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
+  viewDocBtn: { flexDirection: 'row', alignItems: 'center', gap: 3, borderWidth: 1, borderColor: COLORS.primary, paddingVertical: 4, paddingHorizontal: SPACING.sm, borderRadius: BORDER_RADIUS.md },
+  viewDocBtnText: { color: COLORS.primary, fontSize: FONT_SIZE.xs, fontWeight: '600' },
+  inlineUploadBtn: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: COLORS.primary, paddingVertical: 4, paddingHorizontal: SPACING.sm, borderRadius: BORDER_RADIUS.md },
+  inlineUploadBtnDone: { backgroundColor: '#27ae60' },
+  inlineUploadBtnText: { color: COLORS.white, fontSize: FONT_SIZE.xs, fontWeight: '600' },
   fullPhotoOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
   fullPhotoClose: { position: 'absolute', top: 50, right: 20, zIndex: 10, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
   fullPhoto: { width: SCREEN_WIDTH - 40, height: SCREEN_WIDTH - 40, borderRadius: BORDER_RADIUS.lg },

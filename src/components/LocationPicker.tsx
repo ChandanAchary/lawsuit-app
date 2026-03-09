@@ -1,4 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+
+// Module-level cache so results persist across component mounts
+const pincodeResultsCache = new Map<string, any[]>();
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal, FlatList, TextInput,
   ActivityIndicator, ScrollView,
@@ -33,6 +36,13 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ value, onChange,
   const [showPlacePicker, setShowPlacePicker] = useState(false);
   const [loadingPincode, setLoadingPincode] = useState(false);
   const [pincodeError, setPincodeError] = useState('');
+  const [pincodeHint, setPincodeHint] = useState('');
+  const isFetchingRef = useRef(false);
+  // Area/City search state
+  const [areaSearch, setAreaSearch] = useState('');
+  const filteredPostOffices = areaSearch
+    ? postOffices.filter((po: any) => (po.name || po.postOfficeName || '').toLowerCase().includes(areaSearch.toLowerCase()))
+    : postOffices;
 
   useEffect(() => {
     addressApi.getStates().then(({ data }) => {
@@ -41,22 +51,39 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ value, onChange,
     }).catch(() => {});
   }, []);
 
-  const handlePincodeLookup = async (pincode: string) => {
-    onChange({ pincode });
+  const handlePincodeLookup = async (pincode: string, silent = false) => {
+    if (!silent) onChange({ pincode });
     if (pincode.length !== 6) {
-      setPostOffices([]);
-      setPincodeError('');
+      if (!silent) {
+        setPostOffices([]);
+        setPincodeError('');
+        setPincodeHint(pincode.length > 0 ? 'Enter all 6 digits then tap search' : '');
+      }
       return;
     }
-    setLoadingPincode(true);
+    setPincodeHint('');
+    // Serve from cache — avoids re-fetch for same pincode
+    if (pincodeResultsCache.has(pincode)) {
+      const cached = pincodeResultsCache.get(pincode)!;
+      setPostOffices(cached);
+      setPincodeError('');
+      if (!silent && cached.length > 0) {
+        const first = cached[0];
+        onChange({ pincode, state: first.state || value.state, district: first.district || value.district });
+      }
+      return;
+    }
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+    if (!silent) setLoadingPincode(true);
     setPincodeError('');
     try {
       const { data } = await addressApi.lookupPincode(pincode);
       const offices = data?.postOffices || data?.data?.postOffices || [];
       const success = data?.success !== false && offices.length > 0;
       if (success) {
+        pincodeResultsCache.set(pincode, offices);
         setPostOffices(offices);
-        // Auto-set state & district from first result
         const first = offices[0];
         onChange({
           pincode,
@@ -73,13 +100,14 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ value, onChange,
           });
         }
       } else {
-        setPincodeError('No records found for this pincode');
+        if (!silent) setPincodeError('No records found for this pincode');
         setPostOffices([]);
       }
     } catch {
-      setPincodeError('Failed to lookup pincode');
+      if (!silent) setPincodeError('Failed to lookup pincode');
     } finally {
-      setLoadingPincode(false);
+      isFetchingRef.current = false;
+      if (!silent) setLoadingPincode(false);
     }
   };
 
@@ -142,8 +170,14 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ value, onChange,
           maxLength={6}
         />
         <TouchableOpacity
-          style={styles.pincodeBtn}
-          onPress={() => value.pincode?.length === 6 && handlePincodeLookup(value.pincode)}
+          style={[styles.pincodeBtn, value.pincode?.length === 6 ? styles.pincodeBtnActive : null]}
+          onPress={() => {
+            // Clear cache for this pincode so user can force a refresh
+            if (value.pincode?.length === 6) {
+              pincodeResultsCache.delete(value.pincode);
+              void handlePincodeLookup(value.pincode);
+            }
+          }}
         >
           {loadingPincode ? (
             <ActivityIndicator size="small" color={COLORS.white} />
@@ -153,26 +187,32 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ value, onChange,
         </TouchableOpacity>
       </View>
       {pincodeError ? <Text style={styles.errorText}>{pincodeError}</Text> : null}
+      {!pincodeError && pincodeHint ? <Text style={styles.hintText}>{pincodeHint}</Text> : null}
 
       {/* Area/City Dropdown after pincode lookup or when city already selected */}
       {(postOffices.length > 0 || value.city) && (
         <>
-              <Text style={styles.fieldLabel}>Area / City</Text>
-              <TouchableOpacity
-                style={styles.dropdown}
-                onPress={async () => {
-                  // If post offices are not loaded yet, attempt lookup for current pincode
-                  if (postOffices.length === 0 && value.pincode && value.pincode.length === 6) {
-                    await handlePincodeLookup(value.pincode);
-                  }
-                  setShowPlacePicker(true);
-                }}
-              >
-                <Text style={value.city || value.postOfficeName ? styles.dropdownText : styles.dropdownPlaceholder}>
-                  {value.city || value.postOfficeName || 'Select area / city'}
-                </Text>
-                <Ionicons name="chevron-down" size={18} color={COLORS.textMuted} />
-              </TouchableOpacity>
+          <Text style={styles.fieldLabel}>Area / City</Text>
+          <TouchableOpacity
+            style={styles.dropdown}
+            onPress={() => {
+              // Restore from cache silently — never triggers the search button spinner
+              if (postOffices.length === 0 && value.pincode?.length === 6) {
+                const cached = pincodeResultsCache.get(value.pincode);
+                if (cached) {
+                  setPostOffices(cached);
+                } else {
+                  void handlePincodeLookup(value.pincode, true);
+                }
+              }
+              setShowPlacePicker(true);
+            }}
+          >
+            <Text style={value.city || value.postOfficeName ? styles.dropdownText : styles.dropdownPlaceholder}>
+              {value.city || value.postOfficeName || 'Select area / city'}
+            </Text>
+            <Ionicons name="chevron-down" size={18} color={COLORS.textMuted} />
+          </TouchableOpacity>
         </>
       )}
 
@@ -241,21 +281,37 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ value, onChange,
                 <Ionicons name="close" size={24} color={COLORS.text} />
               </TouchableOpacity>
             </View>
-            {postOffices.length > 0 ? (
-              <FlatList
-                data={postOffices}
-                keyExtractor={(item, i) => `${item.name || item.postOfficeName || i}-${i}`}
-                contentContainerStyle={{ paddingBottom: SPACING.lg }}
-                style={{ maxHeight: '70%' }}
-                renderItem={({ item }) => (
-                  <TouchableOpacity style={styles.listItem} onPress={() => selectPlace(item)}>
+            {/* Area/City Search */}
+            <View style={styles.searchBox}>
+              <Ionicons name="search" size={18} color={COLORS.textMuted} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search area/city..."
+                placeholderTextColor={COLORS.textMuted}
+                value={areaSearch}
+                onChangeText={setAreaSearch}
+              />
+            </View>
+            {filteredPostOffices.length > 0 ? (
+              <ScrollView
+                style={{ flexShrink: 1 }}
+                contentContainerStyle={{ paddingBottom: SPACING.xl }}
+              >
+                {filteredPostOffices.map((item: any, i: number) => (
+                  <TouchableOpacity
+                    key={`${item.name || item.postOfficeName || i}-${i}`}
+                    style={styles.listItem}
+                    onPress={() => selectPlace(item)}
+                  >
                     <View>
                       <Text style={styles.listItemText}>{item.name || item.postOfficeName || item.post_office_name}</Text>
-                      <Text style={styles.listItemSub}>{item.district || item.taluk || ''}{item.district ? ', ' : ''}{item.state || ''}</Text>
+                      {(item.district || item.state) ? (
+                        <Text style={styles.listItemSub}>{item.district || item.taluk || ''}{item.district ? ', ' : ''}{item.state || ''}</Text>
+                      ) : null}
                     </View>
                   </TouchableOpacity>
-                )}
-              />
+                ))}
+              </ScrollView>
             ) : value.city ? (
               <TouchableOpacity style={[styles.placeOption, styles.placeOptionActive]} onPress={() => selectPlace({ name: value.city, district: value.district, state: value.state })}>
                 <View>
@@ -314,9 +370,12 @@ const styles = StyleSheet.create({
   },
   pincodeBtn: {
     width: 48, height: 48, borderRadius: BORDER_RADIUS.lg,
-    backgroundColor: COLORS.textMuted, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: COLORS.surfaceAlt, borderWidth: 1, borderColor: COLORS.border,
+    alignItems: 'center', justifyContent: 'center',
   },
+  pincodeBtnActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   errorText: { fontSize: FONT_SIZE.xs, color: COLORS.error, marginTop: -SPACING.sm, marginBottom: SPACING.sm },
+  hintText: { fontSize: FONT_SIZE.xs, color: COLORS.textMuted, marginTop: -SPACING.sm, marginBottom: SPACING.sm },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalContent: {
     backgroundColor: COLORS.white, borderTopLeftRadius: BORDER_RADIUS.xxl,
