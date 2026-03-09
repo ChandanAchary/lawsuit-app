@@ -13,9 +13,11 @@
       "backgroundColor": "#0B4D64"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.msdchandan.lawsuitapp"
     },
     "android": {
+      "hermes": true,
       "adaptiveIcon": {
         "backgroundColor": "#0B4D64",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -32,7 +34,6 @@
       "expo-secure-store",
       "expo-font",
       "@react-native-community/datetimepicker",
-      "expo-dev-client",
       "expo-asset"
     ],
     "updates": {
