@@ -38,10 +38,25 @@ export const AvailabilityScreen: React.FC<{ navigation: any }> = ({ navigation }
       if (data.lawyer) {
         const l = data.lawyer;
         setIsAvailable(l.isAvailable !== false);
-        setFee(String(l.feePerConsultation || ''));
-        if (l.experience?.workingDays) setWorkingDays(l.experience.workingDays);
-        if (l.experience?.startTime) setStartTime(l.experience.startTime);
-        if (l.experience?.endTime) setEndTime(l.experience.endTime);
+        // feePerConsultation is stored in paise on the backend; convert to rupees for display
+        setFee(String(l.feePerConsultation ? Number(l.feePerConsultation) / 100 : ''));
+        // support both legacy object-shaped `experience` and new array-shaped `experience`
+        const exp = l.experience;
+        if (Array.isArray(exp)) {
+          const avail = exp.find((e: any) => e.title === 'Availability' || e.description?.includes?.('workingDays'));
+          if (avail) {
+            if (avail.from) setStartTime(String(avail.from));
+            if (avail.to) setEndTime(String(avail.to));
+            try {
+              const parsed = typeof avail.description === 'string' ? JSON.parse(avail.description) : avail.description;
+              if (parsed?.workingDays) setWorkingDays(parsed.workingDays);
+            } catch (e) {}
+          }
+        } else if (exp && typeof exp === 'object') {
+          if (exp.workingDays) setWorkingDays(exp.workingDays);
+          if (exp.startTime) setStartTime(exp.startTime);
+          if (exp.endTime) setEndTime(exp.endTime);
+        }
       }
     } catch {} finally { setLoading(false); }
   };
@@ -59,10 +74,19 @@ export const AvailabilityScreen: React.FC<{ navigation: any }> = ({ navigation }
     }
     setSaving(true);
     try {
+      // send experience as an array entry so it passes backend validation
+      const availabilityEntry = {
+        title: 'Availability',
+        organisation: '',
+        from: startTime,
+        to: endTime,
+        description: JSON.stringify({ workingDays }),
+      };
+      // convert rupees -> paise for backend
       await usersApi.postLawyerInformation({
         isAvailable,
-        feePerConsultation: Number(fee),
-        experience: { workingDays, startTime, endTime },
+        feePerConsultation: Math.round(Number(fee) * 100),
+        experience: [availabilityEntry],
       });
       Alert.alert('Success', 'Availability updated', [{ text: 'OK', onPress: () => navigation.goBack() }]);
     } catch (err: any) {

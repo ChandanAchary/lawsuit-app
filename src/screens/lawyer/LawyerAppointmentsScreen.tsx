@@ -78,12 +78,39 @@ export const LawyerAppointmentsScreen: React.FC<{ navigation: any }> = ({ naviga
     }
   };
 
+  const handleAccept = async (id: string) => {
+    try {
+      await appointmentsApi.accept(id);
+      Alert.alert('Success', 'Appointment accepted');
+      fetchAppointments(false);
+    } catch (err: any) {
+      Alert.alert('Error', formatErrorMessage(err.response?.data || err) || 'Failed to accept');
+    }
+  };
+
+  const handleReject = async (id: string) => {
+    Alert.alert('Reject Appointment', 'Are you sure you want to reject this appointment?', [
+      { text: 'No', style: 'cancel' },
+      { text: 'Yes', style: 'destructive', onPress: async () => {
+        try {
+          await appointmentsApi.reject(id);
+          Alert.alert('Success', 'Appointment rejected');
+          fetchAppointments(false);
+        } catch (err: any) {
+          Alert.alert('Error', formatErrorMessage(err.response?.data || err) || 'Failed to reject');
+        }
+      } },
+    ]);
+  };
+
   const renderItem = ({ item }: { item: Appointment }) => (
     <AppointmentCard
       appointment={item}
       role="LAWYER"
       onCancel={item.status === AppointmentStatus.CONFIRMED ? () => handleCancel(item.id) : undefined}
       onAttend={item.status === AppointmentStatus.CONFIRMED ? () => handleAttend(item.id) : undefined}
+      onAccept={item.status === AppointmentStatus.PENDING ? () => handleAccept(item.id) : undefined}
+      onReject={item.status === AppointmentStatus.PENDING ? () => handleReject(item.id) : undefined}
       onChat={() => navigation.navigate('ChatScreen', { otherUserId: item.clientId, name: item.client?.name })}
       onCreateCase={item.status === AppointmentStatus.ATTENDED ? () => handleCreateCase(item) : undefined}
     />

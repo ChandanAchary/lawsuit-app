@@ -26,6 +26,8 @@ export const EditProfileScreen: React.FC<{ navigation: any }> = ({ navigation })
   const [phone, setPhone] = useState('');
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadingIncome, setUploadingIncome] = useState(false);
+  const [uploadingCaste, setUploadingCaste] = useState(false);
   const [clientInfo, setClientInfo] = useState<Record<string, any>>({});
   const [showDobPicker, setShowDobPicker] = useState(false);
 
@@ -77,6 +79,36 @@ export const EditProfileScreen: React.FC<{ navigation: any }> = ({ navigation })
     } finally { setUploading(false); }
   };
 
+  const pickAndUploadDocument = async (field: 'incomeProofUrl' | 'casteProofUrl') => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images', 'videos'], allowsEditing: false, quality: 0.8,
+      });
+      if (result.canceled || !result.assets[0]) return;
+      const asset = result.assets[0];
+      if (field === 'incomeProofUrl') setUploadingIncome(true); else setUploadingCaste(true);
+      const { data: signData } = await storageApi.getCloudinarySignature('documents');
+      const formData = new FormData();
+      formData.append('file', { uri: asset.uri, type: asset.mimeType || 'application/octet-stream', name: asset.uri.split('/').pop() || 'file' } as any);
+      formData.append('timestamp', String(signData.timestamp));
+      formData.append('signature', signData.signature);
+      formData.append('api_key', signData.apiKey);
+      formData.append('folder', signData.folder);
+      const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${encodeURIComponent(signData.cloudName)}/auto/upload`, { method: 'POST', body: formData });
+      const uploadData = await uploadRes.json();
+      if (uploadData.secure_url) {
+        setClientInfo((prev) => ({ ...prev, [field]: uploadData.secure_url }));
+        Alert.alert('Success', 'Document uploaded');
+      } else {
+        Alert.alert('Error', 'Upload failed');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to upload');
+    } finally {
+      setUploadingIncome(false); setUploadingCaste(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!name.trim()) { Alert.alert('Error', 'Name is required'); return; }
     setSaving(true);
@@ -88,6 +120,12 @@ export const EditProfileScreen: React.FC<{ navigation: any }> = ({ navigation })
           payload.dob = new Date(payload.dob).toISOString();
         }
         if (payload.income) payload.income = Number(payload.income) || 0;
+        // sanitize payload: backend expects strings for many fields, avoid sending null
+        Object.keys(payload).forEach((k) => {
+          if (payload[k] === null || payload[k] === undefined) payload[k] = '';
+          // ensure files / url fields are strings
+          if (k.toLowerCase().includes('url') && payload[k] && typeof payload[k] !== 'string') payload[k] = String(payload[k]);
+        });
         await usersApi.postClientInformation(payload);
       }
       Alert.alert('Success', 'Profile updated', [{ text: 'OK', onPress: () => navigation.goBack() }]);
@@ -205,6 +243,30 @@ export const EditProfileScreen: React.FC<{ navigation: any }> = ({ navigation })
             selected={clientInfo.caste ? [clientInfo.caste] : []}
             onToggle={(c) => setClientInfo((prev) => ({ ...prev, caste: c }))}
           />
+
+          <View style={{ marginTop: SPACING.md }}>
+            <Text style={[styles.fieldLabel, { marginBottom: SPACING.sm }]}>Income Proof</Text>
+            <TouchableOpacity
+              style={[styles.dropdown, { justifyContent: 'space-between' }]}
+              onPress={() => pickAndUploadDocument('incomeProofUrl')}
+            >
+              <Text style={clientInfo.incomeProofUrl ? styles.dropdownText : styles.dropdownPlaceholder} numberOfLines={1}>
+                {clientInfo.incomeProofUrl ? clientInfo.incomeProofUrl.split('/').pop() : 'Upload income proof (optional)'}
+              </Text>
+              {uploadingIncome ? <ActivityIndicator /> : <Ionicons name="cloud-upload-outline" size={18} color={COLORS.textMuted} />}
+            </TouchableOpacity>
+
+            <Text style={[styles.fieldLabel, { marginBottom: SPACING.sm, marginTop: SPACING.md }]}>Caste Proof</Text>
+            <TouchableOpacity
+              style={[styles.dropdown, { justifyContent: 'space-between' }]}
+              onPress={() => pickAndUploadDocument('casteProofUrl')}
+            >
+              <Text style={clientInfo.casteProofUrl ? styles.dropdownText : styles.dropdownPlaceholder} numberOfLines={1}>
+                {clientInfo.casteProofUrl ? clientInfo.casteProofUrl.split('/').pop() : 'Upload caste proof (optional)'}
+              </Text>
+              {uploadingCaste ? <ActivityIndicator /> : <Ionicons name="cloud-upload-outline" size={18} color={COLORS.textMuted} />}
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Save */}

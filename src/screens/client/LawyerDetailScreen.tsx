@@ -8,6 +8,7 @@ import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../consta
 import { formatErrorMessage } from '../../utils/formatError';
 import { Lawyer, AvailabilitySlot } from '../../types';
 import { lawyersApi, appointmentsApi } from '../../services/api';
+import { API_URL } from '../../constants';
 import { useWalletStore } from '../../stores/walletStore';
 import { format, addDays } from 'date-fns';
 import { Button } from '../../components/Button';
@@ -39,7 +40,26 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
   const fetchLawyer = async () => {
     try {
       const { data } = await lawyersApi.getById(lawyerId);
-      setLawyer(data.lawyer || data);
+      const raw = data.lawyer || data;
+      // normalize avatar fields and ensure full URL
+      const avatarRaw = raw.avatar || raw.avatarUrl || raw.user?.avatar || raw.user?.avatarUrl;
+      let avatar = avatarRaw;
+      if (avatar && typeof avatar === 'string') {
+        if (avatar.startsWith('/')) avatar = `${API_URL}${avatar}`;
+        else if (!avatar.startsWith('http')) avatar = `${API_URL}/${avatar}`;
+      }
+      // normalize common fields so UI shows fee, specialization, location consistently
+      const normalizedLawyer: any = {
+        ...raw,
+        avatar,
+        specialization: raw.specializations || raw.specialization || [],
+        location: raw.city || raw.location || raw.address || '',
+        fee: raw.feePerConsultation || raw.fee || 0,
+        reviewsCount: raw.totalReviews || raw.reviewsCount || 0,
+        experienceYears: raw.experienceYears || raw.experience || 0,
+        rating: raw.rating || raw.avgRating || 0,
+      };
+      setLawyer(normalizedLawyer as Lawyer);
     } catch (err: any) {
       Alert.alert('Error', formatErrorMessage(err?.response?.data || err) || 'Failed to load lawyer details');
       navigation.goBack();
@@ -56,7 +76,36 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
         lawyerId: lawyer.id,
         date: format(selectedDate, 'yyyy-MM-dd'),
       });
-      setSlots(data.slots || []);
+      // support multiple possible response shapes
+      let slotsData: any = [];
+      if (Array.isArray(data)) slotsData = data;
+      else if (Array.isArray(data.slots)) slotsData = data.slots;
+      else if (Array.isArray(data.availability)) slotsData = data.availability;
+      else if (Array.isArray(data.timeSlots)) slotsData = data.timeSlots;
+      else if (Array.isArray(data.data)) slotsData = data.data;
+      else if (Array.isArray(data.availableSlots)) slotsData = data.availableSlots;
+      else if (data && typeof data === 'object') {
+        if (Array.isArray(data.data?.slots)) slotsData = data.data.slots;
+        else if (Array.isArray(data.data)) slotsData = data.data;
+      }
+
+      const normalized = (slotsData || []).map((s: any) => {
+        if (!s) return null;
+        if (typeof s === 'string') return { time: s, available: true, display: s } as any;
+        // try to get an ISO time if available
+        const rawTime = s.time || s.slot || s.start || s.label || s.from || s.to || String(s);
+        let iso = rawTime;
+        // if rawTime looks like HH:mm, keep as-is for display but build iso later
+        const looksLikeTime = /^\d{2}:\d{2}(:\d{2})?$/.test(rawTime);
+        if (!looksLikeTime && Date.parse(String(rawTime))) {
+          try { iso = new Date(rawTime).toISOString(); } catch { iso = String(rawTime); }
+        }
+        const available = typeof s.available === 'boolean' ? s.available : s.isAvailable ?? true;
+        const display = looksLikeTime ? rawTime : (Date.parse(String(iso)) ? format(new Date(iso), 'hh:mm a') : String(rawTime));
+        return { time: iso, available, display } as any;
+      }).filter(Boolean) as AvailabilitySlot[];
+
+      setSlots(normalized.map((s: any) => ({ time: s.time, available: s.available, display: s.display })) as any);
     } catch (err: any) {
       setSlots([]);
     } finally {
@@ -68,7 +117,14 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
     if (!selectedSlot || !lawyer) return;
     setBooking(true);
     try {
-      const scheduledAt = `${format(selectedDate, 'yyyy-MM-dd')}T${selectedSlot}:00`;
+      let scheduledAt = '';
+      // if selectedSlot already looks like an ISO datetime, use it
+      if (selectedSlot.includes('T') && !/^\d{2}:\d{2}$/.test(selectedSlot)) {
+        try { scheduledAt = new Date(selectedSlot).toISOString(); } catch { scheduledAt = selectedSlot; }
+      } else {
+        // assume selectedSlot is a time like HH:mm
+        scheduledAt = new Date(`${format(selectedDate, 'yyyy-MM-dd')}T${selectedSlot}`).toISOString();
+      }
       if (paymentMethod === 'wallet') {
         await appointmentsApi.book({ lawyerId: lawyer.id, scheduledAt });
         Alert.alert('Success', 'Appointment booked successfully!');
@@ -223,7 +279,7 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
                         selectedSlot === s.time && styles.slotTextSelected,
                       ]}
                     >
-                      {s.time}
+                      {(s as any).display || s.time}
                     </Text>
                   </TouchableOpacity>
                 )) : (
@@ -240,7 +296,14 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
         <View style={styles.bottomBar}>
           <View>
             <Text style={styles.bottomFee}>₹{lawyer.fee?.toLocaleString('en-IN')}</Text>
-            <Text style={styles.bottomSlot}>{format(selectedDate, 'dd MMM')} at {selectedSlot}</Text>
+            <Text style={styles.bottomSlot}>{format(selectedDate, 'dd MMM')} at {(() => {
+              const found = slots.find((x) => x.time === selectedSlot) as any;
+              if (found && found.display) return found.display;
+              try {
+                if (!selectedSlot) return '';
+                return format(new Date(selectedSlot), 'hh:mm a');
+              } catch { return selectedSlot || ''; }
+            })()}</Text>
           </View>
           <Button
             title="Book Now"
@@ -265,7 +328,11 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
           </View>
           <View style={styles.confirmRow}>
             <Text style={styles.confirmLabel}>Time</Text>
-            <Text style={styles.confirmValue}>{selectedSlot}</Text>
+            <Text style={styles.confirmValue}>{(() => {
+              const found = slots.find((x) => x.time === selectedSlot) as any;
+              if (found && found.display) return found.display;
+              try { if (!selectedSlot) return ''; return format(new Date(selectedSlot), 'hh:mm a'); } catch { return selectedSlot || ''; }
+            })()}</Text>
           </View>
           <View style={styles.confirmRow}>
             <Text style={styles.confirmLabel}>Fee</Text>

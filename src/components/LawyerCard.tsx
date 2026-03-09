@@ -15,8 +15,11 @@ export const LawyerCard: React.FC<LawyerCardProps> = ({ lawyer, onPress, style }
     <TouchableOpacity activeOpacity={0.7} onPress={onPress} style={[styles.card, style]}>
       <View style={styles.row}>
         <View style={styles.avatarWrapper}>
-          {lawyer.avatar ? (
-            <Image source={{ uri: lawyer.avatar }} style={styles.avatar} />
+          {((lawyer.avatar && lawyer.avatar.length) || lawyer.name) ? (
+            <Image
+              source={{ uri: lawyer.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(lawyer.name)}&size=256&background=EAF2F3&color=0B4D64` }}
+              style={styles.avatar}
+            />
           ) : (
             <View style={[styles.avatar, styles.avatarPlaceholder]}>
               <Ionicons name="person" size={28} color={COLORS.textMuted} />

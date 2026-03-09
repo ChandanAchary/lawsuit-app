@@ -246,6 +246,7 @@ export interface NotificationListResponse {
 export interface AvailabilitySlot {
   time: string;
   available: boolean;
+  display?: string;
 }
 
 export interface LawyerFilterOptions {

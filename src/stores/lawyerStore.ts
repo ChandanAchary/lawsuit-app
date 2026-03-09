@@ -49,9 +49,11 @@ export const useLawyerStore = create<LawyerState>((set) => ({
       set({
         lawyers: items.map((l: any) => ({
           ...l,
+          avatar: l.avatar || l.avatarUrl || (l.user && (l.user.avatar || l.user.avatarUrl)) || undefined,
           specialization: l.specializations || l.specialization || [],
           location: l.city || l.location || '',
-          fee: l.feePerConsultation || l.fee || 0,
+          // normalize fee: backend stores paise, convert to rupees for UI
+          fee: l.feePerConsultation ? Number(l.feePerConsultation) / 100 : (l.fee || 0),
           reviewsCount: l.totalReviews || l.reviewsCount || 0,
         })),
         total: data.total || items.length,

@@ -4,6 +4,7 @@ import { View, ActivityIndicator, StyleSheet, LogBox } from 'react-native';
 import { NavigationContainer, LinkingOptions } from '@react-navigation/native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuthStore } from './src/stores/authStore';
+import { useThemeStore } from './src/stores/themeStore';
 import { useNotificationStore } from './src/stores/notificationStore';
 import { AuthStack, MainStack } from './src/navigation';
 import { COLORS } from './src/constants';
@@ -34,10 +35,12 @@ export default function App() {
   const { isAuthenticated, restoreSession } = useAuthStore();
   const { initSocketListeners, fetchUnreadCount } = useNotificationStore();
   const [isReady, setIsReady] = useState(false);
+  const initTheme = useThemeStore(state => state.init);
+  const isDark = useThemeStore(state => state.isDark);
 
   useEffect(() => {
     const init = async () => {
-      await restoreSession();
+      await Promise.all([restoreSession(), initTheme()]);
       setIsReady(true);
     };
     init();
@@ -61,7 +64,7 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <NavigationContainer linking={linking}>
-        <StatusBar style={isAuthenticated ? 'dark' : 'light'} />
+        <StatusBar style={isDark ? 'light' : 'dark'} />
         {isAuthenticated ? <MainStack /> : <AuthStack />}
       </NavigationContainer>
     </GestureHandlerRootView>

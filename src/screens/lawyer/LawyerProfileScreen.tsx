@@ -196,7 +196,7 @@ export const LawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigation 
         <View style={styles.menuCard}>
           <MenuItem icon="time-outline" label="Set Availability" subtitle="Manage your schedule"
             onPress={() => navigation.navigate('Availability')} />
-          <MenuItem icon="cash-outline" label="Consultation Fees" subtitle={info?.feePerConsultation ? `₹${info.feePerConsultation}` : 'Set your fee'}
+          <MenuItem icon="cash-outline" label="Consultation Fees" subtitle={info?.feePerConsultation ? `₹${(Number(info.feePerConsultation) / 100).toLocaleString('en-IN')}` : 'Set your fee'}
             onPress={() => navigation.navigate('Availability')} last />
         </View>
 

@@ -18,6 +18,8 @@ interface AppointmentCardProps {
   onPress?: () => void;
   onAttend?: () => void;
   onCancel?: () => void;
+  onAccept?: () => void;
+  onReject?: () => void;
   onChat?: () => void;
   onViewAgreement?: () => void;
   onCreateCase?: () => void;
@@ -30,6 +32,8 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
   onPress,
   onAttend,
   onCancel,
+  onAccept,
+  onReject,
   onChat,
   onViewAgreement,
   onCreateCase,
@@ -92,8 +96,23 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
         </View>
       </View>
 
-      {(isUpcoming || isAttended) && (
+      {(isUpcoming || isAttended || appointment.status === AppointmentStatus.PENDING) && (
         <View style={styles.actions}>
+          {appointment.status === AppointmentStatus.PENDING && role === 'LAWYER' && (
+            <>
+              {onAccept && (
+                <TouchableOpacity style={[styles.actionBtn, styles.actionPrimary]} onPress={onAccept}>
+                  <Ionicons name="checkmark" size={14} color={COLORS.white} />
+                  <Text style={styles.actionTextWhite}>Accept</Text>
+                </TouchableOpacity>
+              )}
+              {onReject && (
+                <TouchableOpacity style={[styles.actionBtn, styles.actionOutline]} onPress={onReject}>
+                  <Text style={styles.actionTextPrimary}>Reject</Text>
+                </TouchableOpacity>
+              )}
+            </>
+          )}
           {isUpcoming && onAttend && (
             <TouchableOpacity style={[styles.actionBtn, styles.actionPrimary]} onPress={onAttend}>
               <Ionicons name="videocam" size={14} color={COLORS.white} />

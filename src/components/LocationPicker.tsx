@@ -157,13 +157,22 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ value, onChange,
       {/* Area/City Dropdown after pincode lookup or when city already selected */}
       {(postOffices.length > 0 || value.city) && (
         <>
-          <Text style={styles.fieldLabel}>Area / City</Text>
-          <TouchableOpacity style={styles.dropdown} onPress={() => setShowPlacePicker(true)}>
-            <Text style={value.city || value.postOfficeName ? styles.dropdownText : styles.dropdownPlaceholder}>
-              {value.city || value.postOfficeName || 'Select area / city'}
-            </Text>
-            <Ionicons name="chevron-down" size={18} color={COLORS.textMuted} />
-          </TouchableOpacity>
+              <Text style={styles.fieldLabel}>Area / City</Text>
+              <TouchableOpacity
+                style={styles.dropdown}
+                onPress={async () => {
+                  // If post offices are not loaded yet, attempt lookup for current pincode
+                  if (postOffices.length === 0 && value.pincode && value.pincode.length === 6) {
+                    await handlePincodeLookup(value.pincode);
+                  }
+                  setShowPlacePicker(true);
+                }}
+              >
+                <Text style={value.city || value.postOfficeName ? styles.dropdownText : styles.dropdownPlaceholder}>
+                  {value.city || value.postOfficeName || 'Select area / city'}
+                </Text>
+                <Ionicons name="chevron-down" size={18} color={COLORS.textMuted} />
+              </TouchableOpacity>
         </>
       )}
 
@@ -235,12 +244,14 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ value, onChange,
             {postOffices.length > 0 ? (
               <FlatList
                 data={postOffices}
-                keyExtractor={(item, i) => `${item.name}-${i}`}
+                keyExtractor={(item, i) => `${item.name || item.postOfficeName || i}-${i}`}
+                contentContainerStyle={{ paddingBottom: SPACING.lg }}
+                style={{ maxHeight: '70%' }}
                 renderItem={({ item }) => (
                   <TouchableOpacity style={styles.listItem} onPress={() => selectPlace(item)}>
                     <View>
-                      <Text style={styles.listItemText}>{item.name}</Text>
-                      <Text style={styles.listItemSub}>{item.district}, {item.state}</Text>
+                      <Text style={styles.listItemText}>{item.name || item.postOfficeName || item.post_office_name}</Text>
+                      <Text style={styles.listItemSub}>{item.district || item.taluk || ''}{item.district ? ', ' : ''}{item.state || ''}</Text>
                     </View>
                   </TouchableOpacity>
                 )}

@@ -45,7 +45,9 @@ export const EditLawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigat
         const l = data.lawyer;
         setForm({
           name: l.name || user?.name || '', phone: l.phone || user?.phone || '',
-          bio: l.bio || '', feePerConsultation: String(l.feePerConsultation || ''),
+          bio: l.bio || '',
+          // backend stores paise; convert to rupees for the input field
+          feePerConsultation: l.feePerConsultation ? String(Number(l.feePerConsultation) / 100) : '',
           experienceYears: String(l.experienceYears || ''),
           barCouncilId: l.barCouncilId || '', licenseNumber: l.licenseNumber || '',
           barCouncil: l.barCouncil || '', organisation: l.organisation || '',
@@ -68,7 +70,8 @@ export const EditLawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigat
       await updateUser({ name: form.name, phone: form.phone });
       await usersApi.postLawyerInformation({
         bio: form.bio,
-        feePerConsultation: Number(form.feePerConsultation) || 0,
+        // convert rupees -> paise for backend storage
+        feePerConsultation: Math.round(Number(form.feePerConsultation) * 100) || 0,
         experienceYears: Number(form.experienceYears) || 0,
         barCouncilId: form.barCouncilId, licenseNumber: form.licenseNumber,
         barCouncil: form.barCouncil, organisation: form.organisation,
