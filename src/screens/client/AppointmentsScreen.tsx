@@ -17,16 +17,18 @@ import { formatErrorMessage } from '../../utils/formatError';
 
 
 const TABS = [
+  { key: 'all', label: 'All' },
+  { key: 'pending', label: 'Pending' },
   { key: 'upcoming', label: 'Upcoming' },
   { key: 'attended', label: 'Attended' },
+  { key: 'completed', label: 'Completed' },
   { key: 'missed', label: 'Missed' },
   { key: 'cancelled', label: 'Cancelled' },
-  { key: 'completed', label: 'Completed' },
 ];
 
 
 export const AppointmentsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
-  const [tab, setTab] = useState('upcoming');
+  const [tab, setTab] = useState('all');
   const [allAppointments, setAllAppointments] = useState<Appointment[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,6 +64,12 @@ export const AppointmentsScreen: React.FC<{ navigation: any }> = ({ navigation }
     const now = new Date();
     let filtered: Appointment[] = [];
     switch (tab) {
+      case 'all':
+        filtered = allAppointments;
+        break;
+      case 'pending':
+        filtered = allAppointments.filter(a => a.status === AppointmentStatus.PENDING);
+        break;
       case 'upcoming':
         filtered = allAppointments.filter(a =>
           a.status === AppointmentStatus.CONFIRMED &&
@@ -71,14 +79,14 @@ export const AppointmentsScreen: React.FC<{ navigation: any }> = ({ navigation }
       case 'attended':
         filtered = allAppointments.filter(a => a.status === AppointmentStatus.ATTENDED);
         break;
+      case 'completed':
+        filtered = allAppointments.filter(a => a.status === AppointmentStatus.COMPLETED);
+        break;
       case 'missed':
         filtered = allAppointments.filter(a => a.status === AppointmentStatus.MISSED);
         break;
       case 'cancelled':
         filtered = allAppointments.filter(a => a.status === AppointmentStatus.CANCELLED);
-        break;
-      case 'completed':
-        filtered = allAppointments.filter(a => a.status === AppointmentStatus.COMPLETED);
         break;
       default:
         filtered = allAppointments;
@@ -132,8 +140,16 @@ export const AppointmentsScreen: React.FC<{ navigation: any }> = ({ navigation }
     <AppointmentCard
       appointment={item}
       role="CLIENT"
-      onCancel={() => handleCancel(item.id)}
-      onChat={() => navigation.navigate('ChatScreen', { otherUserId: item.lawyerId, name: item.lawyer?.name })}
+      onPress={() => navigation.navigate('AppointmentDetail', { appointmentId: item.id, appointment: item })}
+      onCancel={
+        item.status === AppointmentStatus.PENDING || item.status === AppointmentStatus.CONFIRMED
+          ? () => handleCancel(item.id) : undefined
+      }
+      onChat={
+        item.status === AppointmentStatus.CONFIRMED || item.status === AppointmentStatus.ATTENDED || item.status === AppointmentStatus.COMPLETED
+          ? () => navigation.navigate('ChatScreen', { otherUserId: item.lawyerId, name: item.lawyer?.name })
+          : undefined
+      }
       onViewAgreement={item.agreementUrl ? () => handleViewAgreement(item.agreementUrl!) : undefined}
       onReschedule={
         item.status === AppointmentStatus.CONFIRMED || item.status === AppointmentStatus.MISSED

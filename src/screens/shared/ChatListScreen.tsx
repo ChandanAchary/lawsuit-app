@@ -1,18 +1,22 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, Image, RefreshControl, StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { chatApi } from '../../services/api';
+import { socketService } from '../../services/socket';
 import { useAuthStore } from '../../stores/authStore';
 import { Loading } from '../../components/Common';
+import { ChatMessage } from '../../types';
 
 export const ChatListScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { user } = useAuthStore();
   const [chats, setChats] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  // Track which chatId is currently open so we don't increment its unread count
+  const activeChatRef = useRef<string | null>(null);
 
   const fetchChats = useCallback(async () => {
     try {
@@ -24,7 +28,42 @@ export const ChatListScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
     }
   }, []);
 
-  useEffect(() => { fetchChats(); }, [fetchChats]);
+  useEffect(() => {
+    fetchChats();
+
+    // Real-time: new message arrives → update last message + unread badge
+    const unsubMsg = socketService.on('chat:message:new', (payload: unknown) => {
+      const { message } = payload as { message: ChatMessage };
+      if (!message) return;
+      setChats((prev) => {
+        const idx = prev.findIndex((c) => c.id === message.chatId);
+        if (idx === -1) {
+          // Unknown chat — re-fetch to get full chat object
+          fetchChats();
+          return prev;
+        }
+        const updated = { ...prev[idx], lastMessage: message, updatedAt: message.createdAt };
+        // Increment unread only if this chat is not currently active
+        if (message.senderId !== user?.id && activeChatRef.current !== message.chatId) {
+          updated.unreadCount = (updated.unreadCount || 0) + 1;
+        }
+        const next = [updated, ...prev.filter((_, i) => i !== idx)];
+        return next;
+      });
+    });
+
+    // When user reads a chat, reset its unread count
+    const unsubRead = socketService.on('chat:message:read', (payload: unknown) => {
+      const { chatId } = payload as { chatId?: string; messageId?: string };
+      if (!chatId) return;
+      setChats((prev) => prev.map((c) => c.id === chatId ? { ...c, unreadCount: 0 } : c));
+    });
+
+    // Track focus state so we can suppress unread increments for the open chat
+    const unsubFocus = navigation.addListener('focus', () => { activeChatRef.current = null; });
+
+    return () => { unsubMsg(); unsubRead(); unsubFocus(); };
+  }, [fetchChats, user?.id, navigation]);
 
   const onRefresh = () => { setRefreshing(true); fetchChats(); };
 
@@ -33,7 +72,7 @@ export const ChatListScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
     return participants.find((p: any) => p.id !== user?.id && p.userId !== user?.id) || participants[0] || {};
   };
 
-  const formatTime = (dateStr: string) => {
+  const formatChatTime = (dateStr: string) => {
     if (!dateStr) return '';
     const d = new Date(dateStr);
     const now = new Date();
@@ -58,22 +97,34 @@ export const ChatListScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
     return (
       <TouchableOpacity
         style={styles.chatItem}
-        onPress={() => navigation.navigate('ChatScreen', { chatId: item.id, otherUser: { id: other?.id || other?.userId, name: otherName, avatarUrl: otherAvatar } })}
+        onPress={() => {
+          activeChatRef.current = item.id;
+          // Reset local unread
+          setChats((prev) => prev.map((c) => c.id === item.id ? { ...c, unreadCount: 0 } : c));
+          navigation.navigate('ChatScreen', {
+            chatId: item.id,
+            otherUser: { id: other?.id || other?.userId, name: otherName, avatarUrl: otherAvatar },
+          });
+        }}
       >
-        {otherAvatar ? (
-          <Image source={{ uri: otherAvatar }} style={styles.avatar} />
-        ) : (
-          <View style={[styles.avatar, styles.avatarPH]}>
-            <Ionicons name="person" size={24} color={COLORS.textMuted} />
-          </View>
-        )}
+        <View style={styles.avatarWrapper}>
+          {otherAvatar ? (
+            <Image source={{ uri: otherAvatar }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, styles.avatarPH]}>
+              <Ionicons name="person" size={24} color={COLORS.textMuted} />
+            </View>
+          )}
+        </View>
         <View style={styles.chatContent}>
           <View style={styles.chatTopRow}>
-            <Text style={styles.chatName} numberOfLines={1}>{otherName}</Text>
-            <Text style={styles.chatTime}>{formatTime(time)}</Text>
+            <Text style={[styles.chatName, unread > 0 && styles.chatNameUnread]} numberOfLines={1}>{otherName}</Text>
+            <Text style={styles.chatTime}>{formatChatTime(time)}</Text>
           </View>
           <View style={styles.chatBottomRow}>
-            <Text style={styles.chatLastMsg} numberOfLines={1}>{lastMsg || 'No messages yet'}</Text>
+            <Text style={[styles.chatLastMsg, unread > 0 && styles.chatLastMsgUnread]} numberOfLines={1}>
+              {lastMsg || 'No messages yet'}
+            </Text>
             {unread > 0 && (
               <View style={styles.unreadBadge}>
                 <Text style={styles.unreadText}>{unread > 99 ? '99+' : unread}</Text>
@@ -123,21 +174,24 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.lg, paddingHorizontal: SPACING.xl,
     backgroundColor: COLORS.white, borderBottomWidth: 1, borderBottomColor: COLORS.borderLight,
   },
+  avatarWrapper: { position: 'relative' },
   avatar: { width: 52, height: 52, borderRadius: 26 },
   avatarPH: { backgroundColor: COLORS.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
   chatContent: { flex: 1 },
   chatTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  chatName: { fontSize: FONT_SIZE.md, fontWeight: '700', color: COLORS.text, flex: 1, marginRight: SPACING.sm },
+  chatName: { fontSize: FONT_SIZE.md, fontWeight: '600', color: COLORS.text, flex: 1, marginRight: SPACING.sm },
+  chatNameUnread: { fontWeight: '800' },
   chatTime: { fontSize: FONT_SIZE.xs, color: COLORS.textMuted },
   chatBottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   chatLastMsg: { fontSize: FONT_SIZE.sm, color: COLORS.textSecondary, flex: 1, marginRight: SPACING.sm },
+  chatLastMsgUnread: { color: COLORS.text, fontWeight: '600' },
   unreadBadge: {
     minWidth: 20, height: 20, borderRadius: 10, backgroundColor: COLORS.primary,
     alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6,
   },
   unreadText: { fontSize: FONT_SIZE.xs - 1, fontWeight: '700', color: COLORS.white },
   emptyContainer: { flex: 1 },
-  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SPACING.md },
+  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SPACING.md, paddingTop: 80 },
   emptyTitle: { fontSize: FONT_SIZE.xl, fontWeight: '700', color: COLORS.text },
   emptySubtitle: { fontSize: FONT_SIZE.sm, color: COLORS.textMuted },
 });

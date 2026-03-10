@@ -36,6 +36,7 @@ import { LawyerProfileScreen } from '../screens/lawyer/LawyerProfileScreen';
 import { EditLawyerProfileScreen } from '../screens/lawyer/EditLawyerProfileScreen';
 import { LawyerTemplatesScreen } from '../screens/lawyer/LawyerTemplatesScreen';
 import { ProSubscriptionScreen } from '../screens/lawyer/ProSubscriptionScreen';
+import { LawyerClientDetailScreen } from '../screens/lawyer/LawyerClientDetailScreen';
 
 // Admin screens
 import { AdminDashboardScreen } from '../screens/admin/AdminDashboardScreen';
@@ -95,6 +96,7 @@ const ClientTabs = () => (
           Search: focused ? 'search' : 'search-outline',
           Appointments: focused ? 'calendar' : 'calendar-outline',
           Cases: focused ? 'briefcase' : 'briefcase-outline',
+          Chats: focused ? 'chatbubbles' : 'chatbubbles-outline',
           Profile: focused ? 'person' : 'person-outline',
         };
         return <Ionicons name={icons[route.name] as any} size={22} color={color} />;
@@ -105,6 +107,7 @@ const ClientTabs = () => (
     <Tab.Screen name="Search" component={SearchScreen} />
     <Tab.Screen name="Appointments" component={AppointmentsScreen} />
     <Tab.Screen name="Cases" component={CasesScreen} />
+    <Tab.Screen name="Chats" component={ChatListScreen} />
     <Tab.Screen name="Profile" component={ProfileScreen} />
   </Tab.Navigator>
 );
@@ -215,6 +218,7 @@ export const MainStack = () => {
       <Stack.Screen name="LawyerTemplates" component={LawyerTemplatesScreen} />
       <Stack.Screen name="ProSubscription" component={ProSubscriptionScreen} />
       <Stack.Screen name="About" component={AboutScreen} />
+      <Stack.Screen name="LawyerClientDetail" component={LawyerClientDetailScreen} />
       <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
       <Stack.Screen name="PrivacyTerms" component={PrivacyTermsScreen} />
       <Stack.Screen name="Availability" component={AvailabilityScreen} />

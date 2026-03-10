@@ -190,6 +190,7 @@ export const LawyerAppointmentsScreen: React.FC<{ navigation: any }> = ({ naviga
         item.status === AppointmentStatus.CONFIRMED
           ? () => navigation.navigate('VideoCall', { appointmentId: item.id }) : undefined
       }
+      onViewClient={() => navigation.navigate('LawyerClientDetail', { clientId: item.clientId, name: item.client?.name })}
     />
   );
 

@@ -234,7 +234,7 @@ export const LawyerDashboardScreen: React.FC<{ navigation: any }> = ({ navigatio
               key={appt.id}
               style={styles.apptCard}
               activeOpacity={0.7}
-              onPress={() => navigation.navigate('ChatScreen', { otherUserId: appt.clientId, name: appt.client?.name })}
+              onPress={() => navigation.navigate('LawyerClientDetail', { clientId: appt.clientId, name: appt.client?.name })}
             >
               <View style={styles.apptAvatar}>
                 {appt.client?.avatar ? (

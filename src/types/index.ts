@@ -184,16 +184,28 @@ export interface ChatMessage {
   id: string;
   chatId: string;
   senderId: string;
-  text: string;
+  text: string | null;
   attachments?: string[];
+  messageType?: string;
+  isRead?: boolean;
+  readAt?: string | null;
   createdAt: string;
-  readAt?: string;
+}
+
+export interface ChatParticipant {
+  id: string;
+  name: string;
+  avatarUrl?: string;
+  avatar?: string;
 }
 
 export interface Chat {
   id: string;
-  participants: { id: string; name: string; avatar?: string }[];
+  caseId?: string | null;
+  participants: ChatParticipant[];
   lastMessage?: ChatMessage;
+  unreadCount?: number;
+  updatedAt?: string;
   createdAt: string;
 }
 
