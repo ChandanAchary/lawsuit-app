@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Alert, TextInput, Linking,
+  View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Alert, TextInput, Linking, StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
@@ -15,22 +15,19 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { format } from 'date-fns';
 import { formatErrorMessage } from '../../utils/formatError';
 
+
 const TABS = [
   { key: 'upcoming', label: 'Upcoming' },
   { key: 'attended', label: 'Attended' },
   { key: 'missed', label: 'Missed' },
   { key: 'cancelled', label: 'Cancelled' },
+  { key: 'completed', label: 'Completed' },
 ];
 
-const statusMap: Record<string, AppointmentStatus | undefined> = {
-  upcoming: AppointmentStatus.CONFIRMED,
-  attended: AppointmentStatus.ATTENDED,
-  missed: AppointmentStatus.MISSED,
-  cancelled: AppointmentStatus.CANCELLED,
-};
 
 export const AppointmentsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const [tab, setTab] = useState('upcoming');
+  const [allAppointments, setAllAppointments] = useState<Appointment[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -42,20 +39,52 @@ export const AppointmentsScreen: React.FC<{ navigation: any }> = ({ navigation }
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [rescheduling, setRescheduling] = useState(false);
 
+  // Fetch all appointments once
   const fetchAppointments = useCallback(async (showLoader = true) => {
     if (showLoader) setLoading(true);
     try {
-      const { data } = await appointmentsApi.getAll({ status: statusMap[tab] });
-      setAppointments(data.items || data.appointments || data || []);
+      const { data } = await appointmentsApi.getAll();
+      setAllAppointments(data.items || data.appointments || data || []);
     } catch {
-      setAppointments([]);
+      setAllAppointments([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [tab]);
+  }, []);
 
-  useEffect(() => { fetchAppointments(); }, [fetchAppointments]);
+  // Filter appointments by tab
+  useEffect(() => {
+    fetchAppointments();
+  }, []);
+
+  useEffect(() => {
+    const now = new Date();
+    let filtered: Appointment[] = [];
+    switch (tab) {
+      case 'upcoming':
+        filtered = allAppointments.filter(a =>
+          a.status === AppointmentStatus.CONFIRMED &&
+          new Date(a.scheduledAt) > now
+        );
+        break;
+      case 'attended':
+        filtered = allAppointments.filter(a => a.status === AppointmentStatus.ATTENDED);
+        break;
+      case 'missed':
+        filtered = allAppointments.filter(a => a.status === AppointmentStatus.MISSED);
+        break;
+      case 'cancelled':
+        filtered = allAppointments.filter(a => a.status === AppointmentStatus.CANCELLED);
+        break;
+      case 'completed':
+        filtered = allAppointments.filter(a => a.status === AppointmentStatus.COMPLETED);
+        break;
+      default:
+        filtered = allAppointments;
+    }
+    setAppointments(filtered);
+  }, [tab, allAppointments]);
 
   const handleCancel = async (id: string) => {
     Alert.alert('Cancel Appointment', 'Are you sure you want to cancel?', [
@@ -119,9 +148,10 @@ export const AppointmentsScreen: React.FC<{ navigation: any }> = ({ navigation }
 
   return (
     <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
       <View style={styles.headerBar}>
         <Text style={styles.headerTitle}>Appointments</Text>
-        <TabBar tabs={TABS} active={tab} onSelect={setTab} variant="filter" />
+        <TabBar tabs={TABS} active={tab} onSelect={setTab} variant="filter" onDarkBg />
       </View>
       {loading ? (
         <Loading />
@@ -176,11 +206,10 @@ const styles = StyleSheet.create({
   headerBar: {
     paddingHorizontal: SPACING.xl,
     paddingTop: SPACING.huge,
-    paddingBottom: 0,
-    backgroundColor: COLORS.white,
-    ...SHADOWS.sm,
+    paddingBottom: SPACING.sm,
+    backgroundColor: COLORS.primary,
   },
-  headerTitle: { fontSize: FONT_SIZE.xxl, fontWeight: '900', color: COLORS.text },
+  headerTitle: { fontSize: FONT_SIZE.xxl, fontWeight: '900', color: COLORS.white },
   list: { padding: SPACING.xl, paddingBottom: 100 },
   rescheduleContent: { paddingBottom: SPACING.xl },
   rescheduleLabel: { fontSize: FONT_SIZE.md, fontWeight: '600', color: COLORS.text, marginBottom: SPACING.lg },

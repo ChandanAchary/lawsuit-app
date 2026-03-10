@@ -1,7 +1,7 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, Modal, Dimensions,
-  ActivityIndicator, StatusBar, TextInput,
+  ActivityIndicator, StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -9,7 +9,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { useAuthStore } from '../../stores/authStore';
 import { useUserStore } from '../../stores/userStore';
-import { usersApi, storageApi, authApi, dashboardApi } from '../../services/api';
+import { usersApi, storageApi, dashboardApi } from '../../services/api';
 import { useThemeStore } from '../../stores/themeStore';
 import { Loading } from '../../components/Common';
 import { Button } from '../../components/Button';
@@ -25,16 +25,7 @@ export const LawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigation 
   const [showFullPhoto, setShowFullPhoto] = useState(false);
   const [lawyerInfo, setLawyerInfo] = useState<Record<string, any> | null>(null);
   const [stats, setStats] = useState({ casesWon: 0, clients: 0, rating: 0 });
-  const [showSecurity, setShowSecurity] = useState(false);
   const [showAppearance, setShowAppearance] = useState(false);
-
-  // Change password state
-  const [pwOtpSent, setPwOtpSent] = useState(false);
-  const [otpDigits, setOtpDigits] = useState(Array(6).fill(''));
-  const otpRefs = Array.from({ length: 6 }, () => useRef<TextInput>(null));
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [pwLoading, setPwLoading] = useState(false);
 
   useEffect(() => { getUser(); fetchLawyerInfo(); fetchStats(); }, []);
 
@@ -85,49 +76,6 @@ export const LawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigation 
     } catch (err: any) {
       Alert.alert('Error', err.message || 'Failed to upload photo');
     } finally { setUploading(false); }
-  };
-
-  const handleSendPwOtp = async () => {
-    const email = (user || authUser)?.email;
-    if (!email) return;
-    setPwLoading(true);
-    try {
-      await authApi.requestOtp(email);
-      setPwOtpSent(true);
-      Alert.alert('OTP Sent', 'Check your email');
-    } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.error || 'Failed to send OTP');
-    } finally { setPwLoading(false); }
-  };
-
-  const handleOtpChange = (text: string, index: number) => {
-    const digit = text.replace(/[^0-9]/g, '').slice(-1);
-    const next = [...otpDigits];
-    next[index] = digit;
-    setOtpDigits(next);
-    if (digit && index < 5) otpRefs[index + 1].current?.focus();
-  };
-
-  const handleOtpKeyPress = (e: any, index: number) => {
-    if (e.nativeEvent.key === 'Backspace' && !otpDigits[index] && index > 0) {
-      otpRefs[index - 1].current?.focus();
-    }
-  };
-
-  const handleChangePassword = async () => {
-    const email = (user || authUser)?.email;
-    const otp = otpDigits.join('');
-    if (!email || otp.length < 6 || !newPassword) return;
-    if (newPassword.length < 8) { Alert.alert('Error', 'Min 8 characters'); return; }
-    if (newPassword !== confirmPassword) { Alert.alert('Error', 'Passwords do not match'); return; }
-    setPwLoading(true);
-    try {
-      await authApi.restorePassword(email, otp, newPassword);
-      Alert.alert('Success', 'Password changed successfully');
-      setOtpDigits(['', '', '']); setNewPassword(''); setConfirmPassword(''); setPwOtpSent(false); setShowSecurity(false);
-    } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.error || 'Failed to change password');
-    } finally { setPwLoading(false); }
   };
 
   const handleLogout = () => {
@@ -221,7 +169,7 @@ export const LawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigation 
           <MenuItem icon="card-outline" label="Bank & UPI Accounts" subtitle="Manage withdrawal accounts"
             onPress={() => navigation.navigate('BankAccounts')} />
           <MenuItem icon="shield-checkmark-outline" label="Security" subtitle="Password, 2FA"
-            onPress={() => setShowSecurity(true)} last />
+            onPress={() => navigation.navigate('Security')} last />
         </View>
 
         {/* ── PREFERENCES Section ── */}
@@ -254,63 +202,6 @@ export const LawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigation 
 
         <Text style={styles.versionText}>LawSoft for Lawyers · v1.0.0</Text>
       </ScrollView>
-
-      {/* ── Security Modal ── */}
-      <Modal visible={showSecurity} transparent animationType="slide" onRequestClose={() => setShowSecurity(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Security</Text>
-              <TouchableOpacity onPress={() => { setShowSecurity(false); setPwOtpSent(false); setOtpDigits(['', '', '']); setNewPassword(''); setConfirmPassword(''); }}>
-                <Ionicons name="close" size={24} color={COLORS.text} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={{ paddingHorizontal: SPACING.xl }} contentContainerStyle={{ paddingBottom: SPACING.xxl }}>
-              <View style={styles.securityInfo}>
-                <View style={styles.securityInfoRow}>
-                  <Text style={styles.securityInfoLabel}>Verification</Text>
-                  <View style={[styles.statusBadge, { backgroundColor: displayUser?.isVerified ? COLORS.successLight : COLORS.warningLight }]}>
-                    <Text style={[styles.statusBadgeText, { color: displayUser?.isVerified ? COLORS.success : COLORS.warning }]}>
-                      {displayUser?.isVerified ? 'Verified' : 'Pending'}
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.securityInfoRow}>
-                  <Text style={styles.securityInfoLabel}>Role</Text>
-                  <Text style={styles.securityInfoValue}>LAWYER</Text>
-                </View>
-              </View>
-              <Text style={styles.securitySectionTitle}>Change Password</Text>
-              <Text style={styles.securityHint}>We'll send a verification code to {displayUser?.email}</Text>
-              {!pwOtpSent ? (
-                <Button title="Send OTP" onPress={handleSendPwOtp} loading={pwLoading} size="lg" />
-              ) : (
-                <>
-                  <Text style={styles.fieldLabel}>Enter OTP</Text>
-                  <View style={styles.otpRow}>
-                    {otpDigits.map((digit, i) => (
-                      <TextInput
-                        key={i}
-                        ref={otpRefs[i]}
-                        style={[styles.otpBox, digit ? styles.otpBoxFilled : null]}
-                        value={digit}
-                        onChangeText={(t) => handleOtpChange(t, i)}
-                        onKeyPress={(e) => handleOtpKeyPress(e, i)}
-                        keyboardType="number-pad"
-                        maxLength={1}
-                        textAlign="center"
-                      />
-                    ))}
-                  </View>
-                  <Input label="New Password" value={newPassword} onChangeText={setNewPassword} placeholder="Min 8 characters" secureTextEntry icon={<Ionicons name="lock-closed-outline" size={20} color={COLORS.textMuted} />} />
-                  <Input label="Confirm Password" value={confirmPassword} onChangeText={setConfirmPassword} placeholder="Re-enter password" secureTextEntry icon={<Ionicons name="lock-closed-outline" size={20} color={COLORS.textMuted} />} />
-                  <Button title="Change Password" onPress={handleChangePassword} loading={pwLoading} size="lg" />
-                </>
-              )}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
 
       {/* ── Appearance Modal ── */}
       <Modal visible={showAppearance} transparent animationType="slide" onRequestClose={() => setShowAppearance(false)}>

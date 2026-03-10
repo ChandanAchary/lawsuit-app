@@ -11,9 +11,11 @@ interface TabBarProps {
    *  'capsule' = tall oval capsules for Cases
    *  'filter'  = bordered white pills (matches SearchScreen sort chips) */
   variant?: 'pill' | 'capsule' | 'filter';
+  /** When true, renders the filter variant with inverted colours for dark/primary headers */
+  onDarkBg?: boolean;
 }
 
-export const TabBar: React.FC<TabBarProps> = ({ tabs, active, onSelect, variant = 'pill' }) => {
+export const TabBar: React.FC<TabBarProps> = ({ tabs, active, onSelect, variant = 'pill', onDarkBg = false }) => {
   const C = useColors();
 
   if (variant === 'filter') {
@@ -27,6 +29,15 @@ export const TabBar: React.FC<TabBarProps> = ({ tabs, active, onSelect, variant 
       >
         {tabs.map((tab) => {
           const isActive = tab.key === active;
+          const chipBg = onDarkBg
+            ? (isActive ? C.white : 'rgba(255,255,255,0.15)')
+            : (isActive ? C.primary : C.surface);
+          const chipBorder = onDarkBg
+            ? (isActive ? C.white : 'rgba(255,255,255,0.35)')
+            : (isActive ? C.primary : C.border);
+          const chipText = onDarkBg
+            ? (isActive ? C.primary : 'rgba(255,255,255,0.9)')
+            : (isActive ? C.white : C.textSecondary);
           return (
             <TouchableOpacity
               key={tab.key}
@@ -34,18 +45,10 @@ export const TabBar: React.FC<TabBarProps> = ({ tabs, active, onSelect, variant 
               activeOpacity={0.75}
               style={[
                 filterStyles.chip,
-                {
-                  backgroundColor: isActive ? C.primary : C.surface,
-                  borderColor: isActive ? C.primary : C.border,
-                },
+                { backgroundColor: chipBg, borderColor: chipBorder },
               ]}
             >
-              <Text
-                style={[
-                  filterStyles.chipText,
-                  { color: isActive ? C.white : C.textSecondary },
-                ]}
-              >
+              <Text style={[filterStyles.chipText, { color: chipText }]}>
                 {tab.label}
               </Text>
               {tab.count !== undefined && tab.count > 0 && (
@@ -54,12 +57,12 @@ export const TabBar: React.FC<TabBarProps> = ({ tabs, active, onSelect, variant 
                     filterStyles.badge,
                     {
                       backgroundColor: isActive
-                        ? 'rgba(255,255,255,0.25)'
+                        ? (onDarkBg ? 'rgba(11,77,100,0.15)' : 'rgba(255,255,255,0.25)')
                         : C.surfaceAlt,
                     },
                   ]}
                 >
-                  <Text style={[filterStyles.badgeText, { color: isActive ? C.white : C.textSecondary }]}>
+                  <Text style={[filterStyles.badgeText, { color: chipText }]}>
                     {tab.count}
                   </Text>
                 </View>

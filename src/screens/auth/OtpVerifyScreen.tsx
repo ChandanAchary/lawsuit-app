@@ -102,9 +102,6 @@ export const OtpVerifyScreen: React.FC<{ navigation: any; route: any }> = ({ nav
             />
           ))}
         </View>
-        <TouchableOpacity style={styles.resendBtn} onPress={handleResendOtp}>
-          <Text style={styles.resendText}>Resend OTP</Text>
-        </TouchableOpacity>
 
         <Button title="Verify" onPress={handleVerify} loading={isLoading} size="lg" />
 

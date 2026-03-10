@@ -61,11 +61,19 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
         ...raw,
         avatar,
         specialization: raw.specializations || raw.specialization || [],
-        location: raw.city || raw.location || raw.address || '',
-        fee: raw.feePerConsultation || raw.fee || 0,
-        reviewsCount: raw.totalReviews || raw.reviewsCount || 0,
-        experienceYears: raw.experienceYears || raw.experience || 0,
-        rating: raw.rating || raw.avgRating || 0,
+        location: [raw.city, raw.state].filter(Boolean).join(', ') || raw.location || raw.address || '',
+        // feePerConsultation is stored in paise — convert to rupees
+        fee: (raw.feePerConsultation != null ? Number(raw.feePerConsultation) : (raw.fee || 0)) / 100,
+        reviewsCount: raw.stats?.totalReviews ?? raw.totalReviews ?? raw.reviewsCount ?? 0,
+        experienceYears: raw.experienceYears || 0,
+        rating: raw.stats?.averageRating ?? raw.rating ?? raw.avgRating ?? 0,
+        isVerified: raw.isVerified || false,
+        organisation: raw.organisation || null,
+        barCouncil: raw.barCouncil || null,
+        licenseNumber: raw.licenseNumber || null,
+        stats: raw.stats || null,
+        education: raw.education || null,
+        experience: raw.experience || null,
       };
       setLawyer(normalizedLawyer as Lawyer);
     } catch (err: any) {
@@ -99,7 +107,13 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
 
       const normalized = (slotsData || []).map((s: any) => {
         if (!s) return null;
-        if (typeof s === 'string') return { time: s, available: true, display: s } as any;
+        if (typeof s === 'string') {
+          try {
+            return { time: s, available: true, display: format(new Date(s), 'hh:mm a') } as any;
+          } catch {
+            return { time: s, available: true, display: s } as any;
+          }
+        }
         // try to get an ISO time if available
         const rawTime = s.time || s.slot || s.start || s.label || s.from || s.to || String(s);
         let iso = rawTime;
@@ -221,7 +235,12 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
                 <Ionicons name="person" size={40} color={COLORS.textMuted} />
               </View>
             )}
-            <Text style={styles.name}>{lawyer.name}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={styles.name}>{lawyer.name}</Text>
+              {lawyer.isVerified && (
+                <Ionicons name="checkmark-circle" size={22} color={COLORS.success} />
+              )}
+            </View>
             {lawyer.specialization?.length > 0 && (
               <Text style={styles.spec}>{lawyer.specialization.join(' · ')}</Text>
             )}
@@ -254,9 +273,33 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
             </View>
             <View style={styles.infoCard}>
               <Ionicons name="cash-outline" size={18} color={COLORS.success} />
-              <Text style={styles.infoText}>₹{lawyer.fee?.toLocaleString('en-IN')}/session</Text>
+              <Text style={styles.infoText}>₹{lawyer.fee?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/session</Text>
             </View>
           </View>
+
+          {/* Professional details card */}
+          {((lawyer as any).organisation || (lawyer as any).barCouncil || lawyer.licenseNumber) && (
+            <View style={styles.proDetailCard}>
+              {(lawyer as any).organisation && (
+                <View style={styles.proDetailRow}>
+                  <Ionicons name="business-outline" size={15} color={COLORS.primary} />
+                  <Text style={styles.proDetailText}>{(lawyer as any).organisation}</Text>
+                </View>
+              )}
+              {(lawyer as any).barCouncil && (
+                <View style={styles.proDetailRow}>
+                  <Ionicons name="shield-checkmark-outline" size={15} color={COLORS.primary} />
+                  <Text style={styles.proDetailText}>Bar Council: {(lawyer as any).barCouncil}</Text>
+                </View>
+              )}
+              {lawyer.licenseNumber && (
+                <View style={styles.proDetailRow}>
+                  <Ionicons name="document-text-outline" size={15} color={COLORS.primary} />
+                  <Text style={styles.proDetailText}>License: {lawyer.licenseNumber}</Text>
+                </View>
+              )}
+            </View>
+          )}
 
           {lawyer.languages?.length > 0 && (
             <View style={styles.languagesRow}>
@@ -277,6 +320,49 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
               <Text style={styles.bioText}>{lawyer.bio}</Text>
             </View>
           )}
+
+          {/* Case Statistics */}
+          {(lawyer as any).stats && (
+            <View style={styles.statsSection}>
+              <Text style={styles.statsSectionTitle}>Case Statistics</Text>
+              <View style={styles.statsCardsRow}>
+                <View style={styles.statsCard}>
+                  <Text style={styles.statsCardValue}>{(lawyer as any).stats.totalCases ?? 0}</Text>
+                  <Text style={styles.statsCardLabel}>Total Cases</Text>
+                </View>
+                <View style={styles.statsCard}>
+                  <Text style={styles.statsCardValue}>{(lawyer as any).stats.completedConsultations ?? 0}</Text>
+                  <Text style={styles.statsCardLabel}>Consultations</Text>
+                </View>
+                <View style={styles.statsCard}>
+                  <Text style={styles.statsCardValue}>{(lawyer as any).stats.successRate ?? 0}%</Text>
+                  <Text style={styles.statsCardLabel}>Success Rate</Text>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Education */}
+          {(lawyer as any).education && (() => {
+            try {
+              const raw = (lawyer as any).education;
+              const eds = typeof raw === 'string' ? JSON.parse(raw) : raw;
+              const eduArr: any[] = Array.isArray(eds) ? eds : (eds ? [eds] : []);
+              if (!eduArr.length) return null;
+              return (
+                <View style={styles.eduSection}>
+                  <Text style={styles.eduTitle}>Education</Text>
+                  {eduArr.map((e: any, i: number) => (
+                    <View key={i} style={styles.eduCard}>
+                      <Text style={styles.eduDegree}>{e.degree || e.title || String(e)}</Text>
+                      {e.institution && <Text style={styles.eduInstitution}>{e.institution}</Text>}
+                      {e.year && <Text style={styles.eduYear}>{e.year}</Text>}
+                    </View>
+                  ))}
+                </View>
+              );
+            } catch { return null; }
+          })()}
 
           {/* Date picker */}
           <View style={styles.bookingSection}>
@@ -343,7 +429,7 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
       {selectedSlot && (
         <View style={styles.bottomBar}>
           <View>
-            <Text style={styles.bottomFee}>₹{lawyer.fee?.toLocaleString('en-IN')}</Text>
+            <Text style={styles.bottomFee}>₹{lawyer.fee?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
             <Text style={styles.bottomSlot}>{format(selectedDate, 'dd MMM')} at {(() => {
               const found = slots.find((x) => x.time === selectedSlot) as any;
               if (found && found.display) return found.display;
@@ -384,7 +470,7 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
           </View>
           <View style={styles.confirmRow}>
             <Text style={styles.confirmLabel}>Fee</Text>
-            <Text style={styles.confirmValue}>₹{lawyer.fee?.toLocaleString('en-IN')}</Text>
+            <Text style={styles.confirmValue}>₹{lawyer.fee?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
           </View>
 
           <Text style={styles.paymentTitle}>Payment Method</Text>
@@ -564,4 +650,42 @@ const styles = StyleSheet.create({
   paymentOptionActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   paymentText: { fontSize: FONT_SIZE.sm, fontWeight: '600', color: COLORS.textSecondary },
   paymentTextActive: { color: COLORS.white },
+  // Professional details
+  proDetailCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.md,
+    marginBottom: SPACING.lg,
+    gap: SPACING.sm,
+    ...SHADOWS.sm,
+  },
+  proDetailRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: SPACING.sm },
+  proDetailText: { fontSize: FONT_SIZE.sm, color: COLORS.text, flex: 1 },
+  // Case stats section
+  statsSection: { marginBottom: SPACING.xl },
+  statsSectionTitle: { fontSize: FONT_SIZE.lg, fontWeight: '700', color: COLORS.text, marginBottom: SPACING.md },
+  statsCardsRow: { flexDirection: 'row' as const, gap: SPACING.md },
+  statsCard: {
+    flex: 1,
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.md,
+    alignItems: 'center' as const,
+    ...SHADOWS.sm,
+  },
+  statsCardValue: { fontSize: FONT_SIZE.xl, fontWeight: '900', color: COLORS.primary },
+  statsCardLabel: { fontSize: FONT_SIZE.xs, color: COLORS.textSecondary, marginTop: 2, textAlign: 'center' as const },
+  // Education section
+  eduSection: { marginBottom: SPACING.xl },
+  eduTitle: { fontSize: FONT_SIZE.lg, fontWeight: '700', color: COLORS.text, marginBottom: SPACING.md },
+  eduCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.md,
+    marginBottom: SPACING.sm,
+    ...SHADOWS.sm,
+  },
+  eduDegree: { fontSize: FONT_SIZE.md, fontWeight: '700', color: COLORS.text },
+  eduInstitution: { fontSize: FONT_SIZE.sm, color: COLORS.textSecondary, marginTop: 2 },
+  eduYear: { fontSize: FONT_SIZE.xs, color: COLORS.textMuted, marginTop: 2 },
 });

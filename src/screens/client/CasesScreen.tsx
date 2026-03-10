@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, RefreshControl,
+  View, Text, StyleSheet, FlatList, RefreshControl, StatusBar,
 } from 'react-native';
 import { COLORS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { casesApi } from '../../services/api';
@@ -42,9 +42,10 @@ export const CasesScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
       <View style={styles.headerBar}>
         <Text style={styles.headerTitle}>My Cases</Text>
-        <TabBar tabs={TABS} active={tab} onSelect={setTab} variant="filter" />
+        <TabBar tabs={TABS} active={tab} onSelect={setTab} variant="filter" onDarkBg />
       </View>
       {loading ? (
         <Loading />
@@ -72,10 +73,9 @@ const styles = StyleSheet.create({
   headerBar: {
     paddingHorizontal: SPACING.xl,
     paddingTop: SPACING.huge,
-    paddingBottom: 0,
-    backgroundColor: COLORS.white,
-    ...SHADOWS.sm,
+    paddingBottom: SPACING.sm,
+    backgroundColor: COLORS.primary,
   },
-  headerTitle: { fontSize: FONT_SIZE.xxl, fontWeight: '900', color: COLORS.text },
+  headerTitle: { fontSize: FONT_SIZE.xxl, fontWeight: '900', color: COLORS.white },
   list: { padding: SPACING.xl, paddingBottom: 100 },
 });

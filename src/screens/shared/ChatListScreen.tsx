@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, Image, RefreshControl,
+  View, Text, StyleSheet, FlatList, TouchableOpacity, Image, RefreshControl, StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
@@ -89,6 +89,7 @@ export const ChatListScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
 
   return (
     <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Chats</Text>
       </View>
@@ -113,10 +114,10 @@ export const ChatListScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   header: {
-    paddingHorizontal: SPACING.xl, paddingTop: SPACING.huge, paddingBottom: SPACING.md,
-    backgroundColor: COLORS.white, ...SHADOWS.sm,
+    paddingHorizontal: SPACING.xl, paddingTop: SPACING.huge, paddingBottom: SPACING.lg,
+    backgroundColor: COLORS.primary,
   },
-  headerTitle: { fontSize: FONT_SIZE.xxl, fontWeight: '900', color: COLORS.text },
+  headerTitle: { fontSize: FONT_SIZE.xxl, fontWeight: '900', color: COLORS.white },
   chatItem: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING.md,
     paddingVertical: SPACING.lg, paddingHorizontal: SPACING.xl,

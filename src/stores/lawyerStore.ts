@@ -51,10 +51,14 @@ export const useLawyerStore = create<LawyerState>((set) => ({
           ...l,
           avatar: l.avatar || l.avatarUrl || (l.user && (l.user.avatar || l.user.avatarUrl)) || undefined,
           specialization: l.specializations || l.specialization || [],
-          location: l.city || l.location || '',
-          // normalize fee: backend stores paise, convert to rupees for UI
-          fee: l.feePerConsultation ? Number(l.feePerConsultation) / 100 : (l.fee || 0),
+          location: [l.city, l.state].filter(Boolean).join(', ') || l.location || l.address || '',
+          // feePerConsultation is stored in paise — convert to rupees
+          fee: l.feePerConsultation != null ? Number(l.feePerConsultation) / 100 : (l.fee || 0),
           reviewsCount: l.totalReviews || l.reviewsCount || 0,
+          rating: l.rating || l.avgRating || 0,
+          bio: l.bio || null,
+          organisation: l.organisation || null,
+          barCouncil: l.barCouncil || null,
         })),
         total: data.total || items.length,
         page,

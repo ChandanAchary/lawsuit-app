@@ -23,6 +23,7 @@ export const SecurityScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   const [showConfirmPw, setShowConfirmPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [resendTimer, setResendTimer] = useState(0);
 
   // Toast state
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
@@ -37,6 +38,17 @@ export const SecurityScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
     ]).start(() => setToast({ message: '', visible: false }));
   };
 
+  // Start resend countdown when entering reset step
+  useEffect(() => {
+    if (step === 'reset') setResendTimer(30);
+  }, [step]);
+
+  useEffect(() => {
+    if (resendTimer <= 0) return;
+    const t = setTimeout(() => setResendTimer((r) => r - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendTimer]);
+
   const handleSendOtp = async () => {
     if (!user?.email) return;
     setError('');
@@ -45,6 +57,21 @@ export const SecurityScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
       await requestOtp(user.email);
       showToast('OTP sent to your email');
       setStep('reset');
+    } catch (err: any) {
+      setError(formatErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (!user?.email) return;
+    setError('');
+    setLoading(true);
+    try {
+      await requestOtp(user.email);
+      setResendTimer(30);
+      showToast('OTP resent to your email');
     } catch (err: any) {
       setError(formatErrorMessage(err));
     } finally {
@@ -199,6 +226,17 @@ export const SecurityScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
                 }
               />
 
+              {/* Resend OTP */}
+              <View style={styles.resendRow}>
+                {resendTimer > 0 ? (
+                  <Text style={styles.resendTimerText}>Resend OTP in {resendTimer}s</Text>
+                ) : (
+                  <TouchableOpacity onPress={handleResendOtp} disabled={loading}>
+                    <Text style={styles.resendLink}>Resend OTP</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
               <View style={styles.btnRow}>
                 <Button
                   title="Back"
@@ -308,6 +346,10 @@ const styles = StyleSheet.create({
 
   btnRow: { flexDirection: 'row', gap: SPACING.md, marginTop: SPACING.sm },
   btnHalf: { flex: 1 },
+
+  resendRow: { alignItems: 'center', marginTop: SPACING.sm, marginBottom: SPACING.md },
+  resendTimerText: { fontSize: FONT_SIZE.sm, color: COLORS.textMuted },
+  resendLink: { fontSize: FONT_SIZE.sm, fontWeight: '700', color: COLORS.primary },
 
   infoRow: {
     flexDirection: 'row',

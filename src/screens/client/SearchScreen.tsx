@@ -35,34 +35,8 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     }
   };
 
-  const renderHeader = () => (
-    <View style={styles.header}>
-      <View style={styles.searchRow}>
-        <View style={styles.searchBox}>
-          <Ionicons name="search" size={20} color={COLORS.textMuted} />
-          <TextInput
-            style={styles.searchInput}
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Search lawyers..."
-            placeholderTextColor={COLORS.textMuted}
-            onSubmitEditing={handleSearch}
-            returnKeyType="search"
-          />
-          {search.length > 0 && (
-            <TouchableOpacity onPress={() => { setSearch(''); fetchLawyers({ ...filters, search: '', sortBy, sortOrder: 'desc' }); }}>
-              <Ionicons name="close-circle" size={18} color={COLORS.textMuted} />
-            </TouchableOpacity>
-          )}
-        </View>
-        <TouchableOpacity
-          style={[styles.filterBtn, Object.keys(filters).length > 0 && styles.filterBtnActive]}
-          onPress={() => setShowFilters(true)}
-        >
-          <Ionicons name="options" size={22} color={Object.keys(filters).length > 0 ? COLORS.white : COLORS.primary} />
-        </TouchableOpacity>
-      </View>
-
+  const renderSubHeader = () => (
+    <View style={styles.subHeader}>
       <View style={styles.sortRow}>
         {['rating', 'experience', 'fee'].map((s) => (
           <TouchableOpacity
@@ -76,21 +50,50 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           </TouchableOpacity>
         ))}
       </View>
-
       <Text style={styles.resultCount}>{total} lawyer{total !== 1 ? 's' : ''} found</Text>
     </View>
   );
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
+
+      {/* Fixed primary-coloured search header */}
+      <View style={styles.headerFixed}>
+        <View style={styles.searchRow}>
+          <View style={styles.searchBox}>
+            <Ionicons name="search" size={20} color={COLORS.textMuted} />
+            <TextInput
+              style={styles.searchInput}
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search lawyers..."
+              placeholderTextColor={COLORS.textMuted}
+              onSubmitEditing={handleSearch}
+              returnKeyType="search"
+            />
+            {search.length > 0 && (
+              <TouchableOpacity onPress={() => { setSearch(''); fetchLawyers({ ...filters, search: '', sortBy, sortOrder: 'desc' }); }}>
+                <Ionicons name="close-circle" size={18} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            )}
+          </View>
+          <TouchableOpacity
+            style={[styles.filterBtn, Object.keys(filters).length > 0 && styles.filterBtnActive]}
+            onPress={() => setShowFilters(true)}
+          >
+            <Ionicons name="options" size={22} color={COLORS.white} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
       <FlatList
         data={lawyers}
         renderItem={({ item }) => (
           <LawyerCard lawyer={item} onPress={() => handleLawyerPress(item)} />
         )}
         keyExtractor={(item) => item.id}
-        ListHeaderComponent={renderHeader}
+        ListHeaderComponent={renderSubHeader}
         contentContainerStyle={styles.list}
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.5}
@@ -156,12 +159,17 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  header: { paddingBottom: SPACING.md },
+  headerFixed: {
+    backgroundColor: COLORS.primary,
+    paddingTop: SPACING.huge,
+    paddingHorizontal: SPACING.xl,
+    paddingBottom: SPACING.lg,
+  },
+  subHeader: { paddingTop: SPACING.md, paddingBottom: SPACING.xs },
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.sm,
-    marginBottom: SPACING.md,
   },
   searchBox: {
     flex: 1,
@@ -172,8 +180,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
     height: 48,
     gap: SPACING.sm,
-    borderWidth: 1,
-    borderColor: COLORS.border,
   },
   searchInput: {
     flex: 1,
@@ -184,15 +190,15 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: BORDER_RADIUS.xl,
-    backgroundColor: COLORS.white,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: 'rgba(255,255,255,0.4)',
+    backgroundColor: 'rgba(255,255,255,0.12)',
   },
   filterBtnActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderColor: COLORS.white,
   },
   sortRow: {
     flexDirection: 'row',
@@ -218,7 +224,7 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     marginBottom: SPACING.sm,
   },
-  list: { padding: SPACING.lg, paddingTop: SPACING.huge + SPACING.lg },
+  list: { padding: SPACING.lg, paddingTop: SPACING.xs },
   empty: { alignItems: 'center', paddingVertical: SPACING.huge },
   emptyTitle: { fontSize: FONT_SIZE.xl, fontWeight: '700', color: COLORS.text, marginTop: SPACING.lg },
   emptyDesc: { fontSize: FONT_SIZE.md, color: COLORS.textMuted, marginTop: SPACING.xs },

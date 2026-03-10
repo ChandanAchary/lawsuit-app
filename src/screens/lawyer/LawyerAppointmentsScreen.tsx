@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, RefreshControl, Alert, TouchableOpacity, Linking,
+  View, Text, StyleSheet, FlatList, RefreshControl, Alert, TouchableOpacity, Linking, StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
@@ -23,16 +23,19 @@ const TABS = [
   { key: 'cancelled', label: 'Cancelled' },
 ];
 
+
 const statusMap: Record<string, AppointmentStatus | undefined> = {
   upcoming: AppointmentStatus.CONFIRMED,
   pending: AppointmentStatus.PENDING,
   attended: AppointmentStatus.ATTENDED,
   missed: AppointmentStatus.MISSED,
   cancelled: AppointmentStatus.CANCELLED,
-};
+}; // unused, now client-side filtering
+
 
 export const LawyerAppointmentsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const [tab, setTab] = useState('upcoming');
+  const [allAppointments, setAllAppointments] = useState<Appointment[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -44,20 +47,49 @@ export const LawyerAppointmentsScreen: React.FC<{ navigation: any }> = ({ naviga
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [rescheduling, setRescheduling] = useState(false);
 
+  // Fetch all appointments once
   const fetchAppointments = useCallback(async (showLoader = true) => {
     if (showLoader) setLoading(true);
     try {
-      const { data } = await appointmentsApi.getAll({ status: statusMap[tab] });
-      setAppointments(data.items || data.appointments || data || []);
+      const { data } = await appointmentsApi.getAll();
+      setAllAppointments(data.items || data.appointments || data || []);
     } catch {
-      setAppointments([]);
+      setAllAppointments([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [tab]);
+  }, []);
 
-  useEffect(() => { fetchAppointments(); }, [fetchAppointments]);
+  useEffect(() => { fetchAppointments(); }, []);
+
+  useEffect(() => {
+    const now = new Date();
+    let filtered: Appointment[] = [];
+    switch (tab) {
+      case 'upcoming':
+        filtered = allAppointments.filter(a =>
+          a.status === AppointmentStatus.CONFIRMED &&
+          new Date(a.scheduledAt) > now
+        );
+        break;
+      case 'pending':
+        filtered = allAppointments.filter(a => a.status === AppointmentStatus.PENDING);
+        break;
+      case 'attended':
+        filtered = allAppointments.filter(a => a.status === AppointmentStatus.ATTENDED);
+        break;
+      case 'missed':
+        filtered = allAppointments.filter(a => a.status === AppointmentStatus.MISSED);
+        break;
+      case 'cancelled':
+        filtered = allAppointments.filter(a => a.status === AppointmentStatus.CANCELLED);
+        break;
+      default:
+        filtered = allAppointments;
+    }
+    setAppointments(filtered);
+  }, [tab, allAppointments]);
 
   const handleCancel = async (id: string) => {
     Alert.alert('Cancel Appointment', 'Are you sure?', [
@@ -163,9 +195,10 @@ export const LawyerAppointmentsScreen: React.FC<{ navigation: any }> = ({ naviga
 
   return (
     <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
       <View style={styles.headerBar}>
         <Text style={styles.headerTitle}>Appointments</Text>
-        <TabBar tabs={TABS} active={tab} onSelect={setTab} variant="filter" />
+        <TabBar tabs={TABS} active={tab} onSelect={setTab} variant="filter" onDarkBg />
       </View>
       {loading ? <Loading /> : (
         <FlatList
@@ -216,10 +249,10 @@ export const LawyerAppointmentsScreen: React.FC<{ navigation: any }> = ({ naviga
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   headerBar: {
-    paddingHorizontal: SPACING.xl, paddingTop: SPACING.huge, paddingBottom: 0,
-    backgroundColor: COLORS.white, ...SHADOWS.sm,
+    paddingHorizontal: SPACING.xl, paddingTop: SPACING.huge, paddingBottom: SPACING.sm,
+    backgroundColor: COLORS.primary,
   },
-  headerTitle: { fontSize: FONT_SIZE.xxl, fontWeight: '900', color: COLORS.text },
+  headerTitle: { fontSize: FONT_SIZE.xxl, fontWeight: '900', color: COLORS.white },
   list: { padding: SPACING.xl, paddingBottom: 100 },
   rescheduleContent: { paddingBottom: SPACING.xl },
   rescheduleLabel: { fontSize: FONT_SIZE.md, fontWeight: '600', color: COLORS.text, marginBottom: SPACING.lg },
