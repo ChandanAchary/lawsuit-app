@@ -46,6 +46,7 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
   style,
 }) => {
   const person = role === 'CLIENT' ? appointment.lawyer : appointment.client;
+  const personAvatar = person?.avatar || (person as any)?.avatarUrl;
   const statusColor = APPOINTMENT_STATUS_COLORS[appointment.status] || APPOINTMENT_STATUS_COLORS.PENDING;
   const isUpcoming =
     appointment.status === AppointmentStatus.CONFIRMED ||
@@ -62,8 +63,8 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
       <View style={styles.header}>
         <View style={styles.personRow}>
           <View style={styles.avatarContainer}>
-            {person?.avatar ? (
-              <Image source={{ uri: person.avatar }} style={styles.avatar} />
+            {personAvatar ? (
+              <Image source={{ uri: personAvatar }} style={styles.avatar} />
             ) : (
               <View style={[styles.avatar, styles.avatarPlaceholder]}>
                 <Ionicons name="person" size={20} color={COLORS.textMuted} />

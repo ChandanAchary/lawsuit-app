@@ -113,7 +113,7 @@ export const appointmentsApi = {
   getById: (id: string) => api.get(`/appointments/${encodeURIComponent(id)}`),
   reschedule: (id: string, scheduledAt: string) =>
     api.put(`/appointments/${encodeURIComponent(id)}/reschedule`, { scheduledAt }),
-  cancel: (id: string) => api.put(`/appointments/${encodeURIComponent(id)}/cancel`),
+  cancel: (id: string) => api.post(`/appointments/${encodeURIComponent(id)}/cancel`),
   updateStatus: (id: string, status: string) =>
     api.put(`/appointments/${encodeURIComponent(id)}/status`, { status }),
   attend: (id: string, attended?: boolean) => api.post(`/appointments/${encodeURIComponent(id)}/attend`, { attended }),

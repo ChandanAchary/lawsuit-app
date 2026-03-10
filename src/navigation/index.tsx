@@ -54,6 +54,7 @@ import { PrivacyTermsScreen } from '../screens/shared/PrivacyTermsScreen';
 import { AvailabilityScreen } from '../screens/lawyer/AvailabilityScreen';
 import { VideoCallScreen } from '../screens/shared/VideoCallScreen';
 import { SecurityScreen } from '../screens/shared/SecurityScreen';
+import { AppointmentDetailScreen } from '../screens/shared/AppointmentDetailScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -224,6 +225,7 @@ export const MainStack = () => {
       <Stack.Screen name="Availability" component={AvailabilityScreen} />
       <Stack.Screen name="VideoCall" component={VideoCallScreen} />
       <Stack.Screen name="Security" component={SecurityScreen} />
+      <Stack.Screen name="AppointmentDetail" component={AppointmentDetailScreen} />
     </Stack.Navigator>
   );
 };

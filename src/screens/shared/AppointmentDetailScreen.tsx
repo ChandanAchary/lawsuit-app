@@ -143,8 +143,8 @@ export const AppointmentDetailScreen: React.FC<Props> = ({ navigation, route }) 
           <Text style={styles.cardTitle}>{personLabel} Details</Text>
           <View style={styles.personRow}>
             <View style={styles.avatarBlock}>
-              {person?.avatar ? (
-                <Image source={{ uri: person.avatar }} style={styles.avatar} />
+              {(person?.avatar || (person as any)?.avatarUrl) ? (
+                <Image source={{ uri: person?.avatar || (person as any)?.avatarUrl }} style={styles.avatar} />
               ) : (
                 <View style={[styles.avatar, styles.avatarFallback]}>
                   <Ionicons name="person" size={22} color={COLORS.textMuted} />
@@ -153,8 +153,8 @@ export const AppointmentDetailScreen: React.FC<Props> = ({ navigation, route }) 
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.personName}>{person?.name || 'Unknown'}</Text>
-              {person?.email && <Text style={styles.personSub}>{person.email}</Text>}
-              {person?.phone && <Text style={styles.personSub}>{person.phone}</Text>}
+              {(person as any)?.email && <Text style={styles.personSub}>{(person as any).email}</Text>}
+              {(person as any)?.phone && <Text style={styles.personSub}>{(person as any).phone}</Text>}
               {isClient && appointment.lawyer?.specialization?.[0] && (
                 <Text style={styles.personSub}>{appointment.lawyer.specialization.join(', ')}</Text>
               )}

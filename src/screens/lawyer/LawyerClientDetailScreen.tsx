@@ -109,8 +109,8 @@ export const LawyerClientDetailScreen: React.FC<Props> = ({ navigation, route })
         {/* Profile Card */}
         <View style={styles.profileCard}>
           <View style={styles.avatarWrapper}>
-            {client?.avatar ? (
-              <Image source={{ uri: client.avatar }} style={styles.avatar} />
+            {(client?.avatar || (client as any)?.avatarUrl) ? (
+              <Image source={{ uri: client?.avatar || (client as any)?.avatarUrl }} style={styles.avatar} />
             ) : (
               <View style={[styles.avatar, styles.avatarFallback]}>
                 <Text style={styles.avatarInitial}>{displayName.charAt(0).toUpperCase()}</Text>

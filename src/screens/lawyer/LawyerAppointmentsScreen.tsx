@@ -16,9 +16,11 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { format } from 'date-fns';
 
 const TABS = [
+  { key: 'all', label: 'All' },
   { key: 'upcoming', label: 'Upcoming' },
   { key: 'pending', label: 'Pending' },
   { key: 'attended', label: 'Attended' },
+  { key: 'completed', label: 'Completed' },
   { key: 'missed', label: 'Missed' },
   { key: 'cancelled', label: 'Cancelled' },
 ];
@@ -34,7 +36,7 @@ const statusMap: Record<string, AppointmentStatus | undefined> = {
 
 
 export const LawyerAppointmentsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
-  const [tab, setTab] = useState('upcoming');
+  const [tab, setTab] = useState('all');
   const [allAppointments, setAllAppointments] = useState<Appointment[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,6 +69,9 @@ export const LawyerAppointmentsScreen: React.FC<{ navigation: any }> = ({ naviga
     const now = new Date();
     let filtered: Appointment[] = [];
     switch (tab) {
+      case 'all':
+        filtered = allAppointments;
+        break;
       case 'upcoming':
         filtered = allAppointments.filter(a =>
           a.status === AppointmentStatus.CONFIRMED &&
@@ -78,6 +83,9 @@ export const LawyerAppointmentsScreen: React.FC<{ navigation: any }> = ({ naviga
         break;
       case 'attended':
         filtered = allAppointments.filter(a => a.status === AppointmentStatus.ATTENDED);
+        break;
+      case 'completed':
+        filtered = allAppointments.filter(a => a.status === AppointmentStatus.COMPLETED);
         break;
       case 'missed':
         filtered = allAppointments.filter(a => a.status === AppointmentStatus.MISSED);
@@ -175,11 +183,16 @@ export const LawyerAppointmentsScreen: React.FC<{ navigation: any }> = ({ naviga
     <AppointmentCard
       appointment={item}
       role="LAWYER"
+      onPress={() => navigation.navigate('AppointmentDetail', { appointmentId: item.id, appointment: item })}
       onCancel={item.status === AppointmentStatus.CONFIRMED ? () => handleCancel(item.id) : undefined}
       onAttend={item.status === AppointmentStatus.CONFIRMED ? () => handleAttend(item.id) : undefined}
       onAccept={item.status === AppointmentStatus.PENDING ? () => handleAccept(item.id) : undefined}
       onReject={item.status === AppointmentStatus.PENDING ? () => handleReject(item.id) : undefined}
-      onChat={() => navigation.navigate('ChatScreen', { otherUserId: item.clientId, name: item.client?.name })}
+      onChat={
+        item.status === AppointmentStatus.CONFIRMED || item.status === AppointmentStatus.ATTENDED || item.status === 'COMPLETED' as any
+          ? () => navigation.navigate('ChatScreen', { otherUserId: item.clientId, name: item.client?.name })
+          : undefined
+      }
       onCreateCase={item.status === AppointmentStatus.ATTENDED ? () => handleCreateCase(item) : undefined}
       onReschedule={
         item.status === AppointmentStatus.CONFIRMED || item.status === AppointmentStatus.MISSED
