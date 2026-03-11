@@ -32,7 +32,7 @@ export const ChatScreen: React.FC<{ navigation: any; route: any }> = ({ navigati
     if (!otherId) return Alert.alert('Error', 'Cannot determine call recipient');
     const roomId = generateRoomId();
     socketService.emit('call:initiate', { to: otherId, callType, roomId, chatId });
-    navigation.navigate('VideoCall', { roomId, callType, otherUser: other, isOutgoing: true });
+    navigation.navigate('VideoCall', { roomId, callType, otherUser: other, isOutgoing: true, chatId });
   };
 
   useEffect(() => {
@@ -118,7 +118,7 @@ export const ChatScreen: React.FC<{ navigation: any; route: any }> = ({ navigati
               <TouchableOpacity
                 style={[styles.callModalBtn, { backgroundColor: COLORS.error }]}
                 onPress={() => {
-                  if (incomingCall && otherId) socketService.emit('call:reject', { to: otherId, roomId: incomingCall.roomId });
+                  if (incomingCall && otherId) socketService.emit('call:reject', { to: otherId, roomId: incomingCall.roomId, chatId });
                   setIncomingCall(null);
                 }}
               >
@@ -131,7 +131,7 @@ export const ChatScreen: React.FC<{ navigation: any; route: any }> = ({ navigati
                     socketService.emit('call:accept', { to: otherId, roomId: incomingCall.roomId });
                     const callInfo = incomingCall;
                     setIncomingCall(null);
-                    navigation.navigate('VideoCall', { roomId: callInfo.roomId, callType: callInfo.callType, otherUser: other, isOutgoing: false });
+                    navigation.navigate('VideoCall', { roomId: callInfo.roomId, callType: callInfo.callType, otherUser: other, isOutgoing: false, chatId });
                   }
                 }}
               >

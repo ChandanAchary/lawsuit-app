@@ -177,6 +177,45 @@ export const ChatTab: React.FC<ChatTabProps> = ({ chatId, participants = [] }) =
 
   const renderMessage = ({ item, index }: { item: ChatMessage; index: number }) => {
     const isMine = item.senderId === currentUser?.id;
+
+    // ─── Call history message ───────────────────────────────────────
+    if (item.messageType === 'CALL') {
+      const meta = (item as any).metadata || {};
+      const callType = meta.callType || 'audio';
+      const duration = meta.duration || 0;
+      const missed = meta.missed || false;
+      const isOutgoing = isMine;
+      const durationStr = duration > 0
+        ? `${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, '0')}`
+        : null;
+      const iconName = callType === 'video' ? 'videocam' : 'call';
+      const arrowIcon = missed ? 'arrow-down-outline' : isOutgoing ? 'arrow-up-outline' : 'arrow-down-outline';
+      const arrowColor = missed ? '#e4091d' : '#4CAF50';
+
+      return (
+        <View style={styles.callLogRow}>
+          <View style={styles.callLogBubble}>
+            <View style={styles.callLogIconWrap}>
+              <Ionicons name={iconName as any} size={18} color={COLORS.primary} />
+            </View>
+            <View style={styles.callLogInfo}>
+              <View style={styles.callLogTop}>
+                <Ionicons name={arrowIcon as any} size={14} color={arrowColor} />
+                <Text style={styles.callLogLabel}>
+                  {missed ? 'Missed' : isOutgoing ? 'Outgoing' : 'Incoming'}{' '}
+                  {callType === 'video' ? 'video' : 'voice'} call
+                </Text>
+              </View>
+              <Text style={styles.callLogTime}>
+                {durationStr ? durationStr + ' • ' : ''}{formatTime(item.createdAt)}
+              </Text>
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    // ─── Regular text message ───────────────────────────────────────
     const isTemp = item.id.startsWith('temp-');
     const prevMsg = messages[index - 1];
     const showAvatar = !isMine && (!prevMsg || prevMsg.senderId !== item.senderId);
@@ -231,8 +270,8 @@ export const ChatTab: React.FC<ChatTabProps> = ({ chatId, participants = [] }) =
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={90}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 80}
     >
       {loadingMore && (
         <View style={styles.loadingMore}>
@@ -368,4 +407,28 @@ const styles = StyleSheet.create({
   sendBtnDisabled: { opacity: 0.4 },
   emptyChat: { alignItems: 'center', paddingVertical: SPACING.huge },
   emptyChatText: { color: COLORS.textMuted, fontSize: FONT_SIZE.md },
+  // Call log styles
+  callLogRow: { alignItems: 'center', marginVertical: SPACING.sm },
+  callLogBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.lg,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    gap: SPACING.sm,
+    ...SHADOWS.sm,
+  },
+  callLogIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.surfaceAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  callLogInfo: { gap: 2 },
+  callLogTop: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  callLogLabel: { fontSize: FONT_SIZE.sm, color: COLORS.text, fontWeight: '600' },
+  callLogTime: { fontSize: 10, color: COLORS.textMuted },
 });

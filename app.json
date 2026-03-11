@@ -20,7 +20,8 @@
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Lawsuit needs your location to find lawyers near you.",
         "NSCameraUsageDescription": "Lawsuit needs camera access to upload your profile photo and documents.",
         "NSMicrophoneUsageDescription": "Lawsuit needs microphone access for audio and video consultations.",
-        "NSPhotoLibraryUsageDescription": "Lawsuit needs photo library access to upload documents and profile photos."
+        "NSPhotoLibraryUsageDescription": "Lawsuit needs photo library access to upload documents and profile photos.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -42,7 +43,8 @@
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.VIBRATE",
-        "android.permission.POST_NOTIFICATIONS"
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
       ]
     },
     "web": {
