@@ -17,7 +17,6 @@
       "bundleIdentifier": "com.msdchandan.lawsuitapp"
     },
     "android": {
-      "hermes": true,
       "adaptiveIcon": {
         "backgroundColor": "#0B4D64",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -55,7 +54,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "956f6ba1-7b2d-4b2a-94d5-7c97c615d396"
+        "projectId": "df59adf1-1f7e-4175-8c41-34ed1d6e48a2"
       }
     },
     "owner": "msdchandan"
