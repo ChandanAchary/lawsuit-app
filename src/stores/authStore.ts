@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { authApi, referralApi } from '../services/api';
 import { storage } from '../services/storage';
 import { User, UserRole } from '../types';
+import { registerPushToken, unregisterPushToken } from '../utils/pushNotifications';
 
 interface AuthState {
   user: User | null;
@@ -38,6 +39,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (data.refreshToken) await storage.setRefreshToken(data.refreshToken);
       await storage.setUser(user);
       set({ user, token, isAuthenticated: true, isLoading: false });
+      // Register push token (non-blocking)
+      void registerPushToken();
     } catch (err: any) {
       const msg = err.response?.data?.error || err.response?.data?.message || 'Login failed';
       set({ error: msg, isLoading: false });
@@ -67,6 +70,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         if (data.refreshToken) await storage.setRefreshToken(data.refreshToken);
         if (user) await storage.setUser(user);
         set({ user, token, isAuthenticated: true, isLoading: false });
+        // Register push token (non-blocking)
+        void registerPushToken();
       } else {
         set({ isLoading: false });
       }
@@ -113,6 +118,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       await authApi.logout();
     } catch {}
+    // Unregister push token (non-blocking)
+    void unregisterPushToken();
     await storage.clear();
     set({ user: null, token: null, isAuthenticated: false, isLoading: false, error: null });
   },
@@ -129,6 +136,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           isAuthenticated: true,
           isLoading: false,
         });
+        // Re-register push token in case it changed
+        void registerPushToken();
       } else {
         set({ isLoading: false });
       }

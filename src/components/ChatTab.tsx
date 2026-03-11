@@ -71,8 +71,11 @@ export const ChatTab: React.FC<ChatTabProps> = ({ chatId, participants = [] }) =
         return [...prev, message];
       });
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-      // Mark as read
-      socketService.markRead(chatId, message.id);
+      // Emit delivered first, then read (so sender sees ✓✓ then eye)
+      if (message.senderId !== currentUser?.id) {
+        socketService.markDelivered(chatId, message.id);
+        socketService.markRead(chatId, message.id);
+      }
     });
 
     // Typing indicators
@@ -202,13 +205,13 @@ export const ChatTab: React.FC<ChatTabProps> = ({ chatId, participants = [] }) =
             </Text>
             {isMine && (
               item.isRead ? (
-                <Ionicons name="eye" size={12} color={COLORS.accent} style={{ marginLeft: 3 }} />
+                <Ionicons name="eye" size={14} color="#7ee8f5" style={{ marginLeft: 4 }} />
               ) : isTemp ? (
-                <Ionicons name="time-outline" size={12} color="rgba(255,255,255,0.6)" style={{ marginLeft: 3 }} />
+                <Ionicons name="time-outline" size={13} color="rgba(255,255,255,0.55)" style={{ marginLeft: 4 }} />
               ) : item.isDelivered ? (
-                <Ionicons name="checkmark-done" size={12} color="rgba(255,255,255,0.6)" style={{ marginLeft: 3 }} />
+                <Ionicons name="checkmark-done" size={14} color="rgba(255,255,255,0.75)" style={{ marginLeft: 4 }} />
               ) : (
-                <Ionicons name="checkmark" size={12} color="rgba(255,255,255,0.6)" style={{ marginLeft: 3 }} />
+                <Ionicons name="checkmark" size={13} color="rgba(255,255,255,0.55)" style={{ marginLeft: 4 }} />
               )
             )}
           </View>

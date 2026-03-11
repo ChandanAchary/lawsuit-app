@@ -83,6 +83,10 @@ class SocketService {
     this.emit('chat:message:read', { chatId, messageId });
   }
 
+  markDelivered(chatId: string, messageId: string): void {
+    this.emit('chat:message:delivered', { chatId, messageId });
+  }
+
   get isConnected(): boolean {
     return this.socket?.connected ?? false;
   }
