@@ -14,7 +14,14 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.msdchandan.lawsuitapp"
+      "bundleIdentifier": "com.msdchandan.lawsuitapp",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Lawsuit needs your location to find lawyers near you.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Lawsuit needs your location to find lawyers near you.",
+        "NSCameraUsageDescription": "Lawsuit needs camera access to upload your profile photo and documents.",
+        "NSMicrophoneUsageDescription": "Lawsuit needs microphone access for audio and video consultations.",
+        "NSPhotoLibraryUsageDescription": "Lawsuit needs photo library access to upload documents and profile photos."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -24,7 +31,19 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.msdchandan.lawsuitapp"
+      "package": "com.msdchandan.lawsuitapp",
+      "permissions": [
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.POST_NOTIFICATIONS"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -41,7 +60,29 @@
           "color": "#0B4D64",
           "androidMode": "default"
         }
-      ]
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Lawsuit needs your location to show lawyers near you.",
+          "locationWhenInUsePermission": "Lawsuit needs your location to show lawyers near you."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Lawsuit needs access to your photos to upload profile pictures and documents.",
+          "cameraPermission": "Lawsuit needs camera access to take profile pictures and document photos.",
+          "microphonePermission": "Lawsuit needs microphone access for video consultations."
+        }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Lawsuit needs microphone access for audio and video consultations."
+        }
+      ],
+      "expo-audio"
     ],
     "updates": {
       "enabled": false,

@@ -8,9 +8,10 @@ interface LawyerCardProps {
   lawyer: Lawyer;
   onPress: () => void;
   style?: ViewStyle;
+  nearMe?: boolean;
 }
 
-export const LawyerCard: React.FC<LawyerCardProps> = ({ lawyer, onPress, style }) => {
+export const LawyerCard: React.FC<LawyerCardProps> = ({ lawyer, onPress, style, nearMe }) => {
   return (
     <TouchableOpacity activeOpacity={0.7} onPress={onPress} style={[styles.card, style]}>
       <View style={styles.row}>
@@ -55,8 +56,13 @@ export const LawyerCard: React.FC<LawyerCardProps> = ({ lawyer, onPress, style }
 
           <View style={styles.bottomRow}>
             <View style={styles.locationRow}>
-              <Ionicons name="location-outline" size={13} color={COLORS.textMuted} />
-              <Text style={styles.locationText} numberOfLines={1}>{lawyer.location || 'N/A'}</Text>
+              <Ionicons name="location-outline" size={13} color={nearMe ? COLORS.primary : COLORS.textMuted} />
+              <Text style={[styles.locationText, nearMe && styles.locationTextNear]} numberOfLines={1}>{lawyer.location || 'N/A'}</Text>
+              {nearMe && (
+                <View style={styles.nearBadge}>
+                  <Text style={styles.nearBadgeText}>Near you</Text>
+                </View>
+              )}
             </View>
             <View style={styles.feeContainer}>
               <Text style={styles.feeLabel}>₹</Text>
@@ -159,6 +165,21 @@ const styles = StyleSheet.create({
   locationText: {
     fontSize: FONT_SIZE.sm,
     color: COLORS.textMuted,
+  },
+  locationTextNear: {
+    color: COLORS.primary,
+  },
+  nearBadge: {
+    backgroundColor: COLORS.primary + '18',
+    borderRadius: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    marginLeft: 4,
+  },
+  nearBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: COLORS.primary,
   },
   feeContainer: {
     flexDirection: 'row',

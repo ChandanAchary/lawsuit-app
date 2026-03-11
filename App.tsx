@@ -8,6 +8,7 @@ import { useThemeStore, DARK_COLORS } from './src/stores/themeStore';
 import { COLORS } from './src/constants';
 import { useNotificationStore } from './src/stores/notificationStore';
 import { AuthStack, MainStack } from './src/navigation';
+import { requestAllPermissions } from './src/utils/permissions';
 
 // Suppress Expo OTA update errors permanently — we don't use OTA updates
 LogBox.ignoreLogs(['Failed to download remote update']);
@@ -67,6 +68,8 @@ export default function App() {
   useEffect(() => {
     const init = async () => {
       await Promise.all([restoreSession(), initTheme()]);
+      // Request all runtime permissions on first launch
+      requestAllPermissions().catch(() => {});
       setIsReady(true);
     };
     init();

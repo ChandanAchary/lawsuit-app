@@ -289,6 +289,8 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
+    marginTop: 48,
+    marginBottom: 24,
   },
   footerText: { fontSize: FONT_SIZE.md, color: COLORS.textSecondary },
   footerLink: { fontSize: FONT_SIZE.md, fontWeight: '700', color: COLORS.primary },
