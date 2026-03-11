@@ -91,7 +91,13 @@ export const ChatTab: React.FC<ChatTabProps> = ({ chatId, participants = [] }) =
     // Read receipt
     const unsubRead = socketService.on('chat:message:read', (data: unknown) => {
       const { messageId } = data as { messageId: string };
-      setMessages((prev) => prev.map((m) => m.id === messageId ? { ...m, isRead: true } : m));
+      setMessages((prev) => prev.map((m) => m.id === messageId ? { ...m, isRead: true, isDelivered: true } : m));
+    });
+
+    // Delivered receipt
+    const unsubDelivered = socketService.on('chat:message:delivered', (data: unknown) => {
+      const { messageId } = data as { messageId: string };
+      setMessages((prev) => prev.map((m) => m.id === messageId ? { ...m, isDelivered: true } : m));
     });
 
     return () => {
@@ -99,6 +105,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ chatId, participants = [] }) =
       unsubTypingStart();
       unsubTypingStop();
       unsubRead();
+      unsubDelivered();
     };
   }, [chatId, fetchMessages, currentUser?.id]);
 
@@ -194,12 +201,15 @@ export const ChatTab: React.FC<ChatTabProps> = ({ chatId, participants = [] }) =
               {formatTime(item.createdAt)}
             </Text>
             {isMine && (
-              <Ionicons
-                name={isTemp ? 'time-outline' : item.isRead ? 'checkmark-done' : 'checkmark'}
-                size={12}
-                color={item.isRead ? COLORS.accent : 'rgba(255,255,255,0.6)'}
-                style={{ marginLeft: 3 }}
-              />
+              item.isRead ? (
+                <Ionicons name="eye" size={12} color={COLORS.accent} style={{ marginLeft: 3 }} />
+              ) : isTemp ? (
+                <Ionicons name="time-outline" size={12} color="rgba(255,255,255,0.6)" style={{ marginLeft: 3 }} />
+              ) : item.isDelivered ? (
+                <Ionicons name="checkmark-done" size={12} color="rgba(255,255,255,0.6)" style={{ marginLeft: 3 }} />
+              ) : (
+                <Ionicons name="checkmark" size={12} color="rgba(255,255,255,0.6)" style={{ marginLeft: 3 }} />
+              )
             )}
           </View>
         </View>

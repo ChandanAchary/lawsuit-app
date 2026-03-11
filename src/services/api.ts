@@ -210,7 +210,7 @@ export const walletApi = {
   getTransactions: (params?: { page?: number; limit?: number; type?: string }) =>
     api.get('/wallet/transactions', { params }),
   addMoney: (amount: number) => api.post('/wallet/add-money', { amount }),
-  confirmAddMoney: (data: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) =>
+  confirmAddMoney: (data: { paymentId: string; razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) =>
     api.post('/wallet/confirm-add-money', data),
   withdraw: (amount: number, bankAccountId?: string) =>
     api.post('/wallet/withdraw', { amount, bankAccountId }),

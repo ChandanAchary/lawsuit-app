@@ -13,14 +13,22 @@ import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING } from '../../constants';
 import { videoApi } from '../../services/api';
 
 export const VideoCallScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
-  const { appointmentId } = route.params;
-  const [loading, setLoading] = useState(true);
-  const [meetingUrl, setMeetingUrl] = useState<string | null>(null);
+  const { appointmentId, roomId: directRoomId, callType = 'audio', otherUser, isOutgoing } = route.params || {};
+  const [loading, setLoading] = useState(!!appointmentId);
+  const [meetingUrl, setMeetingUrl] = useState<string | null>(directRoomId ? null : null);
+  const [roomId, setRoomId] = useState<string | null>(directRoomId || null);
   const [error, setError] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
+  const isVideoCall = callType === 'video';
 
   useEffect(() => {
-    void initMeeting();
+    if (appointmentId) {
+      void initMeeting();
+    } else if (directRoomId) {
+      // Direct call from chat — no appointment needed, just use the roomId
+      setRoomId(directRoomId);
+      setLoading(false);
+    }
   }, []);
 
   const initMeeting = async () => {
@@ -65,14 +73,16 @@ export const VideoCallScreen: React.FC<{ navigation: any; route: any }> = ({ nav
   };
 
   const handleEndCall = async () => {
-    Alert.alert('End Call', 'Are you sure you want to end the audio call?', [
+    Alert.alert('End Call', `Are you sure you want to end the ${isVideoCall ? 'video' : 'audio'} call?`, [
       { text: 'No', style: 'cancel' },
       {
         text: 'Yes',
         style: 'destructive',
         onPress: async () => {
           try {
-            await videoApi.endMeeting(appointmentId);
+            if (appointmentId) {
+              await videoApi.endMeeting(appointmentId);
+            }
           } catch {
             // Ignore end errors and return.
           }
@@ -86,7 +96,7 @@ export const VideoCallScreen: React.FC<{ navigation: any; route: any }> = ({ nav
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Setting up audio call...</Text>
+        <Text style={styles.loadingText}>Setting up {isVideoCall ? 'video' : 'audio'} call...</Text>
       </View>
     );
   }
@@ -94,8 +104,8 @@ export const VideoCallScreen: React.FC<{ navigation: any; route: any }> = ({ nav
   if (error) {
     return (
       <View style={styles.centerContainer}>
-        <Ionicons name="mic-off" size={64} color={COLORS.error} />
-        <Text style={styles.errorTitle}>Could not start audio call</Text>
+        <Ionicons name={isVideoCall ? 'videocam-off' : 'mic-off'} size={64} color={COLORS.error} />
+        <Text style={styles.errorTitle}>Could not start {isVideoCall ? 'video' : 'audio'} call</Text>
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity style={styles.retryBtn} onPress={() => void initMeeting()}>
           <Text style={styles.retryText}>Retry</Text>
@@ -113,19 +123,22 @@ export const VideoCallScreen: React.FC<{ navigation: any; route: any }> = ({ nav
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBtn}>
           <Ionicons name="arrow-back" size={24} color={COLORS.white} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Audio Call</Text>
+        <Text style={styles.headerTitle}>{isVideoCall ? 'Video' : 'Audio'} Call</Text>
         <View style={styles.headerBtn} />
       </View>
 
       <View style={styles.audioCallBody}>
-        <Ionicons name={isMuted ? 'mic-off' : 'mic'} size={64} color={COLORS.primary} />
-        <Text style={styles.audioStatus}>Audio call is ready</Text>
-        <Text style={styles.hintText}>Tap Join to open the call provider link.</Text>
+        <Ionicons name={isVideoCall ? (isMuted ? 'videocam-off' : 'videocam') : (isMuted ? 'mic-off' : 'mic')} size={64} color={COLORS.primary} />
+        {otherUser?.name && <Text style={styles.calleeNameText}>{otherUser.name}</Text>}
+        <Text style={styles.audioStatus}>{isVideoCall ? 'Video' : 'Audio'} call is ready</Text>
+        <Text style={styles.hintText}>{meetingUrl ? 'Tap Join to open the call provider link.' : 'Connected via peer-to-peer'}</Text>
 
-        <TouchableOpacity style={styles.joinBtn} onPress={() => void handleJoinCall()}>
-          <Ionicons name="call" size={20} color={COLORS.white} />
-          <Text style={styles.joinBtnText}>Join Audio Call</Text>
-        </TouchableOpacity>
+        {meetingUrl && (
+          <TouchableOpacity style={styles.joinBtn} onPress={() => void handleJoinCall()}>
+            <Ionicons name="call" size={20} color={COLORS.white} />
+            <Text style={styles.joinBtnText}>Join {isVideoCall ? 'Video' : 'Audio'} Call</Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity
           style={[styles.muteBtn, isMuted && styles.muteBtnActive]}
@@ -212,6 +225,12 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.xl,
     fontWeight: '700',
     marginTop: SPACING.lg,
+  },
+  calleeNameText: {
+    color: COLORS.white,
+    fontSize: FONT_SIZE.xxl,
+    fontWeight: '800',
+    marginTop: SPACING.xl,
   },
   hintText: {
     color: COLORS.textMuted,

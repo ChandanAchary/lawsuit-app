@@ -12,7 +12,7 @@ interface WalletState {
   fetchBalance: () => Promise<void>;
   fetchTransactions: (page?: number, limit?: number, type?: string) => Promise<void>;
   addMoney: (amount: number) => Promise<any>;
-  confirmAddMoney: (data: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => Promise<void>;
+  confirmAddMoney: (data: { paymentId: string; razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => Promise<void>;
   withdraw: (amount: number, bankAccountId?: string) => Promise<void>;
   transfer: (toUserId: string, amount: number, description?: string) => Promise<void>;
 }

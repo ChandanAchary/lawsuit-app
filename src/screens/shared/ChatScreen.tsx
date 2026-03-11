@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, ActivityIndicator, Image } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Text, ActivityIndicator, Image, Alert, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONT_SIZE, SPACING, SHADOWS, BORDER_RADIUS } from '../../constants';
 import { ChatTab } from '../../components/ChatTab';
@@ -22,6 +22,18 @@ export const ChatScreen: React.FC<{ navigation: any; route: any }> = ({ navigati
   const displayName = other?.name || name || 'Chat';
   const displayAvatar = other?.avatarUrl || other?.avatar || null;
   const otherId = other?.id || otherUserId;
+
+  // Incoming call state
+  const [incomingCall, setIncomingCall] = useState<{ callerName: string; callType: string; roomId: string } | null>(null);
+
+  const generateRoomId = () => `call_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+  const initiateCall = (callType: 'audio' | 'video') => {
+    if (!otherId) return Alert.alert('Error', 'Cannot determine call recipient');
+    const roomId = generateRoomId();
+    socketService.emit('call:initiate', { to: otherId, callType, roomId, chatId });
+    navigation.navigate('VideoCall', { roomId, callType, otherUser: other, isOutgoing: true });
+  };
 
   useEffect(() => {
     const init = async () => {
@@ -56,7 +68,13 @@ export const ChatScreen: React.FC<{ navigation: any; route: any }> = ({ navigati
       if (userId === otherId) setIsOnline(false);
     });
 
-    return () => { unsubOnline(); unsubOffline(); };
+    // Incoming call
+    const unsubIncomingCall = socketService.on('call:incoming', (data: unknown) => {
+      const call = data as { from: string; callerName: string; callType: string; roomId: string };
+      setIncomingCall({ callerName: call.callerName, callType: call.callType, roomId: call.roomId });
+    });
+
+    return () => { unsubOnline(); unsubOffline(); unsubIncomingCall(); };
   }, []);
 
   return (
@@ -79,7 +97,50 @@ export const ChatScreen: React.FC<{ navigation: any; route: any }> = ({ navigati
           <Text style={styles.title} numberOfLines={1}>{displayName}</Text>
           {isOnline && <Text style={styles.onlineLabel}>Online</Text>}
         </View>
+        <View style={styles.callButtons}>
+          <TouchableOpacity style={styles.callBtn} onPress={() => initiateCall('video')}>
+            <Ionicons name="videocam-outline" size={22} color={COLORS.text} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.callBtn} onPress={() => initiateCall('audio')}>
+            <Ionicons name="call-outline" size={20} color={COLORS.text} />
+          </TouchableOpacity>
+        </View>
       </View>
+
+      {/* Incoming Call Modal */}
+      <Modal visible={!!incomingCall} transparent animationType="slide">
+        <View style={styles.callModalOverlay}>
+          <View style={styles.callModal}>
+            <Ionicons name={incomingCall?.callType === 'video' ? 'videocam' : 'call'} size={48} color={COLORS.primary} />
+            <Text style={styles.callModalTitle}>Incoming {incomingCall?.callType === 'video' ? 'Video' : 'Audio'} Call</Text>
+            <Text style={styles.callModalSubtitle}>{incomingCall?.callerName || 'Unknown'}</Text>
+            <View style={styles.callModalActions}>
+              <TouchableOpacity
+                style={[styles.callModalBtn, { backgroundColor: COLORS.error }]}
+                onPress={() => {
+                  if (incomingCall && otherId) socketService.emit('call:reject', { to: otherId, roomId: incomingCall.roomId });
+                  setIncomingCall(null);
+                }}
+              >
+                <Ionicons name="close" size={28} color={COLORS.white} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.callModalBtn, { backgroundColor: COLORS.success }]}
+                onPress={() => {
+                  if (incomingCall && otherId) {
+                    socketService.emit('call:accept', { to: otherId, roomId: incomingCall.roomId });
+                    const callInfo = incomingCall;
+                    setIncomingCall(null);
+                    navigation.navigate('VideoCall', { roomId: callInfo.roomId, callType: callInfo.callType, otherUser: other, isOutgoing: false });
+                  }
+                }}
+              >
+                <Ionicons name="checkmark" size={28} color={COLORS.white} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
       {loading ? (
         <View style={styles.center}><ActivityIndicator size="large" color={COLORS.primary} /></View>
       ) : error ? (
@@ -112,6 +173,27 @@ const styles = StyleSheet.create({
   nameBlock: { flex: 1 },
   title: { fontSize: FONT_SIZE.lg, fontWeight: '700', color: COLORS.text },
   onlineLabel: { fontSize: FONT_SIZE.xs, color: COLORS.success, fontWeight: '600' },
+  callButtons: { flexDirection: 'row', gap: SPACING.sm },
+  callBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: COLORS.surfaceAlt, alignItems: 'center', justifyContent: 'center',
+  },
+  callModalOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  callModal: {
+    width: '80%', backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.xl, padding: SPACING.xxl,
+    alignItems: 'center', gap: SPACING.md,
+  },
+  callModalTitle: { fontSize: FONT_SIZE.xl, fontWeight: '800', color: COLORS.text },
+  callModalSubtitle: { fontSize: FONT_SIZE.md, color: COLORS.textSecondary },
+  callModalActions: { flexDirection: 'row', gap: SPACING.xxl, marginTop: SPACING.lg },
+  callModalBtn: {
+    width: 56, height: 56, borderRadius: 28,
+    alignItems: 'center', justifyContent: 'center',
+  },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.xl },
   errorText: { fontSize: FONT_SIZE.md, color: COLORS.textSecondary, textAlign: 'center' },
 });

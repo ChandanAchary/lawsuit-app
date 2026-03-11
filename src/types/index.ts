@@ -187,6 +187,8 @@ export interface ChatMessage {
   text: string | null;
   attachments?: string[];
   messageType?: string;
+  isDelivered?: boolean;
+  deliveredAt?: string | null;
   isRead?: boolean;
   readAt?: string | null;
   createdAt: string;

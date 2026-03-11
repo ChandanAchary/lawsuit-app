@@ -61,6 +61,7 @@ export const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     try {
       const order = await addMoney(num);
       const orderId = order?.order?.id || order?.orderId || order?.id;
+      const serverPaymentId = order?.paymentId;
       if (!orderId) {
         Alert.alert('Error', 'Could not create payment order');
         return;
@@ -73,6 +74,7 @@ export const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         prefillEmail: user?.email || '',
         prefillPhone: user?.phone || '',
         prefillName: user?.name || '',
+        paymentId: serverPaymentId,
       });
       setShowAdd(false);
       setShowRazorpay(true);
@@ -87,6 +89,7 @@ export const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     setShowRazorpay(false);
     try {
       await confirmAddMoney({
+        paymentId: razorpayOrder?.paymentId || '',
         razorpay_payment_id: result.razorpay_payment_id,
         razorpay_order_id: result.razorpay_order_id,
         razorpay_signature: result.razorpay_signature,

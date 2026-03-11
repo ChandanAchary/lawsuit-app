@@ -14,6 +14,8 @@ export interface RazorpayOrderOptions {
   prefillEmail?: string;
   prefillPhone?: string;
   prefillName?: string;
+  /** Internal payment record ID returned by addMoney — needed for confirm-add-money */
+  paymentId?: string;
 }
 
 export interface RazorpayPaymentResult {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator, Platform, StatusBar } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../constants';
 import { Notification, NotificationType } from '../types';
@@ -22,8 +23,10 @@ const NOTIFICATION_ICONS: Record<string, { icon: string; color: string }> = {
   [NotificationType.REVIEW_RECEIVED]: { icon: 'star', color: COLORS.accent },
 };
 
-export const NotificationsScreen: React.FC = () => {
+export const NotificationsScreen: React.FC<{ navigation?: any }> = ({ navigation: navProp }) => {
   const insets = useSafeAreaInsets();
+  const fallbackNav = useNavigation();
+  const nav: any = navProp || fallbackNav;
   const {
     notifications, isLoading, unreadCount, hasMore,
     fetchNotifications, fetchNextPage, markRead, markAllRead, deleteNotification,
@@ -33,13 +36,49 @@ export const NotificationsScreen: React.FC = () => {
 
   const getIcon = (type: string) => NOTIFICATION_ICONS[type] || { icon: 'notifications', color: COLORS.primary };
 
+  const handleNotificationPress = (item: Notification) => {
+    if (!item.isRead) markRead(item.id);
+    const d = item.data;
+    if (!d || !nav) return;
+    switch (item.type) {
+      case NotificationType.APPOINTMENT_BOOKED:
+      case NotificationType.APPOINTMENT_CONFIRMED:
+      case NotificationType.APPOINTMENT_CANCELLED:
+      case NotificationType.APPOINTMENT_REMINDER:
+      case NotificationType.APPOINTMENT_RESCHEDULED:
+      case NotificationType.CONSULTATION_COMPLETED:
+        if (d.appointmentId) nav.navigate('AppointmentDetail', { appointmentId: d.appointmentId });
+        break;
+      case NotificationType.NEW_MESSAGE:
+        if (d.chatId) nav.navigate('ChatScreen', { chatId: d.chatId });
+        break;
+      case NotificationType.CASE_UPDATE:
+      case NotificationType.DOCUMENT_UPLOADED:
+      case NotificationType.TASK_ASSIGNED:
+        if (d.caseId) nav.navigate('CaseDetail', { caseId: d.caseId });
+        break;
+      case NotificationType.VIDEO_CALL:
+        if (d.appointmentId) nav.navigate('VideoCall', { appointmentId: d.appointmentId });
+        break;
+      case NotificationType.PAYMENT_RECEIVED:
+      case NotificationType.WALLET_CREDIT:
+      case NotificationType.WALLET_DEBIT:
+        nav.navigate('Wallet');
+        break;
+      case NotificationType.REVIEW_RECEIVED:
+        break;
+      default:
+        break;
+    }
+  };
+
   const renderItem = ({ item }: { item: Notification }) => {
     const { icon, color } = getIcon(item.type);
     return (
       <TouchableOpacity
         style={[styles.card, !item.isRead && styles.unreadCard]}
         activeOpacity={0.7}
-        onPress={() => { if (!item.isRead) markRead(item.id); }}
+        onPress={() => handleNotificationPress(item)}
       >
         <View style={[styles.iconCircle, { backgroundColor: color + '18' }]}>
           <Ionicons name={icon as any} size={20} color={color} />
