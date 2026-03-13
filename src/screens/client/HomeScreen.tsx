@@ -15,6 +15,7 @@ const FEATURES = [
   { icon: 'chatbubble-ellipses', title: 'Legal Eagle', desc: 'AI legal assistant', route: 'AiChat', color: '#10B981' },
   { icon: 'briefcase', title: 'Track Cases', desc: 'Monitor your legal matters', route: 'Cases', color: '#F59E0B' },
   { icon: 'calendar', title: 'Appointments', desc: 'Manage consultations', route: 'Appointments', color: '#EF4444' },
+  { icon: 'scale', title: 'Tele-Law', desc: 'Free legal aid eligibility', route: 'TeleLaw', color: '#8B5CF6' },
 ];
 
 export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {

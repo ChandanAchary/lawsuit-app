@@ -274,6 +274,13 @@ export const reviewsApi = {
     api.post(`/lawyers/${encodeURIComponent(lawyerId)}/reviews`, data),
 };
 
+// ─── Tele-Law API ───────────────────────────────────────────
+export const teleLawApi = {
+  getInfo: () => api.get('/tele-law/info'),
+  checkEligibility: (data: { income?: number; caste?: string; gender?: string; state?: string; useProfile?: boolean }) =>
+    api.post('/tele-law/check-eligibility', data),
+};
+
 // ─── Address API ────────────────────────────────────────────
 export const addressApi = {
   getStates: () => api.get('/address/states'),
