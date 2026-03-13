@@ -1,9 +1,10 @@
+import { useThemeStore } from '../../stores/themeStore';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, Image, RefreshControl, StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { chatApi } from '../../services/api';
 import { socketService } from '../../services/socket';
 import { useAuthStore } from '../../stores/authStore';
@@ -11,6 +12,10 @@ import { Loading } from '../../components/Common';
 import { ChatMessage } from '../../types';
 
 export const ChatListScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useThemeStore((s: any) => s.isDark ? require('../../stores/themeStore').DARK_COLORS : require('../../constants').COLORS);
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
   const { user } = useAuthStore();
   const [chats, setChats] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -162,7 +167,7 @@ export const ChatListScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     paddingHorizontal: SPACING.xl, paddingTop: SPACING.huge, paddingBottom: SPACING.lg,

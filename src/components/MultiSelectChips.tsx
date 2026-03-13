@@ -1,6 +1,7 @@
+import { useThemeStore } from '../stores/themeStore';
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING } from '../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../constants';
 
 interface MultiSelectChipsProps {
   items: string[];
@@ -10,6 +11,10 @@ interface MultiSelectChipsProps {
 }
 
 export const MultiSelectChips: React.FC<MultiSelectChipsProps> = ({ items, selected, onToggle, label }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useThemeStore((s: any) => s.isDark ? require('../stores/themeStore').DARK_COLORS : require('../constants').COLORS);
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
   return (
     <View style={styles.container}>
       {label && <Text style={styles.label}>{label}</Text>}
@@ -32,7 +37,7 @@ export const MultiSelectChips: React.FC<MultiSelectChipsProps> = ({ items, selec
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   container: { marginBottom: SPACING.lg },
   label: { fontSize: FONT_SIZE.sm, fontWeight: '600', color: COLORS.text, marginBottom: SPACING.sm },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },

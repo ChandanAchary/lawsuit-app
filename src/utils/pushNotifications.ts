@@ -12,20 +12,29 @@
  */
 
 import { Platform } from 'react-native';
-// @ts-ignore – expo-notifications is listed in package.json; types are resolved after `npm install`
-import * as Notifications from 'expo-notifications';
 import { usersApi } from '../services/api';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 
-// Configure how notifications are presented while the app is foregrounded
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,   // Kept for back-compat (SDK <0.28)
-    shouldShowBanner: true,  // SDK >=0.29
-    shouldShowList: true,    // SDK >=0.29
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
+let Notifications: any;
+if (!isExpoGo) {
+  try {
+    Notifications = require('expo-notifications');
+    // Configure how notifications are presented while the app is foregrounded
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,   // Kept for back-compat (SDK <0.28)
+        shouldShowBanner: true,  // SDK >=0.29
+        shouldShowList: true,    // SDK >=0.29
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+      }),
+    });
+  } catch (e) {
+    console.warn("expo-notifications is not available in Expo Go.");
+  }
+}
 
 /**
  * Request push-notification permission, acquire the device token, and
@@ -34,6 +43,8 @@ Notifications.setNotificationHandler({
  */
 
 export async function registerPushToken(): Promise<void> {
+  if (!Notifications) return;
+
   try {
     // 1. Request (or check existing) permission
     const { status: existing } = await Notifications.getPermissionsAsync();
@@ -76,6 +87,8 @@ export async function registerPushToken(): Promise<void> {
  * Remove the push token from the backend on logout.
  */
 export async function unregisterPushToken(): Promise<void> {
+  if (!Notifications) return;
+
   try {
     const tokenData = await Notifications.getDevicePushTokenAsync();
     const token: string | undefined = tokenData?.data;

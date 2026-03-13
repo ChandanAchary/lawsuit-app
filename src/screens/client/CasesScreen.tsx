@@ -1,8 +1,9 @@
+import { useThemeStore } from '../../stores/themeStore';
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, RefreshControl, StatusBar,
 } from 'react-native';
-import { COLORS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
+import { FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { casesApi } from '../../services/api';
 import { Case, CaseStatus } from '../../types';
 import { CaseCard } from '../../components/CaseCard';
@@ -18,6 +19,10 @@ const TABS = [
 ];
 
 export const CasesScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useThemeStore((s: any) => s.isDark ? require('../../stores/themeStore').DARK_COLORS : require('../../constants').COLORS);
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
   const [tab, setTab] = useState('all');
   const [cases, setCases] = useState<Case[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,7 +73,7 @@ export const CasesScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   headerBar: {
     paddingHorizontal: SPACING.xl,

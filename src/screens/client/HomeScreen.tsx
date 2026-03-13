@@ -4,8 +4,9 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { useAuthStore } from '../../stores/authStore';
+import { useThemeStore } from '../../stores/themeStore';
 import { useWalletStore } from '../../stores/walletStore';
 
 const { width } = Dimensions.get('window');
@@ -21,6 +22,9 @@ const FEATURES = [
 export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const user = useAuthStore((s) => s.user);
   const balance = useWalletStore((s) => s.balance);
+  const isDark = useThemeStore((s) => s.isDark);
+  const COLORS = useThemeStore((s) => s.isDark ? require('../../stores/themeStore').DARK_COLORS : require('../../constants').COLORS);
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -137,7 +141,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   hero: {
     paddingTop: SPACING.huge + 20,

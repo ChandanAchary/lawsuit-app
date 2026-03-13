@@ -1,9 +1,10 @@
+import { useThemeStore } from '../../stores/themeStore';
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { useTemplateStore } from '../../stores/templateStore';
 import { AgreementTemplate } from '../../types';
 import { Button } from '../../components/Button';
@@ -11,6 +12,10 @@ import { BottomSheet } from '../../components/Modals';
 import { Loading, EmptyState } from '../../components/Common';
 
 export const LawyerTemplatesScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useThemeStore((s: any) => s.isDark ? require('../../stores/themeStore').DARK_COLORS : require('../../constants').COLORS);
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
   const { templates, loading, fetchTemplates, createTemplate, updateTemplate, deleteTemplate } = useTemplateStore();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -116,7 +121,7 @@ export const LawyerTemplatesScreen: React.FC<{ navigation: any }> = ({ navigatio
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   headerBar: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',

@@ -1,14 +1,19 @@
+import { useThemeStore } from '../../stores/themeStore';
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, StatusBar, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING } from '../../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../constants';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { useAuthStore } from '../../stores/authStore';
 
 export const AdminLoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useThemeStore((s: any) => s.isDark ? require('../../stores/themeStore').DARK_COLORS : require('../../constants').COLORS);
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const { login, isLoading, clearError } = useAuthStore();
@@ -66,7 +71,7 @@ export const AdminLoginScreen: React.FC<{ navigation: any }> = ({ navigation }) 
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   scroll: {
     flexGrow: 1,

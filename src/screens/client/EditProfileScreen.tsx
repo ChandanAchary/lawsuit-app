@@ -1,3 +1,4 @@
+import { useThemeStore } from '../../stores/themeStore';
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, Dimensions,
@@ -7,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS, GENDER_OPTIONS, CASTE_OPTIONS } from '../../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS, GENDER_OPTIONS, CASTE_OPTIONS } from '../../constants';
 import { formatErrorMessage } from '../../utils/formatError';
 import { useAuthStore } from '../../stores/authStore';
 import { useUserStore } from '../../stores/userStore';
@@ -21,6 +22,10 @@ import { MultiSelectChips } from '../../components/MultiSelectChips';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const EditProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useThemeStore((s: any) => s.isDark ? require('../../stores/themeStore').DARK_COLORS : require('../../constants').COLORS);
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
   const { user: authUser } = useAuthStore();
   const { user, loading, getUser, updateUser } = useUserStore();
   const [name, setName] = useState('');
@@ -324,7 +329,7 @@ export const EditProfileScreen: React.FC<{ navigation: any }> = ({ navigation })
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   headerBar: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',

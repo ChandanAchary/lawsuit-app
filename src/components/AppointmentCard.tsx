@@ -1,3 +1,4 @@
+import { useThemeStore } from '../stores/themeStore';
 import React from 'react';
 import {
   View,
@@ -8,7 +9,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS, APPOINTMENT_STATUS_COLORS } from '../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS, APPOINTMENT_STATUS_COLORS } from '../constants';
 import { Appointment, AppointmentStatus } from '../types';
 import { formatDate, formatTime } from '../utils/date';
 
@@ -45,6 +46,10 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
   onViewClient,
   style,
 }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useThemeStore((s: any) => s.isDark ? require('../stores/themeStore').DARK_COLORS : require('../constants').COLORS);
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
   const person = role === 'CLIENT' ? appointment.lawyer : appointment.client;
   const personAvatar = person?.avatar || (person as any)?.avatarUrl;
   const statusColor = APPOINTMENT_STATUS_COLORS[appointment.status] || APPOINTMENT_STATUS_COLORS.PENDING;
@@ -184,7 +189,7 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   card: {
     backgroundColor: COLORS.white,
     borderRadius: BORDER_RADIUS.xl,

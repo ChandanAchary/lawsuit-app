@@ -1,7 +1,8 @@
+import { useThemeStore } from '../stores/themeStore';
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS, CASE_STATUS_COLORS } from '../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS, CASE_STATUS_COLORS } from '../constants';
 import { Case } from '../types';
 import { formatDate } from '../utils/date';
 
@@ -12,6 +13,10 @@ interface CaseCardProps {
 }
 
 export const CaseCard: React.FC<CaseCardProps> = ({ caseItem, onPress, style }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useThemeStore((s: any) => s.isDark ? require('../stores/themeStore').DARK_COLORS : require('../constants').COLORS);
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
   const statusColor = CASE_STATUS_COLORS[caseItem.status] || CASE_STATUS_COLORS.OPEN;
 
   return (
@@ -64,7 +69,7 @@ export const CaseCard: React.FC<CaseCardProps> = ({ caseItem, onPress, style }) 
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   card: {
     backgroundColor: COLORS.white,
     borderRadius: BORDER_RADIUS.xl,

@@ -1,6 +1,7 @@
+import { useThemeStore } from '../stores/themeStore';
 import React from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import { COLORS, FONT_SIZE, SPACING } from '../constants';
+import { FONT_SIZE, SPACING } from '../constants';
 
 interface LoadingProps {
   message?: string;
@@ -8,6 +9,10 @@ interface LoadingProps {
 }
 
 export const Loading: React.FC<LoadingProps> = ({ message, fullScreen = true }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useThemeStore((s: any) => s.isDark ? require('../stores/themeStore').DARK_COLORS : require('../constants').COLORS);
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
   if (!fullScreen) {
     return (
       <View style={styles.inline}>
@@ -53,7 +58,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, colors }) => (
   </View>
 );
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center',

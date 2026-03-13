@@ -1,7 +1,8 @@
+import { useThemeStore } from '../stores/themeStore';
 import React from 'react';
 import { Modal, View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING } from '../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../constants';
 
 interface BottomSheetProps {
   visible: boolean;
@@ -20,6 +21,10 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   children,
   maxHeight = SCREEN_HEIGHT * 0.75,
 }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useThemeStore((s: any) => s.isDark ? require('../stores/themeStore').DARK_COLORS : require('../constants').COLORS);
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose}>
@@ -68,7 +73,7 @@ export const AppModal: React.FC<AppModalProps> = ({ visible, onClose, title, chi
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: COLORS.overlay,

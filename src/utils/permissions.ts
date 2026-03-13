@@ -12,13 +12,26 @@
  */
 
 import { Platform } from 'react-native';
-import * as Notifications from 'expo-notifications';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
+
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
+let Notifications: any;
+if (!isExpoGo) {
+  try {
+    Notifications = require('expo-notifications');
+  } catch (e) {
+    console.warn("expo-notifications is not available in Expo Go.");
+  }
+}
 
 // ─── Notification Permission ──────────────────────────────────────────────────
 export async function requestNotificationPermission(): Promise<boolean> {
+  if (!Notifications) return false;
+
   try {
     const { status: existing } = await Notifications.getPermissionsAsync();
     if (existing === 'granted') return true;

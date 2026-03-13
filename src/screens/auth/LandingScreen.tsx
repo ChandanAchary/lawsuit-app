@@ -1,12 +1,17 @@
+import { useThemeStore } from '../../stores/themeStore';
 import React from 'react';
 import { View, Text, StyleSheet, Image, Dimensions, StatusBar } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING } from '../../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../constants';
 import { Button } from '../../components/Button';
 
 const { width, height } = Dimensions.get('window');
 
 export const LandingScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useThemeStore((s: any) => s.isDark ? require('../../stores/themeStore').DARK_COLORS : require('../../constants').COLORS);
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
@@ -74,7 +79,7 @@ export const LandingScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1 },
   gradient: { flex: 1 },
   decorCircle: {

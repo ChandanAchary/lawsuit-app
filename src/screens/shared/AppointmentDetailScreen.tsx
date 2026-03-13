@@ -1,3 +1,4 @@
+import { useThemeStore } from '../../stores/themeStore';
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity,
@@ -5,7 +6,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
-import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS, APPOINTMENT_STATUS_COLORS } from '../../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS, APPOINTMENT_STATUS_COLORS } from '../../constants';
 import { appointmentsApi } from '../../services/api';
 import { Appointment, AppointmentStatus } from '../../types';
 import { useAuthStore } from '../../stores/authStore';
@@ -17,6 +18,10 @@ interface Props {
 }
 
 export const AppointmentDetailScreen: React.FC<Props> = ({ navigation, route }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useThemeStore((s: any) => s.isDark ? require('../../stores/themeStore').DARK_COLORS : require('../../constants').COLORS);
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
   const { appointmentId, appointment: passedAppt } = route.params;
   const role = useAuthStore((s) => s.user?.role);
 
@@ -45,7 +50,7 @@ export const AppointmentDetailScreen: React.FC<Props> = ({ navigation, route }) 
     const isClient = role === 'CLIENT';
     const otherId = isClient ? appointment.lawyerId : appointment.clientId;
     const otherName = isClient ? appointment.lawyer?.name : appointment.client?.name;
-    navigation.navigate('ChatScreen', { otherUserId: otherId, name: otherName });
+    navigation.navigate('ChatScreen', { otherUserId: otherId, name: otherName, appointmentId: appointment.id });
   };
 
   const handleCancel = () => {
@@ -254,7 +259,7 @@ const InfoRow: React.FC<{ icon: string; label: string; value: string; isLink?: b
   </View>
 );
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.background },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background },
   container: { flex: 1 },

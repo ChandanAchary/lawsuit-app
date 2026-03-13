@@ -1,10 +1,11 @@
+import { useThemeStore } from '../../stores/themeStore';
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar,
   TextInput, Alert, Linking, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 
 const FAQ_DATA = [
   { q: 'How do I book a consultation?', a: 'Search for a lawyer by specialization, view their profile, and tap "Book Appointment". Select your preferred date and time, then confirm the booking.' },
@@ -16,6 +17,10 @@ const FAQ_DATA = [
 ];
 
 export const HelpCenterScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useThemeStore((s: any) => s.isDark ? require('../../stores/themeStore').DARK_COLORS : require('../../constants').COLORS);
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
   const [message, setMessage] = useState('');
 
@@ -110,7 +115,7 @@ export const HelpCenterScreen: React.FC<{ navigation: any }> = ({ navigation }) 
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',

@@ -1,10 +1,11 @@
+import { useThemeStore } from '../../stores/themeStore';
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, StatusBar,
   KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { formatErrorMessage } from '../../utils/formatError';
 import { usersApi } from '../../services/api';
 import { Button } from '../../components/Button';
@@ -20,6 +21,10 @@ const TIME_SLOTS = [
 ];
 
 export const AvailabilityScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useThemeStore((s: any) => s.isDark ? require('../../stores/themeStore').DARK_COLORS : require('../../constants').COLORS);
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isAvailable, setIsAvailable] = useState(true);
@@ -212,7 +217,7 @@ export const AvailabilityScreen: React.FC<{ navigation: any }> = ({ navigation }
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',

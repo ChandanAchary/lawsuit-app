@@ -6,7 +6,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
-import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { useAuthStore } from '../../stores/authStore';
 import { useUserStore } from '../../stores/userStore';
 import { usersApi, storageApi, dashboardApi } from '../../services/api';
@@ -18,6 +18,10 @@ import { Input } from '../../components/Input';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const LawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useThemeStore((s: any) => s.isDark ? require('../../stores/themeStore').DARK_COLORS : require('../../constants').COLORS);
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
   const { user: authUser, logout } = useAuthStore();
   const { user, loading, getUser, updateUser } = useUserStore();
   const { mode: themeMode, setMode: setThemeMode } = useThemeStore();
@@ -259,7 +263,7 @@ const MenuItem = ({ icon, label, subtitle, onPress, last }: { icon: string; labe
   </TouchableOpacity>
 );
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
 
   // Header gradient

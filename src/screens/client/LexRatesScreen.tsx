@@ -1,13 +1,18 @@
+import { useThemeStore } from '../../stores/themeStore';
 import React from 'react';
 import {
   View, Text, StyleSheet, FlatList, 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS, LEX_RATES } from '../../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS, LEX_RATES } from '../../constants';
 import { TouchableOpacity } from 'react-native';
 
 export const LexRatesScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useThemeStore((s: any) => s.isDark ? require('../../stores/themeStore').DARK_COLORS : require('../../constants').COLORS);
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
   const renderItem = ({ item, index }: { item: typeof LEX_RATES[0]; index: number }) => (
     <View style={[styles.card, index % 2 === 0 ? styles.cardEven : styles.cardOdd]}>
       <View style={styles.cardHeader}>
@@ -55,7 +60,7 @@ export const LexRatesScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     paddingTop: SPACING.huge + 10,

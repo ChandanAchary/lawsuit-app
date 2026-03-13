@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   Image,
@@ -10,14 +11,24 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import {
-  RTCPeerConnection,
-  RTCSessionDescription,
-  RTCIceCandidate,
-  mediaDevices,
-  RTCView,
-  MediaStream,
-} from 'react-native-webrtc';
+let RTCPeerConnection: any;
+let RTCSessionDescription: any;
+let RTCIceCandidate: any;
+let mediaDevices: any;
+let RTCView: any = View;
+let MediaStream: any;
+
+try {
+  const webrtc = require('react-native-webrtc');
+  RTCPeerConnection = webrtc.RTCPeerConnection;
+  RTCSessionDescription = webrtc.RTCSessionDescription;
+  RTCIceCandidate = webrtc.RTCIceCandidate;
+  mediaDevices = webrtc.mediaDevices;
+  RTCView = webrtc.RTCView;
+  MediaStream = webrtc.MediaStream;
+} catch (e) {
+  console.warn("react-native-webrtc is not available. Expo Go does not support custom native modules.");
+}
 import { videoApi } from '../../services/api';
 import { socketService } from '../../services/socket';
 

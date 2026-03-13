@@ -1,3 +1,4 @@
+import { useThemeStore } from '../stores/themeStore';
 import React, { useRef } from 'react';
 import {
   Modal,
@@ -10,7 +11,7 @@ import {
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, FONT_SIZE, BORDER_RADIUS } from '../constants';
+import { SPACING, FONT_SIZE, BORDER_RADIUS } from '../constants';
 import {
   buildRazorpayCheckoutHTML,
   RazorpayOrderOptions,
@@ -32,6 +33,10 @@ export const RazorpayCheckout: React.FC<RazorpayCheckoutProps> = ({
   onCancel,
   onError,
 }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useThemeStore((s: any) => s.isDark ? require('../stores/themeStore').DARK_COLORS : require('../constants').COLORS);
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
   const webViewRef = useRef<WebView>(null);
 
   const html = buildRazorpayCheckoutHTML(orderOptions);
@@ -90,7 +95,7 @@ export const RazorpayCheckout: React.FC<RazorpayCheckoutProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,

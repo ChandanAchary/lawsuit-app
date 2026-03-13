@@ -1,3 +1,4 @@
+import { useThemeStore } from '../../stores/themeStore';
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, Modal, Dimensions,
@@ -6,7 +7,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS, LEGAL_CATEGORIES, INDIAN_LANGUAGES } from '../../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS, LEGAL_CATEGORIES, INDIAN_LANGUAGES } from '../../constants';
 import { formatErrorMessage } from '../../utils/formatError';
 import { useAuthStore } from '../../stores/authStore';
 import { useUserStore } from '../../stores/userStore';
@@ -20,6 +21,10 @@ import { MultiSelectChips } from '../../components/MultiSelectChips';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const EditLawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useThemeStore((s: any) => s.isDark ? require('../../stores/themeStore').DARK_COLORS : require('../../constants').COLORS);
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
   const { user: authUser } = useAuthStore();
   const { user, loading, getUser, updateUser } = useUserStore();
   const [form, setForm] = useState({
@@ -332,7 +337,7 @@ export const EditLawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigat
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
     removeDocBtn: { flexDirection: 'row', alignItems: 'center', gap: 3, borderWidth: 1, borderColor: '#e74c3c', paddingVertical: 4, paddingHorizontal: SPACING.sm, borderRadius: BORDER_RADIUS.md },
     removeDocBtnText: { color: '#e74c3c', fontSize: FONT_SIZE.xs, fontWeight: '600' },
   container: { flex: 1, backgroundColor: COLORS.background },

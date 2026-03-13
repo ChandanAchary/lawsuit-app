@@ -1,9 +1,10 @@
+import { useThemeStore } from '../../stores/themeStore';
 import React, { useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { modelChatApi } from '../../services/api';
 import Markdown from 'react-native-markdown-display';
 
@@ -21,6 +22,10 @@ const SUGGESTIONS = [
 ];
 
 export const AiChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useThemeStore((s: any) => s.isDark ? require('../../stores/themeStore').DARK_COLORS : require('../../constants').COLORS);
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -166,7 +171,7 @@ const markdownStyles = StyleSheet.create({
   strong: { fontWeight: '700' as any },
 }) as any;
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING.md,

@@ -1,9 +1,10 @@
+import { useThemeStore } from '../../stores/themeStore';
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Alert, TextInput, Linking, StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { appointmentsApi } from '../../services/api';
 import { Appointment, AppointmentStatus } from '../../types';
 import { AppointmentCard } from '../../components/AppointmentCard';
@@ -28,6 +29,10 @@ const TABS = [
 
 
 export const AppointmentsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useThemeStore((s: any) => s.isDark ? require('../../stores/themeStore').DARK_COLORS : require('../../constants').COLORS);
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
   const [tab, setTab] = useState('all');
   const [allAppointments, setAllAppointments] = useState<Appointment[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -147,7 +152,7 @@ export const AppointmentsScreen: React.FC<{ navigation: any }> = ({ navigation }
       }
       onChat={
         item.status === AppointmentStatus.CONFIRMED || item.status === AppointmentStatus.ATTENDED || item.status === AppointmentStatus.COMPLETED
-          ? () => navigation.navigate('ChatScreen', { otherUserId: item.lawyerId, name: item.lawyer?.name })
+          ? () => navigation.navigate('ChatScreen', { otherUserId: item.lawyerId, name: item.lawyer?.name, appointmentId: item.id })
           : undefined
       }
       onViewAgreement={item.agreementUrl ? () => handleViewAgreement(item.agreementUrl!) : undefined}
@@ -217,7 +222,7 @@ export const AppointmentsScreen: React.FC<{ navigation: any }> = ({ navigation }
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   headerBar: {
     paddingHorizontal: SPACING.xl,

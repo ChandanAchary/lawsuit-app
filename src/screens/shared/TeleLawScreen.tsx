@@ -1,11 +1,16 @@
+import { useThemeStore } from '../../stores/themeStore';
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { teleLawApi } from '../../services/api';
 
 export const TeleLawScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useThemeStore((s: any) => s.isDark ? require('../../stores/themeStore').DARK_COLORS : require('../../constants').COLORS);
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
   const [info, setInfo] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   
@@ -161,7 +166,7 @@ export const TeleLawScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: {

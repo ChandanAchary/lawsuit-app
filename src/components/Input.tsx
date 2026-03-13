@@ -1,7 +1,8 @@
+import { useThemeStore } from '../stores/themeStore';
 import React, { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { TextInput, View, Text, StyleSheet, TextInputProps, ViewStyle, TouchableOpacity } from 'react-native';
-import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../constants';
 
 interface InputProps extends TextInputProps {
   label?: string;
@@ -21,6 +22,10 @@ export const Input: React.FC<InputProps> = ({
   secureTextEntry,
   ...props
 }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useThemeStore((s: any) => s.isDark ? require('../stores/themeStore').DARK_COLORS : require('../constants').COLORS);
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
   const [showPassword, setShowPassword] = useState(false);
   const isPassword = secureTextEntry !== undefined;
   const showInternalEye = isPassword && !rightIcon;
@@ -50,7 +55,7 @@ export const Input: React.FC<InputProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   container: {
     marginBottom: SPACING.lg,
   },

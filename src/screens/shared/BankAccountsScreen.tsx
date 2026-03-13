@@ -1,10 +1,11 @@
+import { useThemeStore } from '../../stores/themeStore';
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput,
   Alert, ActivityIndicator, Modal, Switch, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { formatErrorMessage } from '../../utils/formatError';
 import { bankAccountApi } from '../../services/api';
 
@@ -23,6 +24,10 @@ interface BankAccount {
 type TabType = 'BANK' | 'UPI';
 
 export const BankAccountsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useThemeStore((s: any) => s.isDark ? require('../../stores/themeStore').DARK_COLORS : require('../../constants').COLORS);
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
@@ -303,7 +308,7 @@ const fiStyles = StyleSheet.create({
   },
 });
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

@@ -9,7 +9,7 @@ import { ChatParticipant } from '../../types';
 import { useAuthStore } from '../../stores/authStore';
 
 export const ChatScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
-  const { chatId: initialChatId, otherUserId, caseId, name, otherUser } = route.params || {};
+  const { chatId: initialChatId, otherUserId, caseId, name, otherUser, appointmentId } = route.params || {};
   const [chatId, setChatId] = useState<string | null>(initialChatId || null);
   const [loading, setLoading] = useState(!initialChatId);
   const [error, setError] = useState('');
@@ -39,7 +39,11 @@ export const ChatScreen: React.FC<{ navigation: any; route: any }> = ({ navigati
     const init = async () => {
       try {
         let resolvedChatId = chatId;
-        if (!resolvedChatId && otherUserId) {
+        if (!resolvedChatId && appointmentId) {
+          const { data } = await chatApi.getOrCreateAppointmentChat(appointmentId);
+          resolvedChatId = data.chat?.id || data.id;
+          setChatId(resolvedChatId);
+        } else if (!resolvedChatId && otherUserId) {
           const { data } = await chatApi.createChat(otherUserId, caseId);
           resolvedChatId = data.chat?.id || data.id;
           setChatId(resolvedChatId);

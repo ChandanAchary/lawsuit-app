@@ -1,9 +1,10 @@
+import { useThemeStore } from '../../stores/themeStore';
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, RefreshControl, Alert, TouchableOpacity, Linking, StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { formatErrorMessage } from '../../utils/formatError';
 import { appointmentsApi, casesApi } from '../../services/api';
 import { Appointment, AppointmentStatus } from '../../types';
@@ -36,6 +37,10 @@ const statusMap: Record<string, AppointmentStatus | undefined> = {
 
 
 export const LawyerAppointmentsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useThemeStore((s: any) => s.isDark ? require('../../stores/themeStore').DARK_COLORS : require('../../constants').COLORS);
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
   const [tab, setTab] = useState('all');
   const [allAppointments, setAllAppointments] = useState<Appointment[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -190,7 +195,7 @@ export const LawyerAppointmentsScreen: React.FC<{ navigation: any }> = ({ naviga
       onReject={item.status === AppointmentStatus.PENDING ? () => handleReject(item.id) : undefined}
       onChat={
         item.status === AppointmentStatus.CONFIRMED || item.status === AppointmentStatus.ATTENDED || item.status === 'COMPLETED' as any
-          ? () => navigation.navigate('ChatScreen', { otherUserId: item.clientId, name: item.client?.name })
+          ? () => navigation.navigate('ChatScreen', { otherUserId: item.clientId, name: item.client?.name, appointmentId: item.id })
           : undefined
       }
       onCreateCase={item.status === AppointmentStatus.ATTENDED ? () => handleCreateCase(item) : undefined}
@@ -260,7 +265,7 @@ export const LawyerAppointmentsScreen: React.FC<{ navigation: any }> = ({ naviga
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   headerBar: {
     paddingHorizontal: SPACING.xl, paddingTop: SPACING.huge, paddingBottom: SPACING.sm,

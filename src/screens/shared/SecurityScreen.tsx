@@ -1,10 +1,11 @@
+import { useThemeStore } from '../../stores/themeStore';
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   KeyboardAvoidingView, Platform, Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { useAuthStore } from '../../stores/authStore';
 import { Input } from '../../components/Input';
 import { Button } from '../../components/Button';
@@ -13,6 +14,10 @@ import { formatErrorMessage } from '../../utils/formatError';
 type Step = 'send' | 'reset';
 
 export const SecurityScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useThemeStore((s: any) => s.isDark ? require('../../stores/themeStore').DARK_COLORS : require('../../constants').COLORS);
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
   const { user, requestOtp, resetPassword } = useAuthStore();
 
   const [step, setStep] = useState<Step>('send');
@@ -287,7 +292,7 @@ export const SecurityScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   flex: { flex: 1, backgroundColor: COLORS.background },
 
   header: {

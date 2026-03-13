@@ -1,9 +1,10 @@
+import { useThemeStore } from '../../stores/themeStore';
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 
 const PRIVACY_POLICY = [
   { title: '1. Information We Collect', body: 'We collect personal information you provide when registering, including your name, email address, phone number, and location. For lawyers, we additionally collect bar council ID, license details, specialization, and experience information. We may also collect usage data, device information, and interaction logs to improve our services.' },
@@ -28,6 +29,10 @@ const TERMS_OF_SERVICE = [
 type Tab = 'privacy' | 'terms';
 
 export const PrivacyTermsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useThemeStore((s: any) => s.isDark ? require('../../stores/themeStore').DARK_COLORS : require('../../constants').COLORS);
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
   const [activeTab, setActiveTab] = useState<Tab>('privacy');
   const sections = activeTab === 'privacy' ? PRIVACY_POLICY : TERMS_OF_SERVICE;
 
@@ -76,7 +81,7 @@ export const PrivacyTermsScreen: React.FC<{ navigation: any }> = ({ navigation }
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',

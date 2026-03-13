@@ -96,6 +96,7 @@ export const authApi = {
 export const lawyersApi = {
   getAll: (params?: Record<string, unknown>) => api.get('/lawyers', { params }),
   getById: (id: string) => api.get(`/lawyers/${encodeURIComponent(id)}`),
+  getPublicProfile: (id: string) => api.get(`/lawyers/${encodeURIComponent(id)}/profile`),
   update: (id: string, data: Record<string, unknown>) => api.put(`/lawyers/${encodeURIComponent(id)}`, data),
   apply: (data: Record<string, unknown>) => api.post('/lawyers/apply', data),
   getReviews: (id: string, params?: Record<string, unknown>) => api.get(`/lawyers/${encodeURIComponent(id)}/reviews`, { params }),
@@ -179,7 +180,7 @@ export const usersApi = {
   postClientInformation: (data: Record<string, unknown>) => api.post('/users/client-information', data),
   getLawyerInformation: () => api.get('/users/lawyer-information'),
   postLawyerInformation: (data: Record<string, unknown>) => api.post('/users/lawyer-information', data),
-  registerFcmToken: (token: string) => api.post('/users/fcm-token', { token }),
+  registerFcmToken: (token: string) => api.post('/users/fcm-token', { fcmToken: token }),
   removeFcmToken: (token: string) => api.delete('/users/fcm-token', { data: { token } }),
   getUserById: (id: string) => api.get(`/users/${encodeURIComponent(id)}`),
 };
@@ -187,6 +188,7 @@ export const usersApi = {
 // ─── Chat API ───────────────────────────────────────────────
 export const chatApi = {
   createChat: (otherUserId: string, caseId?: string) => api.post('/chat', { otherUserId, caseId }),
+  getOrCreateAppointmentChat: (appointmentId: string) => api.get(`/chat/appointment/${encodeURIComponent(appointmentId)}`),
   getChats: () => api.get('/chat'),
   getMessages: (chatId: string, params?: Record<string, unknown>) =>
     api.get(`/chat/${encodeURIComponent(chatId)}/messages`, { params }),

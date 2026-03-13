@@ -1,3 +1,4 @@
+import { useThemeStore } from '../stores/themeStore';
 import React, { useState, useEffect, useRef } from 'react';
 
 // Module-level cache so results persist across component mounts
@@ -7,7 +8,7 @@ import {
   ActivityIndicator, ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../constants';
 import { addressApi } from '../services/api';
 import { Input } from './Input';
 
@@ -29,6 +30,10 @@ interface LocationPickerProps {
 }
 
 export const LocationPicker: React.FC<LocationPickerProps> = ({ value, onChange, editable = true }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useThemeStore((s: any) => s.isDark ? require('../stores/themeStore').DARK_COLORS : require('../constants').COLORS);
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
   const [states, setStates] = useState<string[]>([]);
   const [showStatePicker, setShowStatePicker] = useState(false);
   const [stateSearch, setStateSearch] = useState('');
@@ -341,7 +346,7 @@ const InfoRow = ({ icon, label, value }: { icon: string; label: string; value: s
   </View>
 );
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   lockedField: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING.md,
     backgroundColor: COLORS.surfaceAlt, borderRadius: BORDER_RADIUS.lg,

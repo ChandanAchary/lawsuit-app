@@ -1,7 +1,8 @@
+import { useThemeStore } from '../stores/themeStore';
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../constants';
 import { Lawyer } from '../types';
 
 interface LawyerCardProps {
@@ -12,6 +13,10 @@ interface LawyerCardProps {
 }
 
 export const LawyerCard: React.FC<LawyerCardProps> = ({ lawyer, onPress, style, nearMe }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useThemeStore((s: any) => s.isDark ? require('../stores/themeStore').DARK_COLORS : require('../constants').COLORS);
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
   return (
     <TouchableOpacity activeOpacity={0.7} onPress={onPress} style={[styles.card, style]}>
       <View style={styles.row}>
@@ -77,7 +82,7 @@ export const LawyerCard: React.FC<LawyerCardProps> = ({ lawyer, onPress, style, 
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   card: {
     backgroundColor: COLORS.white,
     borderRadius: BORDER_RADIUS.xl,
