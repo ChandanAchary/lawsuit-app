@@ -41,6 +41,14 @@ import { LawyerClientDetailScreen } from '../screens/lawyer/LawyerClientDetailSc
 // Admin screens
 import { AdminDashboardScreen } from '../screens/admin/AdminDashboardScreen';
 import { AdminUsersScreen } from '../screens/admin/AdminUsersScreen';
+import { AdminPaymentsScreen } from '../screens/admin/AdminPaymentsScreen';
+import { AdminWalletsScreen } from '../screens/admin/AdminWalletsScreen';
+import { CourtManagementScreen } from '../screens/admin/CourtManagementScreen';
+import { CourtAdminManagementScreen } from '../screens/admin/CourtAdminManagementScreen';
+
+// Court Admin screens
+import { CourtAdminDashboardScreen } from '../screens/courtAdmin/CourtAdminDashboardScreen';
+import { LawyerVerificationScreen } from '../screens/courtAdmin/LawyerVerificationScreen';
 
 // Shared screens
 import { ChatScreen } from '../screens/shared/ChatScreen';
@@ -56,6 +64,8 @@ import { VideoCallScreen } from '../screens/shared/VideoCallScreen';
 import { SecurityScreen } from '../screens/shared/SecurityScreen';
 import { AppointmentDetailScreen } from '../screens/shared/AppointmentDetailScreen';
 import { TeleLawScreen } from '../screens/shared/TeleLawScreen';
+import { PaymentHistoryScreen } from '../screens/shared/PaymentHistoryScreen';
+import { CourtAdminLoginScreen } from '../screens/auth/CourtAdminLoginScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -69,6 +79,7 @@ export const AuthStack = () => (
     <Stack.Screen name="OtpVerify" component={OtpVerifyScreen} />
     <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
     <Stack.Screen name="AdminLogin" component={AdminLoginScreen} />
+    <Stack.Screen name="CourtAdminLogin" component={CourtAdminLoginScreen} />
   </Stack.Navigator>
 );
 
@@ -188,11 +199,46 @@ const AdminTabs = () => (
   </Tab.Navigator>
 );
 
+// ─── Court Admin Tab Navigator ──────────────────────────
+const CourtAdminTabs = () => (
+  <Tab.Navigator
+    screenOptions={({ route }) => ({
+      headerShown: false,
+      tabBarActiveTintColor: COLORS.primary,
+      tabBarInactiveTintColor: COLORS.textMuted,
+      tabBarLabelStyle: { fontSize: FONT_SIZE.xs - 1, fontWeight: '600' },
+      tabBarStyle: {
+        backgroundColor: COLORS.white,
+        borderTopWidth: 0,
+        elevation: 12,
+        shadowColor: '#000',
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: -4 },
+        height: 64,
+        paddingBottom: 8,
+        paddingTop: 6,
+      },
+      tabBarIcon: ({ focused, color }) => {
+        const icons: Record<string, string> = {
+          CourtAdminDashboard: focused ? 'shield-checkmark' : 'shield-checkmark-outline',
+          LawyerVerification: focused ? 'checkmark-done-circle' : 'checkmark-done-circle-outline',
+        };
+        return <Ionicons name={icons[route.name] as any} size={22} color={color} />;
+      },
+    })}
+  >
+    <Tab.Screen name="CourtAdminDashboard" component={CourtAdminDashboardScreen} options={{ title: 'Dashboard' }} />
+    <Tab.Screen name="LawyerVerification" component={LawyerVerificationScreen} options={{ title: 'Verifications' }} />
+  </Tab.Navigator>
+);
+
 // ─── Role-based Main Navigator ──────────────────────────
-const getRoleTabs = (role: UserRole) => {
+const getRoleTabs = (role: UserRole | string) => {
   switch (role) {
     case UserRole.LAWYER: return LawyerTabs;
     case UserRole.ADMIN: return AdminTabs;
+    case 'COURT_ADMIN': return CourtAdminTabs;
     default: return ClientTabs;
   }
 };
@@ -228,6 +274,15 @@ export const MainStack = () => {
       <Stack.Screen name="Security" component={SecurityScreen} />
       <Stack.Screen name="AppointmentDetail" component={AppointmentDetailScreen} />
       <Stack.Screen name="TeleLaw" component={TeleLawScreen} />
+      {/* Payment History */}
+      <Stack.Screen name="PaymentHistory" component={PaymentHistoryScreen} />
+      {/* Admin-only screens */}
+      <Stack.Screen name="AdminPayments" component={AdminPaymentsScreen} />
+      <Stack.Screen name="AdminWallets" component={AdminWalletsScreen} />
+      <Stack.Screen name="CourtManagement" component={CourtManagementScreen} />
+      <Stack.Screen name="CourtAdminManagement" component={CourtAdminManagementScreen} />
+      {/* Court Admin screens (also accessible from stack) */}
+      <Stack.Screen name="LawyerVerification" component={LawyerVerificationScreen} />
     </Stack.Navigator>
   );
 };

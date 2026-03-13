@@ -20,7 +20,7 @@ export const AdminDashboardScreen: React.FC<{ navigation: any }> = ({ navigation
 
   const fetchStats = useCallback(async () => {
     try {
-      const { data } = await adminApi.getDashboardStats();
+      const { data } = await adminApi.getDashboard();
       setStats(data);
     } catch {
       setStats({ users: 0, lawyers: 0, cases: 0, appointments: 0 });
@@ -44,35 +44,39 @@ export const AdminDashboardScreen: React.FC<{ navigation: any }> = ({ navigation
       </LinearGradient>
 
       <View style={styles.statsGrid}>
-        <StatCard icon="people" color="#3B82F6" label="Total Users" value={stats?.users ?? stats?.totalUsers ?? '—'} />
-        <StatCard icon="briefcase" color={COLORS.accent} label="Lawyers" value={stats?.lawyers ?? stats?.totalLawyers ?? '—'} />
-        <StatCard icon="folder-open" color={COLORS.success} label="Cases" value={stats?.cases ?? stats?.totalCases ?? '—'} />
-        <StatCard icon="calendar" color="#8B5CF6" label="Appointments" value={stats?.appointments ?? stats?.totalAppointments ?? '—'} />
+        <StatCard icon="people" color="#3B82F6" label="Total Users" value={stats?.users ?? stats?.totalUsers ?? '—'} COLORS={COLORS} styles={styles} />
+        <StatCard icon="briefcase" color={COLORS.accent} label="Lawyers" value={stats?.lawyers ?? stats?.totalLawyers ?? '—'} COLORS={COLORS} styles={styles} />
+        <StatCard icon="folder-open" color={COLORS.success} label="Cases" value={stats?.cases ?? stats?.totalCases ?? '—'} COLORS={COLORS} styles={styles} />
+        <StatCard icon="calendar" color="#8B5CF6" label="Appointments" value={stats?.appointments ?? stats?.totalAppointments ?? '—'} COLORS={COLORS} styles={styles} />
       </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Management</Text>
-        <MenuItem icon="people-outline" label="User Management" desc="Verify and manage users" onPress={() => navigation.navigate('AdminUsers')} />
-        <MenuItem icon="notifications-outline" label="Notifications" desc="System notifications" onPress={() => navigation.navigate('Notifications')} />
+        <MenuItem icon="people-outline" label="User Management" desc="Verify and manage users" onPress={() => navigation.navigate('AdminUsers')} COLORS={COLORS} styles={styles} />
+        <MenuItem icon="card-outline" label="Payment Monitoring" desc="View all platform payments" onPress={() => navigation.navigate('AdminPayments')} COLORS={COLORS} styles={styles} />
+        <MenuItem icon="wallet-outline" label="Wallet Management" desc="Credit, debit & withdrawals" onPress={() => navigation.navigate('AdminWallets')} COLORS={COLORS} styles={styles} />
+        <MenuItem icon="business-outline" label="Court Management" desc="Manage courts" onPress={() => navigation.navigate('CourtManagement')} COLORS={COLORS} styles={styles} />
+        <MenuItem icon="shield-outline" label="Court Admins" desc="Manage court administrators" onPress={() => navigation.navigate('CourtAdminManagement')} COLORS={COLORS} styles={styles} />
+        <MenuItem icon="notifications-outline" label="Notifications" desc="System notifications" onPress={() => navigation.navigate('Notifications')} COLORS={COLORS} styles={styles} />
       </View>
     </ScrollView>
   );
 };
 
-const StatCard = ({ icon, color, label, value }: { icon: string; color: string; label: string; value: any }) => (
+const StatCard = ({ icon, color, label, value, COLORS, styles }: any) => (
   <View style={styles.statCard}>
     <View style={[styles.statIcon, { backgroundColor: color + '18' }]}>
-      <Ionicons name={icon as any} size={24} color={color} />
+      <Ionicons name={icon} size={24} color={color} />
     </View>
     <Text style={styles.statValue}>{value}</Text>
     <Text style={styles.statLabel}>{label}</Text>
   </View>
 );
 
-const MenuItem = ({ icon, label, desc, onPress }: { icon: string; label: string; desc: string; onPress: () => void }) => (
+const MenuItem = ({ icon, label, desc, onPress, COLORS, styles }: any) => (
   <TouchableOpacity style={styles.menuItem} onPress={onPress}>
     <View style={styles.menuIcon}>
-      <Ionicons name={icon as any} size={22} color={COLORS.primary} />
+      <Ionicons name={icon} size={22} color={COLORS.primary} />
     </View>
     <View style={styles.menuInfo}>
       <Text style={styles.menuLabel}>{label}</Text>

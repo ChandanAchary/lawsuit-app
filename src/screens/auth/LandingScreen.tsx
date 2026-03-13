@@ -1,6 +1,6 @@
 import { useThemeStore } from '../../stores/themeStore';
 import React from 'react';
-import { View, Text, StyleSheet, Image, Dimensions, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, StatusBar } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../constants';
 import { Button } from '../../components/Button';
@@ -70,6 +70,13 @@ export const LandingScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
               onPress={() => navigation.navigate('Login')}
               variant="ghost"
               size="lg"
+              textStyle={styles.loginBtnText}
+            />
+            <Button
+              title="Court Admin Login"
+              onPress={() => navigation.navigate('CourtAdminLogin')}
+              variant="ghost"
+              size="sm"
               textStyle={styles.loginBtnText}
             />
           </View>

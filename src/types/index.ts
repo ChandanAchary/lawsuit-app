@@ -308,3 +308,62 @@ export interface Review {
   client?: { name: string; avatar?: string };
   createdAt: string;
 }
+
+export interface Payment {
+  id: string;
+  userId: string;
+  appointmentId?: string;
+  amount: number;
+  currency: string;
+  provider: string;
+  providerOrderId?: string;
+  providerPaymentId?: string;
+  status: PaymentStatus;
+  escrowStatus?: string;
+  metadata?: any;
+  createdAt: string;
+}
+
+export enum CourtAdminStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+  SUSPENDED = 'SUSPENDED',
+}
+
+export interface Court {
+  id: string;
+  name: string;
+  code: string;
+  type: string;
+  state?: string;
+  district?: string;
+  city?: string;
+  address?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CourtAdmin {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  courtId: string;
+  court?: Court;
+  status: CourtAdminStatus;
+  avatarUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LawyerVerification {
+  id: string;
+  lawyerId: string;
+  courtAdminId: string;
+  status: string;
+  remarks?: string;
+  verifiedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
