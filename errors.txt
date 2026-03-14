@@ -1,7 +1,0 @@
-﻿src/navigation/index.tsx(223,47): error TS2322: Type 'FC<Props>' is not assignable to type 'ScreenComponentType<ParamListBase, "LawyerClientDetail"> | undefined'.
-  Type 'FunctionComponent<Props>' is not assignable to type 'FunctionComponent<{}>'.
-    Type '{}' is missing the following properties from type 'Props': navigation, route
-src/navigation/index.tsx(229,46): error TS2322: Type 'FC<Props>' is not assignable to type 'ScreenComponentType<ParamListBase, "AppointmentDetail"> | undefined'.
-  Type 'FunctionComponent<Props>' is not assignable to type 'FunctionComponent<{}>'.
-    Type '{}' is missing the following properties from type 'Props': navigation, route
-src/screens/admin/AdminDashboardScreen.tsx(18,39): error TS2551: Property 'getDashboardStats' does not exist on type '{ getDashboard: () => Promise<AxiosResponse<any, any, {}>>; getUsers: (params?: Record<string, unknown> | undefined) => Promise<AxiosResponse<any, any, {}>>; ... 11 more ...; verifyClient: (id: string) => Promise<...>; }'. Did you mean 'getDashboard'?

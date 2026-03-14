@@ -1,4 +1,4 @@
-import { useThemeStore } from '../../stores/themeStore';
+import {  useThemeStore , useColors } from '../../stores/themeStore';
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, StatusBar, Alert,
@@ -13,7 +13,7 @@ type RoleChoice = 'CLIENT' | 'LAWYER';
 
 export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
-  const COLORS = useThemeStore((s: any) => s.isDark ? require('../../stores/themeStore').DARK_COLORS : require('../../constants').COLORS);
+  const COLORS = useColors();
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
 
   const [selectedRole, setSelectedRole] = useState<RoleChoice | null>(null);

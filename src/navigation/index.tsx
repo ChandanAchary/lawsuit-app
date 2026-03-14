@@ -2,9 +2,11 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, FONT_SIZE } from '../constants';
+import { ComponentType } from 'react';
+import { FONT_SIZE } from '../constants';
 import { UserRole } from '../types';
 import { useAuthStore } from '../stores/authStore';
+import { useColors } from '../stores/themeStore';
 
 // Auth screens
 import { LandingScreen } from '../screens/auth/LandingScreen';
@@ -84,154 +86,170 @@ export const AuthStack = () => (
 );
 
 // ─── Client Tab Navigator ───────────────────────────────
-const ClientTabs = () => (
-  <Tab.Navigator
-    screenOptions={({ route }) => ({
-      headerShown: false,
-      tabBarActiveTintColor: COLORS.primary,
-      tabBarInactiveTintColor: COLORS.textMuted,
-      tabBarLabelStyle: { fontSize: FONT_SIZE.xs - 1, fontWeight: '600' },
-      tabBarStyle: {
-        backgroundColor: COLORS.white,
-        borderTopWidth: 0,
-        elevation: 12,
-        shadowColor: '#000',
-        shadowOpacity: 0.08,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: -4 },
-        height: 64,
-        paddingBottom: 8,
-        paddingTop: 6,
-      },
-      tabBarIcon: ({ focused, color }) => {
-        const icons: Record<string, string> = {
-          Home: focused ? 'home' : 'home-outline',
-          Search: focused ? 'search' : 'search-outline',
-          Appointments: focused ? 'calendar' : 'calendar-outline',
-          Cases: focused ? 'briefcase' : 'briefcase-outline',
-          Chats: focused ? 'chatbubbles' : 'chatbubbles-outline',
-          Profile: focused ? 'person' : 'person-outline',
-        };
-        return <Ionicons name={icons[route.name] as any} size={22} color={color} />;
-      },
-    })}
-  >
-    <Tab.Screen name="Home" component={HomeScreen} />
-    <Tab.Screen name="Search" component={SearchScreen} />
-    <Tab.Screen name="Appointments" component={AppointmentsScreen} />
-    <Tab.Screen name="Cases" component={CasesScreen} />
-    <Tab.Screen name="Chats" component={ChatListScreen} />
-    <Tab.Screen name="Profile" component={ProfileScreen} />
-  </Tab.Navigator>
-);
+const ClientTabs = () => {
+  const C = useColors();
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarActiveTintColor: C.primary,
+        tabBarInactiveTintColor: C.textMuted,
+        tabBarLabelStyle: { fontSize: FONT_SIZE.xs - 1, fontWeight: '600' },
+        tabBarStyle: {
+          backgroundColor: C.surface,
+          borderTopWidth: 1,
+          borderTopColor: C.border,
+          elevation: 12,
+          shadowColor: '#000',
+          shadowOpacity: 0.08,
+          shadowRadius: 12,
+          shadowOffset: { width: 0, height: -4 },
+          height: 64,
+          paddingBottom: 8,
+          paddingTop: 6,
+        },
+        tabBarIcon: ({ focused, color }) => {
+          const icons: Record<string, string> = {
+            Home: focused ? 'home' : 'home-outline',
+            Search: focused ? 'search' : 'search-outline',
+            Appointments: focused ? 'calendar' : 'calendar-outline',
+            Cases: focused ? 'briefcase' : 'briefcase-outline',
+            Chats: focused ? 'chatbubbles' : 'chatbubbles-outline',
+            Profile: focused ? 'person' : 'person-outline',
+          };
+          return <Ionicons name={icons[route.name] as any} size={22} color={color} />;
+        },
+      })}
+    >
+      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Search" component={SearchScreen} />
+      <Tab.Screen name="Appointments" component={AppointmentsScreen} />
+      <Tab.Screen name="Cases" component={CasesScreen} />
+      <Tab.Screen name="Chats" component={ChatListScreen} />
+      <Tab.Screen name="Profile" component={ProfileScreen} />
+    </Tab.Navigator>
+  );
+};
 
 // ─── Lawyer Tab Navigator ───────────────────────────────
-const LawyerTabs = () => (
-  <Tab.Navigator
-    screenOptions={({ route }) => ({
-      headerShown: false,
-      tabBarActiveTintColor: COLORS.primary,
-      tabBarInactiveTintColor: COLORS.textMuted,
-      tabBarLabelStyle: { fontSize: FONT_SIZE.xs - 1, fontWeight: '600' },
-      tabBarStyle: {
-        backgroundColor: COLORS.white,
-        borderTopWidth: 0,
-        elevation: 12,
-        shadowColor: '#000',
-        shadowOpacity: 0.08,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: -4 },
-        height: 64,
-        paddingBottom: 8,
-        paddingTop: 6,
-      },
-      tabBarIcon: ({ focused, color }) => {
-        const icons: Record<string, string> = {
-          Dashboard: focused ? 'grid' : 'grid-outline',
-          LawyerAppointments: focused ? 'calendar' : 'calendar-outline',
-          LawyerCases: focused ? 'briefcase' : 'briefcase-outline',
-          LawyerChats: focused ? 'chatbubbles' : 'chatbubbles-outline',
-          LawyerProfile: focused ? 'person' : 'person-outline',
-        };
-        return <Ionicons name={icons[route.name] as any} size={22} color={color} />;
-      },
-    })}
-  >
-    <Tab.Screen name="Dashboard" component={LawyerDashboardScreen} />
-    <Tab.Screen name="LawyerAppointments" component={LawyerAppointmentsScreen} options={{ title: 'Appointments' }} />
-    <Tab.Screen name="LawyerCases" component={LawyerCasesScreen} options={{ title: 'Cases' }} />
-    <Tab.Screen name="LawyerChats" component={ChatListScreen} options={{ title: 'Chats' }} />
-    <Tab.Screen name="LawyerProfile" component={LawyerProfileScreen} options={{ title: 'Profile' }} />
-  </Tab.Navigator>
-);
+const LawyerTabs = () => {
+  const C = useColors();
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarActiveTintColor: C.primary,
+        tabBarInactiveTintColor: C.textMuted,
+        tabBarLabelStyle: { fontSize: FONT_SIZE.xs - 1, fontWeight: '600' },
+        tabBarStyle: {
+          backgroundColor: C.surface,
+          borderTopWidth: 1,
+          borderTopColor: C.border,
+          elevation: 12,
+          shadowColor: '#000',
+          shadowOpacity: 0.08,
+          shadowRadius: 12,
+          shadowOffset: { width: 0, height: -4 },
+          height: 64,
+          paddingBottom: 8,
+          paddingTop: 6,
+        },
+        tabBarIcon: ({ focused, color }) => {
+          const icons: Record<string, string> = {
+            Dashboard: focused ? 'grid' : 'grid-outline',
+            LawyerAppointments: focused ? 'calendar' : 'calendar-outline',
+            LawyerCases: focused ? 'briefcase' : 'briefcase-outline',
+            LawyerChats: focused ? 'chatbubbles' : 'chatbubbles-outline',
+            LawyerProfile: focused ? 'person' : 'person-outline',
+          };
+          return <Ionicons name={icons[route.name] as any} size={22} color={color} />;
+        },
+      })}
+    >
+      <Tab.Screen name="Dashboard" component={LawyerDashboardScreen} />
+      <Tab.Screen name="LawyerAppointments" component={LawyerAppointmentsScreen} options={{ title: 'Appointments' }} />
+      <Tab.Screen name="LawyerCases" component={LawyerCasesScreen} options={{ title: 'Cases' }} />
+      <Tab.Screen name="LawyerChats" component={ChatListScreen} options={{ title: 'Chats' }} />
+      <Tab.Screen name="LawyerProfile" component={LawyerProfileScreen} options={{ title: 'Profile' }} />
+    </Tab.Navigator>
+  );
+};
 
 // ─── Admin Tab Navigator ────────────────────────────────
-const AdminTabs = () => (
-  <Tab.Navigator
-    screenOptions={({ route }) => ({
-      headerShown: false,
-      tabBarActiveTintColor: COLORS.primary,
-      tabBarInactiveTintColor: COLORS.textMuted,
-      tabBarLabelStyle: { fontSize: FONT_SIZE.xs - 1, fontWeight: '600' },
-      tabBarStyle: {
-        backgroundColor: COLORS.white,
-        borderTopWidth: 0,
-        elevation: 12,
-        shadowColor: '#000',
-        shadowOpacity: 0.08,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: -4 },
-        height: 64,
-        paddingBottom: 8,
-        paddingTop: 6,
-      },
-      tabBarIcon: ({ focused, color }) => {
-        const icons: Record<string, string> = {
-          AdminDashboard: focused ? 'shield-checkmark' : 'shield-checkmark-outline',
-          AdminUsers: focused ? 'people' : 'people-outline',
-        };
-        return <Ionicons name={icons[route.name] as any} size={22} color={color} />;
-      },
-    })}
-  >
-    <Tab.Screen name="AdminDashboard" component={AdminDashboardScreen} options={{ title: 'Dashboard' }} />
-    <Tab.Screen name="AdminUsers" component={AdminUsersScreen} options={{ title: 'Users' }} />
-  </Tab.Navigator>
-);
+const AdminTabs = () => {
+  const C = useColors();
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarActiveTintColor: C.primary,
+        tabBarInactiveTintColor: C.textMuted,
+        tabBarLabelStyle: { fontSize: FONT_SIZE.xs - 1, fontWeight: '600' },
+        tabBarStyle: {
+          backgroundColor: C.surface,
+          borderTopWidth: 1,
+          borderTopColor: C.border,
+          elevation: 12,
+          shadowColor: '#000',
+          shadowOpacity: 0.08,
+          shadowRadius: 12,
+          shadowOffset: { width: 0, height: -4 },
+          height: 64,
+          paddingBottom: 8,
+          paddingTop: 6,
+        },
+        tabBarIcon: ({ focused, color }) => {
+          const icons: Record<string, string> = {
+            AdminDashboard: focused ? 'shield-checkmark' : 'shield-checkmark-outline',
+            AdminUsers: focused ? 'people' : 'people-outline',
+          };
+          return <Ionicons name={icons[route.name] as any} size={22} color={color} />;
+        },
+      })}
+    >
+      <Tab.Screen name="AdminDashboard" component={AdminDashboardScreen} options={{ title: 'Dashboard' }} />
+      <Tab.Screen name="AdminUsers" component={AdminUsersScreen} options={{ title: 'Users' }} />
+    </Tab.Navigator>
+  );
+};
 
 // ─── Court Admin Tab Navigator ──────────────────────────
-const CourtAdminTabs = () => (
-  <Tab.Navigator
-    screenOptions={({ route }) => ({
-      headerShown: false,
-      tabBarActiveTintColor: COLORS.primary,
-      tabBarInactiveTintColor: COLORS.textMuted,
-      tabBarLabelStyle: { fontSize: FONT_SIZE.xs - 1, fontWeight: '600' },
-      tabBarStyle: {
-        backgroundColor: COLORS.white,
-        borderTopWidth: 0,
-        elevation: 12,
-        shadowColor: '#000',
-        shadowOpacity: 0.08,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: -4 },
-        height: 64,
-        paddingBottom: 8,
-        paddingTop: 6,
-      },
-      tabBarIcon: ({ focused, color }) => {
-        const icons: Record<string, string> = {
-          CourtAdminDashboard: focused ? 'shield-checkmark' : 'shield-checkmark-outline',
-          LawyerVerification: focused ? 'checkmark-done-circle' : 'checkmark-done-circle-outline',
-        };
-        return <Ionicons name={icons[route.name] as any} size={22} color={color} />;
-      },
-    })}
-  >
-    <Tab.Screen name="CourtAdminDashboard" component={CourtAdminDashboardScreen} options={{ title: 'Dashboard' }} />
-    <Tab.Screen name="LawyerVerification" component={LawyerVerificationScreen} options={{ title: 'Verifications' }} />
-  </Tab.Navigator>
-);
+const CourtAdminTabs = () => {
+  const C = useColors();
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarActiveTintColor: C.primary,
+        tabBarInactiveTintColor: C.textMuted,
+        tabBarLabelStyle: { fontSize: FONT_SIZE.xs - 1, fontWeight: '600' },
+        tabBarStyle: {
+          backgroundColor: C.surface,
+          borderTopWidth: 1,
+          borderTopColor: C.border,
+          elevation: 12,
+          shadowColor: '#000',
+          shadowOpacity: 0.08,
+          shadowRadius: 12,
+          shadowOffset: { width: 0, height: -4 },
+          height: 64,
+          paddingBottom: 8,
+          paddingTop: 6,
+        },
+        tabBarIcon: ({ focused, color }) => {
+          const icons: Record<string, string> = {
+            CourtAdminDashboard: focused ? 'shield-checkmark' : 'shield-checkmark-outline',
+            LawyerVerification: focused ? 'checkmark-done-circle' : 'checkmark-done-circle-outline',
+          };
+          return <Ionicons name={icons[route.name] as any} size={22} color={color} />;
+        },
+      })}
+    >
+      <Tab.Screen name="CourtAdminDashboard" component={CourtAdminDashboardScreen} options={{ title: 'Dashboard' }} />
+      <Tab.Screen name="LawyerVerification" component={LawyerVerificationScreen} options={{ title: 'Verifications' }} />
+    </Tab.Navigator>
+  );
+};
 
 // ─── Role-based Main Navigator ──────────────────────────
 const getRoleTabs = (role: UserRole | string) => {
@@ -266,13 +284,13 @@ export const MainStack = () => {
       <Stack.Screen name="LawyerTemplates" component={LawyerTemplatesScreen} />
       <Stack.Screen name="ProSubscription" component={ProSubscriptionScreen} />
       <Stack.Screen name="About" component={AboutScreen} />
-      <Stack.Screen name="LawyerClientDetail" component={LawyerClientDetailScreen} />
+      <Stack.Screen name="LawyerClientDetail" component={LawyerClientDetailScreen as ComponentType<any>} />
       <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
       <Stack.Screen name="PrivacyTerms" component={PrivacyTermsScreen} />
       <Stack.Screen name="Availability" component={AvailabilityScreen} />
       <Stack.Screen name="VideoCall" component={VideoCallScreen} />
       <Stack.Screen name="Security" component={SecurityScreen} />
-      <Stack.Screen name="AppointmentDetail" component={AppointmentDetailScreen} />
+      <Stack.Screen name="AppointmentDetail" component={AppointmentDetailScreen as ComponentType<any>} />
       <Stack.Screen name="TeleLaw" component={TeleLawScreen} />
       {/* Payment History */}
       <Stack.Screen name="PaymentHistory" component={PaymentHistoryScreen} />

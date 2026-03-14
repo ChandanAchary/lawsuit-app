@@ -6,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { useAuthStore } from '../../stores/authStore';
-import { useThemeStore } from '../../stores/themeStore';
+import {  useThemeStore , useColors } from '../../stores/themeStore';
 import { useWalletStore } from '../../stores/walletStore';
 
 const { width } = Dimensions.get('window');
@@ -23,7 +23,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const user = useAuthStore((s) => s.user);
   const balance = useWalletStore((s) => s.balance);
   const isDark = useThemeStore((s) => s.isDark);
-  const COLORS = useThemeStore((s) => s.isDark ? require('../../stores/themeStore').DARK_COLORS : require('../../constants').COLORS);
+  const COLORS = useColors();
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
 
   return (

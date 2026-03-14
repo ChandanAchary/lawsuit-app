@@ -1,4 +1,4 @@
-import { useThemeStore } from '../../stores/themeStore';
+import {  useThemeStore , useColors } from '../../stores/themeStore';
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,7 +8,7 @@ import { teleLawApi } from '../../services/api';
 
 export const TeleLawScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
-  const COLORS = useThemeStore((s: any) => s.isDark ? require('../../stores/themeStore').DARK_COLORS : require('../../constants').COLORS);
+  const COLORS = useColors();
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
 
   const [info, setInfo] = useState<any>(null);

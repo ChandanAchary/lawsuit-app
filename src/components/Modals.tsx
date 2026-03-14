@@ -1,4 +1,4 @@
-import { useThemeStore } from '../stores/themeStore';
+import {  useThemeStore , useColors } from '../stores/themeStore';
 import React from 'react';
 import { Modal, View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,7 +22,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   maxHeight = SCREEN_HEIGHT * 0.75,
 }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
-  const COLORS = useThemeStore((s: any) => s.isDark ? require('../stores/themeStore').DARK_COLORS : require('../constants').COLORS);
+  const COLORS = useColors();
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
 
   return (
@@ -54,6 +54,10 @@ interface AppModalProps {
 }
 
 export const AppModal: React.FC<AppModalProps> = ({ visible, onClose, title, children }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useColors();
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>

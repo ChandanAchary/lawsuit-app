@@ -1,4 +1,4 @@
-import { useThemeStore } from '../../stores/themeStore';
+import {  useThemeStore , useColors } from '../../stores/themeStore';
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity,
@@ -25,7 +25,7 @@ interface Stats {
 
 export const LawyerClientDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
-  const COLORS = useThemeStore((s: any) => s.isDark ? require('../../stores/themeStore').DARK_COLORS : require('../../constants').COLORS);
+  const COLORS = useColors();
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
 
   const { clientId, name } = route.params;
@@ -217,15 +217,23 @@ export const LawyerClientDetailScreen: React.FC<Props> = ({ navigation, route })
 };
 
 /* ── Stat Box ── */
-const StatBox: React.FC<{ value: number; label: string; color: string }> = ({ value, label, color }) => (
-  <View style={styles.statBox}>
-    <Text style={[styles.statValue, { color }]}>{value}</Text>
-    <Text style={styles.statLabel}>{label}</Text>
-  </View>
-);
+const StatBox: React.FC<{ value: number; label: string; color: string }> = ({ value, label, color }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useColors();
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+  return (
+    <View style={styles.statBox}>
+      <Text style={[styles.statValue, { color }]}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+};
 
 /* ── Appointment Row ── */
 const AppointmentRow: React.FC<{ appointment: Appointment }> = ({ appointment }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useColors();
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
   const statusColors: Record<string, string> = {
     CONFIRMED: COLORS.success,
     ATTENDED: '#7C3AED',
@@ -235,11 +243,10 @@ const AppointmentRow: React.FC<{ appointment: Appointment }> = ({ appointment })
     COMPLETED: '#7C3AED',
     RESCHEDULED: COLORS.accent,
   };
-  const color = statusColors[appointment.status] || COLORS.textMuted;
-
+  const statusColor = statusColors[appointment.status] || COLORS.textMuted;
   return (
     <View style={styles.apptRow}>
-      <View style={[styles.apptDot, { backgroundColor: color }]} />
+      <View style={[styles.apptDot, { backgroundColor: statusColor }]} />
       <View style={{ flex: 1 }}>
         <Text style={styles.apptDate}>
           {format(new Date(appointment.scheduledAt), 'dd MMM yyyy, hh:mm a')}
@@ -248,8 +255,8 @@ const AppointmentRow: React.FC<{ appointment: Appointment }> = ({ appointment })
           <Text style={styles.apptNotes} numberOfLines={1}>{appointment.notes}</Text>
         ) : null}
       </View>
-      <View style={[styles.apptBadge, { backgroundColor: color + '20' }]}>
-        <Text style={[styles.apptStatus, { color }]}>
+      <View style={[styles.apptBadge, { backgroundColor: statusColor + '20' }]}>
+        <Text style={[styles.apptStatus, { color: statusColor }]}>
           {appointment.status.charAt(0) + appointment.status.slice(1).toLowerCase()}
         </Text>
       </View>

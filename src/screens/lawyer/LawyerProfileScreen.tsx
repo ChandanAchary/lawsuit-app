@@ -10,7 +10,7 @@ import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { useAuthStore } from '../../stores/authStore';
 import { useUserStore } from '../../stores/userStore';
 import { usersApi, storageApi, dashboardApi } from '../../services/api';
-import { useThemeStore } from '../../stores/themeStore';
+import {  useThemeStore , useColors } from '../../stores/themeStore';
 import { Loading } from '../../components/Common';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
@@ -19,7 +19,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const LawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
-  const COLORS = useThemeStore((s: any) => s.isDark ? require('../../stores/themeStore').DARK_COLORS : require('../../constants').COLORS);
+  const COLORS = useColors();
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
 
   const { user: authUser, logout } = useAuthStore();
@@ -250,18 +250,24 @@ export const LawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigation 
 };
 
 /* ─── Menu Item ─── */
-const MenuItem = ({ icon, label, subtitle, onPress, last }: { icon: string; label: string; subtitle?: string; onPress: () => void; last?: boolean }) => (
-  <TouchableOpacity style={[styles.menuItem, !last && styles.menuItemBorder]} onPress={onPress}>
-    <View style={styles.menuIconWrap}>
-      <Ionicons name={icon as any} size={20} color={COLORS.primary} />
-    </View>
-    <View style={styles.menuContentArea}>
-      <Text style={styles.menuLabel}>{label}</Text>
-      {subtitle ? <Text style={styles.menuSub}>{subtitle}</Text> : null}
-    </View>
-    <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
-  </TouchableOpacity>
-);
+const MenuItem = ({ icon, label, subtitle, onPress, last }: { icon: string; label: string; subtitle?: string; onPress: () => void; last?: boolean }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useColors();
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
+  return (
+    <TouchableOpacity style={[styles.menuItem, !last && styles.menuItemBorder]} onPress={onPress}>
+      <View style={styles.menuIconWrap}>
+        <Ionicons name={icon as any} size={20} color={COLORS.primary} />
+      </View>
+      <View style={styles.menuContentArea}>
+        <Text style={styles.menuLabel}>{label}</Text>
+        {subtitle ? <Text style={styles.menuSub}>{subtitle}</Text> : null}
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
+    </TouchableOpacity>
+  );
+};
 
 const getStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },

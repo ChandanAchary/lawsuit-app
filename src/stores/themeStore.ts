@@ -8,7 +8,7 @@ type ThemeMode = 'light' | 'dark' | 'system';
 interface ThemeStore {
   mode: ThemeMode;
   isDark: boolean;
-  setMode: (mode: ThemeMode) => void;
+  setMode: (mode: ThemeMode) => Promise<void>;
   init: () => Promise<void>;
 }
 
@@ -18,22 +18,36 @@ const resolveIsDark = (mode: ThemeMode): boolean => {
 };
 
 export const useThemeStore = create<ThemeStore>((set, get) => ({
-  mode: 'light',
-  isDark: false,
-  setMode: async (mode) => {
-    await AsyncStorage.setItem('theme_mode', mode);
-    set({ mode, isDark: resolveIsDark(mode) });
+  mode: 'system',
+  isDark: Appearance.getColorScheme() === 'dark',
+  setMode: async (mode: ThemeMode) => {
+    try {
+      await AsyncStorage.setItem('theme_mode', mode);
+      const isDark = resolveIsDark(mode);
+      set({ mode, isDark });
+    } catch (error) {
+      console.error('Failed to set theme mode:', error);
+    }
   },
   init: async () => {
-    const stored = await AsyncStorage.getItem('theme_mode');
-    const mode = (stored as ThemeMode) || 'light';
-    set({ mode, isDark: resolveIsDark(mode) });
-    Appearance.addChangeListener(() => {
-      const current = get().mode;
-      if (current === 'system') {
-        set({ isDark: Appearance.getColorScheme() === 'dark' });
-      }
-    });
+    try {
+      const stored = await AsyncStorage.getItem('theme_mode');
+      const mode = (stored as ThemeMode) || 'system';
+      const isDark = resolveIsDark(mode);
+      set({ mode, isDark });
+      
+      // Handle system theme changes
+      const subscription = Appearance.addChangeListener(({ colorScheme }) => {
+        const current = get().mode;
+        if (current === 'system') {
+          set({ isDark: colorScheme === 'dark' });
+        }
+      });
+      
+      return () => subscription.remove();
+    } catch (error) {
+      console.error('Failed to initialize theme:', error);
+    }
   },
 }));
 

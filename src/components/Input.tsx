@@ -1,4 +1,4 @@
-import { useThemeStore } from '../stores/themeStore';
+import {  useThemeStore , useColors } from '../stores/themeStore';
 import React, { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { TextInput, View, Text, StyleSheet, TextInputProps, ViewStyle, TouchableOpacity } from 'react-native';
@@ -23,7 +23,7 @@ export const Input: React.FC<InputProps> = ({
   ...props
 }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
-  const COLORS = useThemeStore((s: any) => s.isDark ? require('../stores/themeStore').DARK_COLORS : require('../constants').COLORS);
+  const COLORS = useColors();
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
 
   const [showPassword, setShowPassword] = useState(false);

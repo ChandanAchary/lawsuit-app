@@ -1,4 +1,4 @@
-import { useThemeStore } from '../../stores/themeStore';
+import {  useThemeStore , useColors } from '../../stores/themeStore';
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Image,
@@ -34,7 +34,7 @@ interface ReferralInfo {
 
 export const LawyerDashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
-  const COLORS = useThemeStore((s: any) => s.isDark ? require('../../stores/themeStore').DARK_COLORS : require('../../constants').COLORS);
+  const COLORS = useColors();
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
 
   const user = useAuthStore((s) => s.user);
@@ -312,33 +312,45 @@ const StatCard: React.FC<{
   icon: string; iconBg: string; iconColor: string;
   value: string; label: string; change: number | null;
   onPress: () => void;
-}> = ({ icon, iconBg, iconColor, value, label, change, onPress }) => (
-  <TouchableOpacity style={styles.statCard} onPress={onPress} activeOpacity={0.7}>
-    <View style={[styles.statIcon, { backgroundColor: iconBg }]}>
-      <Ionicons name={icon as any} size={20} color={iconColor} />
-    </View>
-    <Text style={styles.statValue}>{value}</Text>
-    <Text style={styles.statLabel}>{label}</Text>
-    {change !== null && change !== undefined && (
-      <View style={[styles.changeBadge, { backgroundColor: change >= 0 ? COLORS.successLight : COLORS.errorLight }]}>
-        <Ionicons name={change >= 0 ? 'trending-up' : 'trending-down'} size={10} color={change >= 0 ? COLORS.success : COLORS.error} />
-        <Text style={[styles.changeText, { color: change >= 0 ? COLORS.success : COLORS.error }]}>
-          {change >= 0 ? '+' : ''}{change}%
-        </Text>
+}> = ({ icon, iconBg, iconColor, value, label, change, onPress }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useColors();
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
+  return (
+    <TouchableOpacity style={styles.statCard} onPress={onPress} activeOpacity={0.7}>
+      <View style={[styles.statIcon, { backgroundColor: iconBg }]}>
+        <Ionicons name={icon as any} size={20} color={iconColor} />
       </View>
-    )}
-  </TouchableOpacity>
-);
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+      {change !== null && change !== undefined && (
+        <View style={[styles.changeBadge, { backgroundColor: change >= 0 ? COLORS.successLight : COLORS.errorLight }]}>
+          <Ionicons name={change >= 0 ? 'trending-up' : 'trending-down'} size={10} color={change >= 0 ? COLORS.success : COLORS.error} />
+          <Text style={[styles.changeText, { color: change >= 0 ? COLORS.success : COLORS.error }]}>
+            {change >= 0 ? '+' : ''}{change}%
+          </Text>
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+};
 
 /* ── Quick Action ── */
-const QuickAction = ({ icon, label, color, onPress }: { icon: string; label: string; color: string; onPress: () => void }) => (
-  <TouchableOpacity style={styles.quickItem} onPress={onPress}>
-    <View style={[styles.quickIcon, { backgroundColor: color + '18' }]}>
-      <Ionicons name={icon as any} size={22} color={color} />
-    </View>
-    <Text style={styles.quickLabel}>{label}</Text>
-  </TouchableOpacity>
-);
+const QuickAction = ({ icon, label, color, onPress }: { icon: string; label: string; color: string; onPress: () => void }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useColors();
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
+  return (
+    <TouchableOpacity style={styles.quickItem} onPress={onPress}>
+      <View style={[styles.quickIcon, { backgroundColor: color + '18' }]}>
+        <Ionicons name={icon as any} size={22} color={color} />
+      </View>
+      <Text style={styles.quickLabel}>{label}</Text>
+    </TouchableOpacity>
+  );
+};
 
 const getStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },

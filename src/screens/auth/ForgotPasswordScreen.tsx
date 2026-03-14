@@ -1,11 +1,11 @@
-import { useThemeStore } from '../../stores/themeStore';
+import {  useThemeStore , useColors } from '../../stores/themeStore';
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView,
   Platform, ScrollView, StatusBar, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, COLORS as STATIC_COLORS } from '../../constants';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { useAuthStore } from '../../stores/authStore';
@@ -14,21 +14,21 @@ import { authApi } from '../../services/api';
 type Step = 'email' | 'otp' | 'newPassword';
 
 const getPasswordStrength = (pw: string): { label: string; color: string; width: string } => {
-  if (!pw) return { label: '', color: COLORS.border, width: '0%' };
+  if (!pw) return { label: '', color: STATIC_COLORS.border, width: '0%' };
   let score = 0;
   if (pw.length >= 8) score++;
   if (/[A-Z]/.test(pw)) score++;
   if (/[a-z]/.test(pw)) score++;
   if (/[0-9]/.test(pw)) score++;
   if (/[^A-Za-z0-9]/.test(pw)) score++;
-  if (score <= 2) return { label: 'Weak', color: COLORS.error, width: '33%' };
-  if (score <= 3) return { label: 'Medium', color: COLORS.warning, width: '66%' };
-  return { label: 'Strong', color: COLORS.success, width: '100%' };
+  if (score <= 2) return { label: 'Weak', color: STATIC_COLORS.error, width: '33%' };
+  if (score <= 3) return { label: 'Medium', color: STATIC_COLORS.warning, width: '66%' };
+  return { label: 'Strong', color: STATIC_COLORS.success, width: '100%' };
 };
 
 export const ForgotPasswordScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
-  const COLORS = useThemeStore((s: any) => s.isDark ? require('../../stores/themeStore').DARK_COLORS : require('../../constants').COLORS);
+  const COLORS = useColors();
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
 
   const [step, setStep] = useState<Step>('email');

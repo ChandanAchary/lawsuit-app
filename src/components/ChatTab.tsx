@@ -1,4 +1,4 @@
-import { useThemeStore } from '../stores/themeStore';
+import {  useThemeStore , useColors } from '../stores/themeStore';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Image,
@@ -19,7 +19,7 @@ interface ChatTabProps {
 
 export const ChatTab: React.FC<ChatTabProps> = ({ chatId, participants = [] }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
-  const COLORS = useThemeStore((s: any) => s.isDark ? require('../stores/themeStore').DARK_COLORS : require('../constants').COLORS);
+  const COLORS = useColors();
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);

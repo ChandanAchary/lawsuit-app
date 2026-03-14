@@ -1,4 +1,4 @@
-import { useThemeStore } from '../../stores/themeStore';
+import {  useThemeStore , useColors } from '../../stores/themeStore';
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity,
@@ -19,7 +19,7 @@ interface Props {
 
 export const AppointmentDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
-  const COLORS = useThemeStore((s: any) => s.isDark ? require('../../stores/themeStore').DARK_COLORS : require('../../constants').COLORS);
+  const COLORS = useColors();
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
 
   const { appointmentId, appointment: passedAppt } = route.params;
@@ -249,15 +249,21 @@ export const AppointmentDetailScreen: React.FC<Props> = ({ navigation, route }) 
 };
 
 /* ── Info Row helper ── */
-const InfoRow: React.FC<{ icon: string; label: string; value: string; isLink?: boolean }> = ({ icon, label, value, isLink }) => (
-  <View style={styles.infoRow}>
-    <Ionicons name={icon as any} size={16} color={COLORS.textMuted} style={{ marginTop: 2 }} />
-    <View style={{ flex: 1, marginLeft: SPACING.md }}>
-      <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={[styles.infoValue, isLink && { color: COLORS.primary }]}>{value}</Text>
+const InfoRow: React.FC<{ icon: string; label: string; value: string; isLink?: boolean }> = ({ icon, label, value, isLink }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useColors();
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
+  return (
+    <View style={styles.infoRow}>
+      <Ionicons name={icon as any} size={16} color={COLORS.textMuted} style={{ marginTop: 2 }} />
+      <View style={{ flex: 1, marginLeft: SPACING.md }}>
+        <Text style={styles.infoLabel}>{label}</Text>
+        <Text style={[styles.infoValue, isLink && { color: COLORS.primary }]}>{value}</Text>
+      </View>
     </View>
-  </View>
-);
+  );
+};
 
 const getStyles = (COLORS: any) => StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.background },

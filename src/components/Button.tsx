@@ -1,4 +1,4 @@
-import { useThemeStore } from '../stores/themeStore';
+import {  useThemeStore , useColors } from '../stores/themeStore';
 import React from 'react';
 import {
   TouchableOpacity,
@@ -36,7 +36,7 @@ export const Button: React.FC<ButtonProps> = ({
   fullWidth = true,
 }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
-  const COLORS = useThemeStore((s: any) => s.isDark ? require('../stores/themeStore').DARK_COLORS : require('../constants').COLORS);
+  const COLORS = useColors();
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
 
   const isDisabled = disabled || loading;

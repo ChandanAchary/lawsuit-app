@@ -1,4 +1,4 @@
-import { useThemeStore } from '../stores/themeStore';
+import {  useThemeStore , useColors } from '../stores/themeStore';
 import React from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { FONT_SIZE, SPACING } from '../constants';
@@ -10,7 +10,7 @@ interface LoadingProps {
 
 export const Loading: React.FC<LoadingProps> = ({ message, fullScreen = true }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
-  const COLORS = useThemeStore((s: any) => s.isDark ? require('../stores/themeStore').DARK_COLORS : require('../constants').COLORS);
+  const COLORS = useColors();
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
 
   if (!fullScreen) {
@@ -36,6 +36,10 @@ interface EmptyStateProps {
 }
 
 export const EmptyState: React.FC<EmptyStateProps> = ({ icon, title, message }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useColors();
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
   return (
     <View style={styles.emptyContainer}>
       <View style={styles.emptyIcon}>
@@ -52,11 +56,17 @@ interface StatusBadgeProps {
   colors: { bg: string; text: string };
 }
 
-export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, colors }) => (
-  <View style={[styles.badge, { backgroundColor: colors.bg }]}>
-    <Text style={[styles.badgeText, { color: colors.text }]}>{status}</Text>
-  </View>
-);
+export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, colors }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useColors();
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
+  return (
+    <View style={[styles.badge, { backgroundColor: colors.bg }]}>
+      <Text style={[styles.badgeText, { color: colors.text }]}>{status}</Text>
+    </View>
+  );
+};
 
 const getStyles = (COLORS: any) => StyleSheet.create({
   container: {

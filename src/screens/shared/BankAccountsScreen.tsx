@@ -1,4 +1,4 @@
-import { useThemeStore } from '../../stores/themeStore';
+import {  useThemeStore , useColors } from '../../stores/themeStore';
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput,
@@ -25,7 +25,7 @@ type TabType = 'BANK' | 'UPI';
 
 export const BankAccountsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
-  const COLORS = useThemeStore((s: any) => s.isDark ? require('../../stores/themeStore').DARK_COLORS : require('../../constants').COLORS);
+  const COLORS = useColors();
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
 
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
@@ -233,17 +233,17 @@ export const BankAccountsScreen: React.FC<{ navigation: any }> = ({ navigation }
             <ScrollView style={styles.modalScroll} contentContainerStyle={{ paddingBottom: 24 }}>
               {activeTab === 'BANK' ? (
                 <>
-                  <FieldInput label="Account Holder Name" value={holderName} onChangeText={setHolderName} placeholder="Full name" />
-                  <FieldInput label="Account Number" value={accountNumber} onChangeText={setAccountNumber} placeholder="Enter account number" keyboardType="numeric" />
+                  <FieldInput COLORS={COLORS} label="Account Holder Name" value={holderName} onChangeText={setHolderName} placeholder="Full name" />
+                  <FieldInput COLORS={COLORS} label="Account Number" value={accountNumber} onChangeText={setAccountNumber} placeholder="Enter account number" keyboardType="numeric" />
                   <View>
-                    <FieldInput label="IFSC Code" value={ifsc} onChangeText={handleIfscLookup} placeholder="e.g. SBIN0001234" autoCapitalize="characters" maxLength={11} />
+                    <FieldInput COLORS={COLORS} label="IFSC Code" value={ifsc} onChangeText={handleIfscLookup} placeholder="e.g. SBIN0001234" autoCapitalize="characters" maxLength={11} />
                     {lookingUpIfsc && <ActivityIndicator size="small" color={COLORS.primary} style={{ position: 'absolute', right: 16, top: 38 }} />}
                   </View>
-                  <FieldInput label="Bank Name" value={bankName} onChangeText={setBankName} placeholder="Auto-filled from IFSC" />
+                  <FieldInput COLORS={COLORS} label="Bank Name" value={bankName} onChangeText={setBankName} placeholder="Auto-filled from IFSC" />
                 </>
               ) : (
                 <>
-                  <FieldInput label="UPI ID" value={upiId} onChangeText={(t) => { setUpiId(t); setUpiVerified(false); }} placeholder="name@upi" />
+                  <FieldInput COLORS={COLORS} label="UPI ID" value={upiId} onChangeText={(t) => { setUpiId(t); setUpiVerified(false); }} placeholder="name@upi" />
                   <TouchableOpacity
                     style={[styles.verifyBtn, upiVerified && styles.verifyBtnDone]}
                     onPress={handleVerifyUpi} disabled={verifyingUpi || upiVerified}
@@ -258,7 +258,7 @@ export const BankAccountsScreen: React.FC<{ navigation: any }> = ({ navigation }
                 </>
               )}
 
-              <FieldInput label="Label (optional)" value={label} onChangeText={setLabel} placeholder="e.g. Salary Account" />
+              <FieldInput COLORS={COLORS} label="Label (optional)" value={label} onChangeText={setLabel} placeholder="e.g. Salary Account" />
 
               <View style={styles.switchRow}>
                 <Text style={styles.switchLabel}>Set as default</Text>
@@ -283,30 +283,7 @@ export const BankAccountsScreen: React.FC<{ navigation: any }> = ({ navigation }
 };
 
 /* ─── Field Input helper ─── */
-const FieldInput: React.FC<{
-  label: string; value: string; onChangeText: (t: string) => void;
-  placeholder?: string; keyboardType?: 'default' | 'numeric'; autoCapitalize?: 'none' | 'characters';
-  maxLength?: number;
-}> = ({ label, value, onChangeText, placeholder, keyboardType, autoCapitalize, maxLength }) => (
-  <View style={fiStyles.field}>
-    <Text style={fiStyles.label}>{label}</Text>
-    <TextInput
-      style={fiStyles.input} value={value} onChangeText={onChangeText}
-      placeholder={placeholder} placeholderTextColor={COLORS.textLight}
-      keyboardType={keyboardType} autoCapitalize={autoCapitalize} maxLength={maxLength}
-    />
-  </View>
-);
-
-const fiStyles = StyleSheet.create({
-  field: { marginBottom: SPACING.lg },
-  label: { fontSize: FONT_SIZE.sm, color: COLORS.textSecondary, fontWeight: '600', marginBottom: SPACING.xs },
-  input: {
-    borderWidth: 1, borderColor: COLORS.border, borderRadius: BORDER_RADIUS.md,
-    paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md,
-    fontSize: FONT_SIZE.md, color: COLORS.text, backgroundColor: COLORS.white,
-  },
-});
+const FieldInput = ({ label, value, onChangeText, placeholder, keyboardType, autoCapitalize, maxLength, COLORS }: any) => { const fiStyles = StyleSheet.create({ field: { marginBottom: 16 }, label: { fontSize: 12, color: COLORS.textSecondary, fontWeight: '600', marginBottom: 4 }, input: { borderWidth: 1, borderColor: COLORS.border, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12, fontSize: 14, color: COLORS.text, backgroundColor: COLORS.white } }); return ( <View style={fiStyles.field}> <Text style={fiStyles.label}>{label}</Text> <TextInput style={fiStyles.input} value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={COLORS.textLight} keyboardType={keyboardType} autoCapitalize={autoCapitalize} maxLength={maxLength} /> </View> ); };
 
 const getStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },

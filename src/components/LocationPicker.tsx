@@ -1,4 +1,4 @@
-import { useThemeStore } from '../stores/themeStore';
+import {  useThemeStore , useColors } from '../stores/themeStore';
 import React, { useState, useEffect, useRef } from 'react';
 
 // Module-level cache so results persist across component mounts
@@ -31,7 +31,7 @@ interface LocationPickerProps {
 
 export const LocationPicker: React.FC<LocationPickerProps> = ({ value, onChange, editable = true }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
-  const COLORS = useThemeStore((s: any) => s.isDark ? require('../stores/themeStore').DARK_COLORS : require('../constants').COLORS);
+  const COLORS = useColors();
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
 
   const [states, setStates] = useState<string[]>([]);
@@ -336,7 +336,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ value, onChange,
   );
 };
 
-const InfoRow = ({ icon, label, value }: { icon: string; label: string; value: string }) => (
+const InfoRow = ({ icon, label, value, COLORS, styles }: any) => (
   <View style={styles.infoRow}>
     <Ionicons name={icon as any} size={18} color={COLORS.textMuted} />
     <View style={{ flex: 1 }}>

@@ -1,10 +1,10 @@
-import { useThemeStore } from '../../stores/themeStore';
+import {  useThemeStore , useColors } from '../../stores/themeStore';
 import React, { useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS, COLORS as STATIC_COLORS } from '../../constants';
 import { modelChatApi } from '../../services/api';
 import Markdown from 'react-native-markdown-display';
 
@@ -23,7 +23,7 @@ const SUGGESTIONS = [
 
 export const AiChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
-  const COLORS = useThemeStore((s: any) => s.isDark ? require('../../stores/themeStore').DARK_COLORS : require('../../constants').COLORS);
+  const COLORS = useColors();
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -161,13 +161,13 @@ export const AiChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 };
 
 const markdownStyles = StyleSheet.create({
-  body: { fontSize: FONT_SIZE.md, color: COLORS.text, lineHeight: 22 },
+  body: { fontSize: FONT_SIZE.md, color: STATIC_COLORS.text, lineHeight: 22 },
   heading1: { fontSize: FONT_SIZE.xl, fontWeight: '800' as any, marginBottom: 8 },
   heading2: { fontSize: FONT_SIZE.lg, fontWeight: '700' as any, marginBottom: 6 },
   paragraph: { marginBottom: 8 },
   list_item: { marginBottom: 4 },
-  code_inline: { backgroundColor: COLORS.surfaceAlt, paddingHorizontal: 4, borderRadius: 4, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
-  fence: { backgroundColor: COLORS.surfaceAlt, padding: 12, borderRadius: 8, marginVertical: 8 },
+  code_inline: { backgroundColor: STATIC_COLORS.surfaceAlt, paddingHorizontal: 4, borderRadius: 4, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
+  fence: { backgroundColor: STATIC_COLORS.surfaceAlt, padding: 12, borderRadius: 8, marginVertical: 8 },
   strong: { fontWeight: '700' as any },
 }) as any;
 

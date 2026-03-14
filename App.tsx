@@ -38,54 +38,67 @@ export default function App() {
   const [isReady, setIsReady] = useState(false);
   const initTheme = useThemeStore(state => state.init);
   const isDark = useThemeStore(state => state.isDark);
+  const mode = useThemeStore(state => state.mode);
 
-  const navTheme: Theme = isDark
-    ? {
-        ...DarkTheme,
-        colors: {
-          ...DarkTheme.colors,
-          background: DARK_COLORS.background,
-          card: DARK_COLORS.surface,
-          text: DARK_COLORS.text,
-          border: DARK_COLORS.border,
-          primary: DARK_COLORS.primary,
-          notification: DARK_COLORS.primary,
-        },
-      }
-    : {
-        ...DefaultTheme,
-        colors: {
-          ...DefaultTheme.colors,
-          background: COLORS.background,
-          card: COLORS.surface,
-          text: COLORS.text,
-          border: COLORS.border,
-          primary: COLORS.primary,
-          notification: COLORS.primary,
-        },
-      };
+  // Compute theme based on current dark mode state
+  const navTheme: Theme = React.useMemo(() => {
+    const currentIsDark = isDark;
+    return currentIsDark
+      ? {
+          ...DarkTheme,
+          colors: {
+            ...DarkTheme.colors,
+            background: DARK_COLORS.background,
+            card: DARK_COLORS.surface,
+            text: DARK_COLORS.text,
+            border: DARK_COLORS.border,
+            primary: DARK_COLORS.primary,
+            notification: DARK_COLORS.primary,
+          },
+        }
+      : {
+          ...DefaultTheme,
+          colors: {
+            ...DefaultTheme.colors,
+            background: COLORS.background,
+            card: COLORS.surface,
+            text: COLORS.text,
+            border: COLORS.border,
+            primary: COLORS.primary,
+            notification: COLORS.primary,
+          },
+        };
+  }, [isDark]);
 
   useEffect(() => {
     const init = async () => {
-      await Promise.all([restoreSession(), initTheme()]);
-      // Request all runtime permissions on first launch
-      requestAllPermissions().catch(() => {});
-      setIsReady(true);
+      try {
+        await Promise.all([initTheme(), restoreSession()]);
+        // Request all runtime permissions on first launch
+        await requestAllPermissions().catch(() => {});
+      } catch (error) {
+        console.error('App initialization error:', error);
+      } finally {
+        setIsReady(true);
+      }
     };
     init();
-  }, []);
+  }, [initTheme, restoreSession]);
 
   useEffect(() => {
     if (isAuthenticated) {
       initSocketListeners();
       fetchUnreadCount();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, initSocketListeners, fetchUnreadCount]);
 
   if (!isReady) {
+    const splashBg = isDark ? DARK_COLORS.background : COLORS.background;
+    const spinnerColor = isDark ? DARK_COLORS.primary : COLORS.primary;
+    
     return (
-      <View style={styles.splash}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+      <View style={[styles.splash, { backgroundColor: splashBg }]}>
+        <ActivityIndicator size="large" color={spinnerColor} />
       </View>
     );
   }
