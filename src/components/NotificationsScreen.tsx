@@ -3,12 +3,13 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndi
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../constants';
 import { Notification, NotificationType } from '../types';
 import { useNotificationStore } from '../stores/notificationStore';
 import { formatTimeAgo } from '../utils/date';
+import { useThemeStore, useColors } from '../stores/themeStore';
 
-const NOTIFICATION_ICONS: Record<string, { icon: string; color: string }> = {
+const getNotificationIcons = (COLORS: any): Record<string, { icon: string; color: string }> => ({
   [NotificationType.APPOINTMENT_BOOKED]: { icon: 'calendar', color: COLORS.info },
   [NotificationType.APPOINTMENT_CONFIRMED]: { icon: 'checkmark-circle', color: COLORS.success },
   [NotificationType.APPOINTMENT_CANCELLED]: { icon: 'close-circle', color: COLORS.error },
@@ -21,9 +22,13 @@ const NOTIFICATION_ICONS: Record<string, { icon: string; color: string }> = {
   [NotificationType.DOCUMENT_UPLOADED]: { icon: 'document', color: COLORS.primary },
   [NotificationType.VIDEO_CALL]: { icon: 'videocam', color: COLORS.accent },
   [NotificationType.REVIEW_RECEIVED]: { icon: 'star', color: COLORS.accent },
-};
+});
 
 export const NotificationsScreen: React.FC<{ navigation?: any }> = ({ navigation: navProp }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useColors();
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+  const NOTIFICATION_ICONS = React.useMemo(() => getNotificationIcons(COLORS), [isDark]);
   const insets = useSafeAreaInsets();
   const fallbackNav = useNavigation();
   const nav: any = navProp || fallbackNav;
@@ -103,6 +108,7 @@ export const NotificationsScreen: React.FC<{ navigation?: any }> = ({ navigation
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Notifications</Text>
         {unreadCount > 0 && (
@@ -132,7 +138,7 @@ export const NotificationsScreen: React.FC<{ navigation?: any }> = ({ navigation
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     flexDirection: 'row',

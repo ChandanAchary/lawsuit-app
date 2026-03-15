@@ -1,9 +1,10 @@
+import { useThemeStore, useColors } from '../../stores/themeStore';
 import React from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 
 const WHY_ITEMS = [
   { icon: 'shield-checkmark-outline', title: 'Secure', desc: 'End-to-end encrypted communications' },
@@ -12,56 +13,62 @@ const WHY_ITEMS = [
   { icon: 'globe-outline', title: 'Accessible', desc: 'Available across India in 10+ languages' },
 ];
 
-export const AboutScreen: React.FC<{ navigation: any }> = ({ navigation }) => (
-  <View style={styles.container}>
-    <StatusBar barStyle="dark-content" />
-    <View style={styles.header}>
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-        <Ionicons name="arrow-back" size={22} color={COLORS.text} />
-      </TouchableOpacity>
-      <Text style={styles.headerTitle}>About</Text>
-      <View style={{ width: 36 }} />
+export const AboutScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useColors();
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={22} color={COLORS.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>About</Text>
+        <View style={{ width: 36 }} />
+      </View>
+
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* App Icon */}
+        <View style={styles.iconWrap}>
+          <Ionicons name="chatbubbles" size={48} color={COLORS.accent} />
+        </View>
+        <Text style={styles.appName}>LawSoft</Text>
+        <Text style={styles.version}>Version 1.0.0</Text>
+        <Text style={styles.tagline}>Making Legal Services Accessible to Everyone</Text>
+
+        {/* About Card */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>About</Text>
+          <Text style={styles.cardText}>
+            LawSoft connects clients with verified legal professionals across India. Whether you need a consultation, want to manage ongoing cases, or need immediate legal advice, LawSoft provides a seamless platform for all your legal needs.
+          </Text>
+        </View>
+
+        {/* Why LawSoft Card */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Why LawSoft?</Text>
+          {WHY_ITEMS.map((item, idx) => (
+            <View key={item.title} style={[styles.featureRow, idx < WHY_ITEMS.length - 1 && styles.featureRowBorder]}>
+              <View style={styles.featureIcon}>
+                <Ionicons name={item.icon as any} size={22} color={COLORS.textSecondary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.featureTitle}>{item.title}</Text>
+                <Text style={styles.featureDesc}>{item.desc}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+
+        <Text style={styles.copyright}>© 2026 LawSoft. All rights reserved.</Text>
+      </ScrollView>
     </View>
+  );
+};
 
-    <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      {/* App Icon */}
-      <View style={styles.iconWrap}>
-        <Ionicons name="chatbubbles" size={48} color={COLORS.accent} />
-      </View>
-      <Text style={styles.appName}>LawSoft</Text>
-      <Text style={styles.version}>Version 1.0.0</Text>
-      <Text style={styles.tagline}>Making Legal Services Accessible to Everyone</Text>
-
-      {/* About Card */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>About</Text>
-        <Text style={styles.cardText}>
-          LawSoft connects clients with verified legal professionals across India. Whether you need a consultation, want to manage ongoing cases, or need immediate legal advice, LawSoft provides a seamless platform for all your legal needs.
-        </Text>
-      </View>
-
-      {/* Why LawSoft Card */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Why LawSoft?</Text>
-        {WHY_ITEMS.map((item, idx) => (
-          <View key={item.title} style={[styles.featureRow, idx < WHY_ITEMS.length - 1 && styles.featureRowBorder]}>
-            <View style={styles.featureIcon}>
-              <Ionicons name={item.icon as any} size={22} color={COLORS.textSecondary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.featureTitle}>{item.title}</Text>
-              <Text style={styles.featureDesc}>{item.desc}</Text>
-            </View>
-          </View>
-        ))}
-      </View>
-
-      <Text style={styles.copyright}>© 2026 LawSoft. All rights reserved.</Text>
-    </ScrollView>
-  </View>
-);
-
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',

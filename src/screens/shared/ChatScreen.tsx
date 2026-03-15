@@ -1,7 +1,8 @@
+import { useThemeStore, useColors } from '../../stores/themeStore';
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, ActivityIndicator, Image, Alert, Modal } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Text, ActivityIndicator, Image, Alert, Modal, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, FONT_SIZE, SPACING, SHADOWS, BORDER_RADIUS } from '../../constants';
+import { FONT_SIZE, SPACING, SHADOWS, BORDER_RADIUS } from '../../constants';
 import { ChatTab } from '../../components/ChatTab';
 import { chatApi } from '../../services/api';
 import { socketService } from '../../services/socket';
@@ -9,6 +10,10 @@ import { ChatParticipant } from '../../types';
 import { useAuthStore } from '../../stores/authStore';
 
 export const ChatScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useColors();
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
   const { chatId: initialChatId, otherUserId, caseId, name, otherUser, appointmentId } = route.params || {};
   const [chatId, setChatId] = useState<string | null>(initialChatId || null);
   const [loading, setLoading] = useState(!initialChatId);
@@ -83,6 +88,7 @@ export const ChatScreen: React.FC<{ navigation: any; route: any }> = ({ navigati
 
   return (
     <View style={styles.container}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={COLORS.text} />
@@ -158,7 +164,7 @@ export const ChatScreen: React.FC<{ navigation: any; route: any }> = ({ navigati
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING.md,

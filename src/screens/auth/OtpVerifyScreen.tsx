@@ -1,13 +1,18 @@
+import { useThemeStore, useColors } from '../../stores/themeStore';
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Alert, StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING } from '../../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../constants';
 import { Button } from '../../components/Button';
 import { useAuthStore } from '../../stores/authStore';
 
 export const OtpVerifyScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useColors();
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
   const identifier = route.params?.identifier || '';
   const referralCode = route.params?.referralCode;
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
@@ -69,7 +74,7 @@ export const OtpVerifyScreen: React.FC<{ navigation: any; route: any }> = ({ nav
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <View style={styles.content}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
@@ -119,7 +124,7 @@ export const OtpVerifyScreen: React.FC<{ navigation: any; route: any }> = ({ nav
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   content: { flex: 1, paddingHorizontal: SPACING.xxl },
   backBtn: {

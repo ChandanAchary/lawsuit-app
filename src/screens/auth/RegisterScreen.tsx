@@ -1,17 +1,18 @@
+import { useThemeStore, useColors } from '../../stores/themeStore';
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform,
   ScrollView, StatusBar, Alert, Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { useAuthStore } from '../../stores/authStore';
 
 type Step = 'info' | 'password';
 
-const getPasswordStrength = (pw: string): { label: string; color: string; width: string } => {
+const getPasswordStrength = (pw: string, COLORS: any): { label: string; color: string; width: string } => {
   if (!pw) return { label: '', color: COLORS.border, width: '0%' };
   let score = 0;
   if (pw.length >= 8) score++;
@@ -25,6 +26,10 @@ const getPasswordStrength = (pw: string): { label: string; color: string; width:
 };
 
 export const RegisterScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useColors();
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
   const [step, setStep] = useState<Step>('info');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -105,7 +110,7 @@ export const RegisterScreen: React.FC<{ navigation: any; route: any }> = ({ navi
     }
   };
 
-  const strength = getPasswordStrength(password);
+  const strength = getPasswordStrength(password, COLORS);
 
   // ─── Step 1: Personal Info ────────────────────────────
   if (step === 'info') {
@@ -114,7 +119,7 @@ export const RegisterScreen: React.FC<{ navigation: any; route: any }> = ({ navi
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <StatusBar barStyle="dark-content" />
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
         <ScrollView
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
@@ -252,7 +257,7 @@ export const RegisterScreen: React.FC<{ navigation: any; route: any }> = ({ navi
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <ScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
@@ -351,7 +356,7 @@ export const RegisterScreen: React.FC<{ navigation: any; route: any }> = ({ navi
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   scroll: { flexGrow: 1, paddingHorizontal: SPACING.xxl, paddingBottom: SPACING.xxxl },
   backBtn: {
