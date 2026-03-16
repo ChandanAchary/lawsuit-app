@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { View, ActivityIndicator, StyleSheet, LogBox } from 'react-native';
-import { NavigationContainer, LinkingOptions, DefaultTheme, DarkTheme, Theme } from '@react-navigation/native';
+import { View, ActivityIndicator, StyleSheet, LogBox, Modal, Text, TouchableOpacity } from 'react-native';
+import { NavigationContainer, LinkingOptions, DefaultTheme, DarkTheme, Theme, createNavigationContainerRef } from '@react-navigation/native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from './src/stores/authStore';
 import { useThemeStore, DARK_COLORS } from './src/stores/themeStore';
 import { COLORS } from './src/constants';
 import { useNotificationStore } from './src/stores/notificationStore';
 import { AuthStack, MainStack } from './src/navigation';
 import { requestAllPermissions } from './src/utils/permissions';
+import { socketService } from './src/services/socket';
 
 // Suppress Expo OTA update errors permanently — we don't use OTA updates
 LogBox.ignoreLogs(['Failed to download remote update']);
@@ -32,10 +34,21 @@ const linking: LinkingOptions<any> = {
   },
 };
 
+const navigationRef = createNavigationContainerRef<any>();
+
+type IncomingCall = {
+  from: string;
+  callerName: string;
+  callType: 'audio' | 'video';
+  roomId: string;
+  chatId?: string;
+};
+
 export default function App() {
-  const { isAuthenticated, restoreSession } = useAuthStore();
+  const { isAuthenticated, restoreSession, user } = useAuthStore();
   const { initSocketListeners, fetchUnreadCount } = useNotificationStore();
   const [isReady, setIsReady] = useState(false);
+  const [incomingCall, setIncomingCall] = useState<IncomingCall | null>(null);
   const initTheme = useThemeStore(state => state.init);
   const isDark = useThemeStore(state => state.isDark);
   const mode = useThemeStore(state => state.mode);
@@ -87,10 +100,67 @@ export default function App() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      initSocketListeners();
+      socketService.connect().catch(() => {});
+      const cleanupNotifications = initSocketListeners();
       fetchUnreadCount();
+
+      const unsubIncomingCall = socketService.on('call:incoming', (payload: unknown) => {
+        const call = payload as IncomingCall;
+        if (!call?.from || !call?.roomId) return;
+        setIncomingCall(call);
+      });
+
+      const unsubCallEnded = socketService.on('call:ended', (payload: unknown) => {
+        const call = payload as { roomId?: string };
+        setIncomingCall((prev) => {
+          if (!prev) return prev;
+          if (call?.roomId && prev.roomId !== call.roomId) return prev;
+          return null;
+        });
+      });
+
+      return () => {
+        cleanupNotifications();
+        unsubIncomingCall();
+        unsubCallEnded();
+      };
     }
+
+    setIncomingCall(null);
+    socketService.disconnect();
+    return () => {
+      socketService.disconnect();
+    };
   }, [isAuthenticated, initSocketListeners, fetchUnreadCount]);
+
+  const rejectIncomingCall = () => {
+    if (!incomingCall || !user?.id) return;
+    socketService.emit('call:reject', {
+      to: incomingCall.from,
+      roomId: incomingCall.roomId,
+      chatId: incomingCall.chatId,
+    });
+    setIncomingCall(null);
+  };
+
+  const acceptIncomingCall = () => {
+    if (!incomingCall || !navigationRef.isReady()) return;
+
+    socketService.emit('call:accept', {
+      to: incomingCall.from,
+      roomId: incomingCall.roomId,
+    });
+
+    const call = incomingCall;
+    setIncomingCall(null);
+    navigationRef.navigate('VideoCall', {
+      roomId: call.roomId,
+      callType: call.callType,
+      otherUser: { id: call.from, name: call.callerName || 'Unknown' },
+      isOutgoing: false,
+      chatId: call.chatId,
+    });
+  };
 
   if (!isReady) {
     const splashBg = isDark ? DARK_COLORS.background : COLORS.background;
@@ -105,10 +175,33 @@ export default function App() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <NavigationContainer linking={linking} theme={navTheme}>
+      <NavigationContainer ref={navigationRef} linking={linking} theme={navTheme}>
         <StatusBar style={isDark ? 'light' : 'dark'} />
         {isAuthenticated ? <MainStack /> : <AuthStack />}
       </NavigationContainer>
+
+      <Modal visible={!!incomingCall} transparent animationType="fade" onRequestClose={rejectIncomingCall}>
+        <View style={styles.callOverlay}>
+          <View style={[styles.callCard, { backgroundColor: isDark ? DARK_COLORS.surface : COLORS.white }] }>
+            <Ionicons
+              name={incomingCall?.callType === 'video' ? 'videocam' : 'call'}
+              size={42}
+              color={isDark ? DARK_COLORS.primary : COLORS.primary}
+            />
+            <Text style={[styles.callTitle, { color: isDark ? DARK_COLORS.text : COLORS.text }]}>Incoming {incomingCall?.callType === 'video' ? 'Video' : 'Audio'} Call</Text>
+            <Text style={[styles.callSubtitle, { color: isDark ? DARK_COLORS.textSecondary : COLORS.textSecondary }]}>from {incomingCall?.callerName || 'Unknown'}</Text>
+
+            <View style={styles.callActions}>
+              <TouchableOpacity style={[styles.callActionBtn, { backgroundColor: COLORS.error }]} onPress={rejectIncomingCall}>
+                <Ionicons name="close" size={28} color={COLORS.white} />
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.callActionBtn, { backgroundColor: COLORS.success }]} onPress={acceptIncomingCall}>
+                <Ionicons name="checkmark" size={28} color={COLORS.white} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </GestureHandlerRootView>
   );
 }
@@ -117,6 +210,42 @@ const styles = StyleSheet.create({
   splash: {
     flex: 1,
     backgroundColor: COLORS.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  callOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  callCard: {
+    width: '100%',
+    maxWidth: 360,
+    borderRadius: 20,
+    paddingVertical: 26,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  callTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    marginTop: 10,
+  },
+  callSubtitle: {
+    marginTop: 6,
+    fontSize: 14,
+  },
+  callActions: {
+    marginTop: 22,
+    flexDirection: 'row',
+    gap: 26,
+  },
+  callActionBtn: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     alignItems: 'center',
     justifyContent: 'center',
   },

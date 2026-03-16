@@ -66,6 +66,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ chatId, participants = [] }) =
       const { message } = data as { message: ChatMessage };
       if (!message || message.chatId !== chatId) return;
       setMessages((prev) => {
+        if (prev.some((m) => m.id === message.id)) return prev;
         // Replace optimistic if same text + sender
         const optIdx = prev.findIndex((m) => m.id.startsWith('temp-') && m.senderId === message.senderId && m.text === message.text);
         if (optIdx !== -1) {

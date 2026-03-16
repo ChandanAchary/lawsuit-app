@@ -327,11 +327,14 @@ export const dashboardApi = {
 export const videoApi = {
   createMeeting: (data: { appointmentId: string; meetingType?: string }) =>
     api.post('/video/meeting', data),
-  getIceServers: () => api.get('/video/ice-servers'),
   getMeeting: (appointmentId: string) =>
     api.get(`/video/meeting/${encodeURIComponent(appointmentId)}`),
   endMeeting: (appointmentId: string) =>
     api.post(`/video/meeting/${encodeURIComponent(appointmentId)}/end`),
+  createChatSession: (chatId: string) =>
+    api.post(`/video/chat/${encodeURIComponent(chatId)}/session`),
+  getChatSession: (chatId: string) =>
+    api.get(`/video/chat/${encodeURIComponent(chatId)}/session`),
 };
 
 // ─── Payments API ───────────────────────────────────────────

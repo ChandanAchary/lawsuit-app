@@ -1,6 +1,7 @@
 // @ts-nocheck
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Image,
   Platform,
   StatusBar,
@@ -11,35 +12,10 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-let RTCPeerConnection: any;
-let RTCSessionDescription: any;
-let RTCIceCandidate: any;
-let mediaDevices: any;
-let RTCView: any = View;
-let MediaStream: any;
-
-try {
-  const webrtc = require('react-native-webrtc');
-  RTCPeerConnection = webrtc.RTCPeerConnection;
-  RTCSessionDescription = webrtc.RTCSessionDescription;
-  RTCIceCandidate = webrtc.RTCIceCandidate;
-  mediaDevices = webrtc.mediaDevices;
-  RTCView = webrtc.RTCView;
-  MediaStream = webrtc.MediaStream;
-} catch (e) {
-  console.warn("react-native-webrtc is not available. Expo Go does not support custom native modules.");
-}
+import { WebView } from 'react-native-webview';
 import { videoApi } from '../../services/api';
 import { socketService } from '../../services/socket';
 
-const ICE_SERVERS = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-  ],
-};
-
-// ─── Small reusable action button ───────────────────────────────────────────
 const ActionBtn: React.FC<{
   icon: string;
   label: string;
@@ -54,11 +30,10 @@ const ActionBtn: React.FC<{
   </View>
 );
 
-// ─── Main screen ─────────────────────────────────────────────────────────────
 export const VideoCallScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
   const {
     appointmentId,
-    roomId: directRoomId,
+    roomId,
     callType = 'audio',
     otherUser,
     isOutgoing = true,
@@ -69,7 +44,6 @@ export const VideoCallScreen: React.FC<{ navigation: any; route: any }> = ({ nav
   const displayName: string = otherUser?.name || 'Unknown';
   const displayAvatar: string | null = otherUser?.avatarUrl || otherUser?.avatar || null;
   const otherId: string | undefined = otherUser?.id;
-  const roomId: string | undefined = directRoomId;
 
   const [callState, setCallState] = useState<'calling' | 'connected' | 'ended'>(
     isOutgoing ? 'calling' : 'connected',
@@ -77,16 +51,13 @@ export const VideoCallScreen: React.FC<{ navigation: any; route: any }> = ({ nav
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeakerOn, setIsSpeakerOn] = useState(isVideoCall);
   const [isCameraOff, setIsCameraOff] = useState(false);
-  const [isFrontCamera, setIsFrontCamera] = useState(true);
   const [callSeconds, setCallSeconds] = useState(0);
+  const [meetingLink, setMeetingLink] = useState<string | null>(null);
+  const [meetingToken, setMeetingToken] = useState<string | null>(null);
+  const [sessionLoading, setSessionLoading] = useState(true);
+  const [sessionError, setSessionError] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // WebRTC refs
-  const pcRef = useRef<RTCPeerConnection | null>(null);
-  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
-  const remoteSocketIdRef = useRef<string | null>(null);
-  const iceCandidatesBuffer = useRef<RTCIceCandidate[]>([]);
+  const webViewRef = useRef<WebView>(null);
 
   const startTimer = () => {
     if (timerRef.current) return;
@@ -94,283 +65,234 @@ export const VideoCallScreen: React.FC<{ navigation: any; route: any }> = ({ nav
   };
 
   const stopTimer = () => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
+    if (!timerRef.current) return;
+    clearInterval(timerRef.current);
+    timerRef.current = null;
   };
-
-  // ─── Get local media stream ─────────────────────────────────────────────
-  const getLocalStream = useCallback(async () => {
-    try {
-      const constraints: any = {
-        audio: true,
-        video: isVideoCall ? { facingMode: 'user', width: 640, height: 480 } : false,
-      };
-      const stream = await mediaDevices.getUserMedia(constraints);
-      setLocalStream(stream);
-      return stream;
-    } catch (err) {
-      console.error('[WebRTC] getUserMedia error:', err);
-      return null;
-    }
-  }, [isVideoCall]);
-
-  // ─── Create peer connection ─────────────────────────────────────────────
-  const createPeerConnection = useCallback((stream: MediaStream) => {
-    const pc = new RTCPeerConnection(ICE_SERVERS);
-
-    // Add local tracks to connection
-    stream.getTracks().forEach((track) => {
-      pc.addTrack(track, stream);
-    });
-
-    // Handle remote stream
-    (pc as any).ontrack = (event: any) => {
-      if (event.streams && event.streams[0]) {
-        setRemoteStream(event.streams[0]);
-      }
-    };
-
-    // Handle ICE candidates
-    (pc as any).onicecandidate = (event: any) => {
-      if (event.candidate && remoteSocketIdRef.current) {
-        socketService.emit('video:ice-candidate', {
-          roomId,
-          candidate: event.candidate,
-          to: remoteSocketIdRef.current,
-        });
-      }
-    };
-
-    (pc as any).oniceconnectionstatechange = () => {
-      const state = pc.iceConnectionState;
-      if (state === 'connected' || state === 'completed') {
-        setCallState('connected');
-        startTimer();
-      } else if (state === 'failed' || state === 'disconnected' || state === 'closed') {
-        // Connection lost
-      }
-    };
-
-    pcRef.current = pc;
-    return pc;
-  }, [roomId]);
-
-  // ─── Create and send offer ──────────────────────────────────────────────
-  const createOffer = useCallback(async (pc: RTCPeerConnection, targetSocketId: string) => {
-    try {
-      const offer = await pc.createOffer({
-        offerToReceiveAudio: true,
-        offerToReceiveVideo: isVideoCall,
-      } as any);
-      await pc.setLocalDescription(offer);
-      socketService.emit('video:offer', {
-        roomId,
-        offer: offer,
-        to: targetSocketId,
-      });
-    } catch (err) {
-      console.error('[WebRTC] createOffer error:', err);
-    }
-  }, [roomId, isVideoCall]);
-
-  // ─── Handle incoming offer and send answer ──────────────────────────────
-  const handleOffer = useCallback(async (pc: RTCPeerConnection, offer: any, fromSocketId: string) => {
-    try {
-      remoteSocketIdRef.current = fromSocketId;
-      await pc.setRemoteDescription(new RTCSessionDescription(offer));
-
-      // Apply buffered ICE candidates
-      for (const candidate of iceCandidatesBuffer.current) {
-        await pc.addIceCandidate(candidate);
-      }
-      iceCandidatesBuffer.current = [];
-
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      socketService.emit('video:answer', {
-        roomId,
-        answer: answer,
-        to: fromSocketId,
-      });
-    } catch (err) {
-      console.error('[WebRTC] handleOffer error:', err);
-    }
-  }, [roomId]);
-
-  // ─── Cleanup media ─────────────────────────────────────────────────────
-  const cleanupMedia = useCallback(() => {
-    if (localStream) {
-      localStream.getTracks().forEach((track) => track.stop());
-      setLocalStream(null);
-    }
-    if (pcRef.current) {
-      pcRef.current.close();
-      pcRef.current = null;
-    }
-    setRemoteStream(null);
-  }, [localStream]);
 
   const endCall = useCallback((notifyOther = true) => {
     if (notifyOther && otherId && roomId) {
       socketService.emit('call:end', { to: otherId, roomId, chatId, duration: callSeconds });
     }
-    if (roomId) {
-      socketService.emit('video:leave', { roomId });
-    }
+    webViewRef.current?.injectJavaScript("window.__handleNativeCmd && window.__handleNativeCmd({ type: 'end' }); true;");
     if (appointmentId) videoApi.endMeeting(appointmentId).catch(() => {});
-    cleanupMedia();
     stopTimer();
     setCallState('ended');
     setTimeout(() => navigation.goBack(), 900);
-  }, [otherId, roomId, appointmentId, cleanupMedia, navigation, chatId, callSeconds]);
+  }, [otherId, roomId, appointmentId, navigation, chatId, callSeconds]);
 
-  // ─── Toggle mute ────────────────────────────────────────────────────────
   const toggleMute = useCallback(() => {
-    if (localStream) {
-      const audioTrack = localStream.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled;
-        setIsMuted(!audioTrack.enabled);
-      }
-    }
-  }, [localStream]);
+    setIsMuted((prev) => {
+      const nextMuted = !prev;
+      webViewRef.current?.injectJavaScript(
+        `window.__handleNativeCmd && window.__handleNativeCmd(${JSON.stringify({ type: 'set-mute', muted: nextMuted })}); true;`,
+      );
+      return nextMuted;
+    });
+  }, []);
 
-  // ─── Toggle camera ──────────────────────────────────────────────────────
   const toggleCamera = useCallback(() => {
-    if (localStream && isVideoCall) {
-      const videoTrack = localStream.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled;
-        setIsCameraOff(!videoTrack.enabled);
-      }
-    }
-  }, [localStream, isVideoCall]);
+    if (!isVideoCall) return;
+    setIsCameraOff((prev) => {
+      const nextCameraOff = !prev;
+      webViewRef.current?.injectJavaScript(
+        `window.__handleNativeCmd && window.__handleNativeCmd(${JSON.stringify({ type: 'set-camera', cameraOff: nextCameraOff })}); true;`,
+      );
+      return nextCameraOff;
+    });
+  }, [isVideoCall]);
 
-  // ─── Flip camera ────────────────────────────────────────────────────────
   const flipCamera = useCallback(() => {
-    if (localStream && isVideoCall) {
-      const videoTrack = localStream.getVideoTracks()[0];
-      if (videoTrack) {
-        (videoTrack as any)._switchCamera();
-        setIsFrontCamera((prev) => !prev);
-      }
-    }
-  }, [localStream, isVideoCall]);
+    if (!isVideoCall) return;
+    webViewRef.current?.injectJavaScript(
+      "window.__handleNativeCmd && window.__handleNativeCmd({ type: 'flip-camera' }); true;",
+    );
+  }, [isVideoCall]);
 
-  // ─── Toggle speaker ─────────────────────────────────────────────────────
   const toggleSpeaker = useCallback(() => {
-    // Toggle the flag; react-native-webrtc uses default speaker for video calls
     setIsSpeakerOn((prev) => !prev);
   }, []);
 
-  // ─── Setup WebRTC ───────────────────────────────────────────────────────
   useEffect(() => {
     let mounted = true;
 
-    const setup = async () => {
-      // Fetch dynamic ICE servers
+    const loadSession = async () => {
+      setSessionLoading(true);
+      setSessionError(null);
       try {
-        const { data } = await videoApi.getIceServers();
-        if (data?.iceServers) {
-          ICE_SERVERS.iceServers = data.iceServers;
+        if (appointmentId) {
+          const { data } = await videoApi.getMeeting(appointmentId);
+          if (!mounted) return;
+          setMeetingLink(data.meetingLink || null);
+          setMeetingToken(data.token || null);
+          return;
         }
-      } catch {}
-
-      const stream = await getLocalStream();
-      if (!stream || !mounted) return;
-
-      const pc = createPeerConnection(stream);
-
-      // Join the signaling room
-      socketService.emit('video:join', { roomId });
-
-      // If outgoing call, wait for remote user to join, then send offer
-      // If incoming call, wait for the offer from caller
+        if (chatId) {
+          const { data } = await videoApi.getChatSession(chatId);
+          if (!mounted) return;
+          setMeetingLink(data.meetingLink || null);
+          setMeetingToken(data.token || null);
+          return;
+        }
+        if (!mounted) return;
+        setSessionError('Unable to start call: missing appointment or chat context.');
+      } catch (err: any) {
+        if (!mounted) return;
+        const msg = err?.response?.data?.error || err?.message || 'Failed to initialize call session.';
+        setSessionError(msg);
+      } finally {
+        if (mounted) setSessionLoading(false);
+      }
     };
 
-    setup();
+    loadSession();
 
-    // Socket event: remote user joined the video room
-    const unsubUserJoined = socketService.on('video:user-joined', (data: unknown) => {
-      const { socketId } = data as { userId: string; socketId: string };
-      remoteSocketIdRef.current = socketId;
-      // The person who joined later (or the caller) creates the offer
-      if (isOutgoing && pcRef.current) {
-        createOffer(pcRef.current, socketId);
-      }
+    const unsubAccepted = socketService.on('call:accepted', (data: unknown) => {
+      const { roomId: incomingRoom } = data as { roomId?: string };
+      if (incomingRoom && roomId && incomingRoom !== roomId) return;
+      if (callState !== 'ended') setCallState('connected');
+      startTimer();
     });
 
-    // Socket event: received an offer
-    const unsubOffer = socketService.on('video:offer', (data: unknown) => {
-      const { offer, from } = data as { offer: any; from: string; userId: string };
-      if (pcRef.current) {
-        handleOffer(pcRef.current, offer, from);
-      }
-    });
-
-    // Socket event: received an answer
-    const unsubAnswer = socketService.on('video:answer', (data: unknown) => {
-      const { answer } = data as { answer: any; from: string };
-      if (pcRef.current) {
-        pcRef.current.setRemoteDescription(new RTCSessionDescription(answer)).then(() => {
-          // Apply buffered ICE candidates
-          for (const candidate of iceCandidatesBuffer.current) {
-            pcRef.current?.addIceCandidate(candidate);
-          }
-          iceCandidatesBuffer.current = [];
-        });
-      }
-    });
-
-    // Socket event: received an ICE candidate
-    const unsubICE = socketService.on('video:ice-candidate', (data: unknown) => {
-      const { candidate } = data as { candidate: any };
-      const iceCandidate = new RTCIceCandidate(candidate);
-      if (pcRef.current?.remoteDescription) {
-        pcRef.current.addIceCandidate(iceCandidate);
-      } else {
-        iceCandidatesBuffer.current.push(iceCandidate);
-      }
-    });
-
-    // Socket event: remote user left
-    const unsubUserLeft = socketService.on('video:user-left', () => {
+    const unsubRejected = socketService.on('call:rejected', (data: unknown) => {
+      const { roomId: incomingRoom } = data as { roomId?: string };
+      if (incomingRoom && roomId && incomingRoom !== roomId) return;
       if (mounted) endCall(false);
     });
 
-    // Call signaling events
-    const unsubAccepted = socketService.on('call:accepted', () => {
-      setCallState('connected');
-    });
-    const unsubEnded = socketService.on('call:ended', () => {
+    const unsubEnded = socketService.on('call:ended', (data: unknown) => {
+      const { roomId: incomingRoom } = data as { roomId?: string };
+      if (incomingRoom && roomId && incomingRoom !== roomId) return;
       if (mounted) endCall(false);
     });
 
     return () => {
       mounted = false;
-      unsubUserJoined();
-      unsubOffer();
-      unsubAnswer();
-      unsubICE();
-      unsubUserLeft();
       unsubAccepted();
+      unsubRejected();
       unsubEnded();
       stopTimer();
-      // Cleanup on unmount
-      if (localStream) {
-        localStream.getTracks().forEach((track) => track.stop());
-      }
-      if (pcRef.current) {
-        pcRef.current.close();
-        pcRef.current = null;
-      }
-      if (roomId) {
-        socketService.emit('video:leave', { roomId });
-      }
     };
   }, []);
+
+  const callHtml = React.useMemo(() => {
+    if (!meetingLink || !meetingToken) return null;
+    const safeMeetingLink = JSON.stringify(meetingLink);
+    const safeMeetingToken = JSON.stringify(meetingToken);
+    const startVideoOff = !isVideoCall;
+    return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <style>
+    html, body, #root { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }
+  </style>
+  <script src="https://unpkg.com/@daily-co/daily-js"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+    const meetingLink = ${safeMeetingLink};
+    const meetingToken = ${safeMeetingToken};
+    const startVideoOff = ${JSON.stringify(startVideoOff)};
+    let frame = null;
+
+    const post = (event, payload = {}) => {
+      if (!window.ReactNativeWebView) return;
+      window.ReactNativeWebView.postMessage(JSON.stringify({ event, ...payload }));
+    };
+
+    async function boot() {
+      try {
+        if (!window.DailyIframe) {
+          post('error', { message: 'Daily SDK failed to load.' });
+          return;
+        }
+
+        frame = window.DailyIframe.createFrame(document.getElementById('root'), {
+          showLeaveButton: false,
+          showFullscreenButton: false,
+          iframeStyle: {
+            position: 'fixed',
+            top: '0px',
+            left: '0px',
+            width: '100%',
+            height: '100%',
+            border: '0px',
+            background: '#000',
+          },
+        });
+
+        frame.on('joined-meeting', () => post('joined'));
+        frame.on('left-meeting', () => post('left'));
+        frame.on('error', (e) => post('error', { message: e?.errorMsg || 'Call error' }));
+
+        await frame.join({
+          url: meetingLink,
+          token: meetingToken,
+          startVideoOff,
+        });
+      } catch (e) {
+        post('error', { message: String(e && e.message ? e.message : e) });
+      }
+    }
+
+    window.__handleNativeCmd = async function (cmd) {
+      if (!frame || !cmd || !cmd.type) return;
+      try {
+        if (cmd.type === 'set-mute') {
+          await frame.setLocalAudio(!cmd.muted);
+          return;
+        }
+        if (cmd.type === 'set-camera') {
+          await frame.setLocalVideo(!cmd.cameraOff);
+          return;
+        }
+        if (cmd.type === 'flip-camera') {
+          const local = frame.participants && frame.participants().local;
+          const devices = local && local.devices;
+          const hasSecondary = devices && devices.camera && devices.camera.length > 1;
+          if (hasSecondary && frame.cycleCamera) {
+            frame.cycleCamera();
+          }
+          return;
+        }
+        if (cmd.type === 'end') {
+          await frame.leave();
+          return;
+        }
+      } catch (e) {
+        post('error', { message: String(e && e.message ? e.message : e) });
+      }
+    };
+
+    boot();
+  </script>
+</body>
+</html>`;
+  }, [meetingLink, meetingToken, isVideoCall]);
+
+  const onWebViewMessage = useCallback((event: any) => {
+    try {
+      const payload = JSON.parse(event.nativeEvent.data || '{}');
+      if (payload.event === 'joined') {
+        if (callState !== 'ended') setCallState('connected');
+        startTimer();
+        return;
+      }
+      if (payload.event === 'left') {
+        endCall(false);
+        return;
+      }
+      if (payload.event === 'error') {
+        const msg = payload.message || 'Call failed.';
+        setSessionError(String(msg));
+      }
+    } catch {
+      // ignore malformed webview messages
+    }
+  }, [callState, endCall]);
 
   const formatTimeFn = (sec: number) => {
     const mm = Math.floor(sec / 60).toString().padStart(2, '0');
@@ -384,10 +306,9 @@ export const VideoCallScreen: React.FC<{ navigation: any; route: any }> = ({ nav
       : callState === 'connected'
       ? formatTimeFn(callSeconds)
       : isOutgoing
-      ? 'Calling…'
-      : 'Connecting…';
+      ? 'Calling...'
+      : 'Connecting...';
 
-  // ─── Gradient colours per call type ────────────────────────────────────────
   const bgColors: [string, string, string] = isVideoCall
     ? ['#080808', '#111', '#080808']
     : ['#0b141a', '#1c2f3a', '#0b141a'];
@@ -396,41 +317,46 @@ export const VideoCallScreen: React.FC<{ navigation: any; route: any }> = ({ nav
     <>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       <LinearGradient colors={bgColors} locations={[0, 0.5, 1]} style={s.container}>
-
-        {/* ─── Remote video (full screen background) ──────────────────── */}
-        {isVideoCall && remoteStream && (
-          <RTCView
-            streamURL={remoteStream.toURL()}
+        {callHtml && (
+          <WebView
+            ref={webViewRef}
+            source={{ html: callHtml, baseUrl: 'https://daily.co/' }}
+            onMessage={onWebViewMessage}
+            javaScriptEnabled
+            domStorageEnabled
+            mediaPlaybackRequiresUserAction={false}
+            allowsInlineMediaPlayback
             style={s.remoteVideo}
-            objectFit="cover"
           />
         )}
 
-        {/* ─── Local video (picture-in-picture) ──────────────────────── */}
-        {isVideoCall && localStream && !isCameraOff && (
-          <View style={s.localVideoContainer}>
-            <RTCView
-              streamURL={localStream.toURL()}
-              style={s.localVideo}
-              objectFit="cover"
-              mirror={isFrontCamera}
-            />
+        {sessionLoading && (
+          <View style={s.loadingOverlay}>
+            <ActivityIndicator size="large" color="#fff" />
+            <Text style={s.loadingText}>Connecting call...</Text>
           </View>
         )}
 
-        {/* ─── Top bar ─────────────────────────────────────────────────── */}
+        {!!sessionError && (
+          <View style={s.errorOverlay}>
+            <Text style={s.errorText}>{sessionError}</Text>
+          </View>
+        )}
+
+        {isVideoCall && !isCameraOff && (
+          <View style={s.localVideoContainer}>
+            <View style={s.localVideo} />
+          </View>
+        )}
+
         <View style={s.topBar}>
           <TouchableOpacity style={s.iconBtn} onPress={() => endCall()}>
             <Ionicons name="chevron-down" size={28} color="#fff" />
           </TouchableOpacity>
           <View style={s.topCenter}>
             <Text style={s.topName} numberOfLines={1}>{displayName}</Text>
-            <View style={s.encRow}>
-              <Ionicons name="lock-closed" size={11} color="rgba(255,255,255,0.55)" />
-              <Text style={s.encText}>End-to-end encrypted</Text>
-            </View>
+            <Text style={s.encText}>{statusText}</Text>
           </View>
-          {/* Flip camera button for video calls */}
           {isVideoCall ? (
             <TouchableOpacity style={s.iconBtn} onPress={flipCamera}>
               <Ionicons name="camera-reverse-outline" size={22} color="#fff" />
@@ -440,8 +366,7 @@ export const VideoCallScreen: React.FC<{ navigation: any; route: any }> = ({ nav
           )}
         </View>
 
-        {/* ─── Avatar + status (shown when no remote video) ──────────── */}
-        {(!isVideoCall || !remoteStream) && (
+        {(!isVideoCall || isCameraOff) && (
           <View style={s.avatarSection}>
             <View style={s.avatarRing}>
               {displayAvatar ? (
@@ -457,14 +382,6 @@ export const VideoCallScreen: React.FC<{ navigation: any; route: any }> = ({ nav
           </View>
         )}
 
-        {/* Status overlay for video call when connected */}
-        {isVideoCall && remoteStream && (
-          <View style={s.videoStatusOverlay}>
-            <Text style={s.videoStatusText}>{statusText}</Text>
-          </View>
-        )}
-
-        {/* ─── Bottom action bar ──────────────────────────────────────── */}
         <View style={s.bottomBar}>
           <ActionBtn
             icon={isVideoCall ? (isCameraOff ? 'videocam-off' : 'videocam') : 'volume-medium-outline'}
@@ -484,7 +401,6 @@ export const VideoCallScreen: React.FC<{ navigation: any; route: any }> = ({ nav
             onPress={toggleMute}
             active={isMuted}
           />
-          {/* End call */}
           <View style={s.actionItem}>
             <TouchableOpacity style={s.endBtn} onPress={() => endCall()}>
               <Ionicons name="call" size={24} color="#fff" style={s.endIcon} />
@@ -492,7 +408,6 @@ export const VideoCallScreen: React.FC<{ navigation: any; route: any }> = ({ nav
             <Text style={s.actionLabel}>End</Text>
           </View>
         </View>
-
       </LinearGradient>
     </>
   );
@@ -500,11 +415,28 @@ export const VideoCallScreen: React.FC<{ navigation: any; route: any }> = ({ nav
 
 const s = StyleSheet.create({
   container: { flex: 1 },
-  // Remote video: full-screen background
-  remoteVideo: {
+  remoteVideo: { ...StyleSheet.absoluteFillObject },
+  loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    zIndex: 3,
+    gap: 10,
   },
-  // Local video PiP
+  loadingText: { color: 'rgba(255,255,255,0.8)', fontSize: 13 },
+  errorOverlay: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 110 : 95,
+    left: 18,
+    right: 18,
+    zIndex: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: 'rgba(229, 28, 66, 0.85)',
+  },
+  errorText: { color: '#fff', fontSize: 12, textAlign: 'center' },
   localVideoContainer: {
     position: 'absolute',
     top: Platform.OS === 'ios' ? 100 : 88,
@@ -518,9 +450,7 @@ const s = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.3)',
   },
-  localVideo: {
-    flex: 1,
-  },
+  localVideo: { flex: 1 },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -533,33 +463,22 @@ const s = StyleSheet.create({
   iconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22 },
   topCenter: { flex: 1, alignItems: 'center', paddingHorizontal: 8 },
   topName: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  encRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
-  encText: { color: 'rgba(255,255,255,0.55)', fontSize: 12 },
+  encText: { color: 'rgba(255,255,255,0.55)', fontSize: 12, marginTop: 3 },
   avatarSection: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14 },
   avatarRing: {
-    width: 170, height: 170, borderRadius: 85,
-    borderWidth: 2, borderColor: 'rgba(255,255,255,0.12)',
-    alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.65,
-    shadowRadius: 22,
-    elevation: 14,
+    width: 170,
+    height: 170,
+    borderRadius: 85,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   avatar: { width: 162, height: 162, borderRadius: 81 },
   avatarFallback: { backgroundColor: '#2c4a5a', alignItems: 'center', justifyContent: 'center' },
   avatarInitial: { color: '#fff', fontSize: 68, fontWeight: '300' },
   calleeName: { color: '#fff', fontSize: 26, fontWeight: '700', marginTop: 6 },
   statusText: { color: 'rgba(255,255,255,0.6)', fontSize: 15 },
-  videoStatusOverlay: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 110 : 96,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    zIndex: 5,
-  },
-  videoStatusText: { color: '#fff', fontSize: 16, fontWeight: '600', textShadowColor: 'rgba(0,0,0,0.7)', textShadowRadius: 4 },
   bottomBar: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -574,15 +493,21 @@ const s = StyleSheet.create({
   },
   actionItem: { alignItems: 'center', gap: 7, minWidth: 56 },
   actionBtn: {
-    width: 54, height: 54, borderRadius: 27,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     backgroundColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   actionBtnActive: { backgroundColor: 'rgba(255,255,255,0.33)' },
   endBtn: {
-    width: 54, height: 54, borderRadius: 27,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     backgroundColor: '#e4091d',
-    alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   endIcon: { transform: [{ rotate: '135deg' }] },
   actionLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 11, textAlign: 'center' },

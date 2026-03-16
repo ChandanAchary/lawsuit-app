@@ -14,7 +14,7 @@
 import { Platform } from 'react-native';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
-import { Audio } from 'expo-av';
+import { getRecordingPermissionsAsync, requestRecordingPermissionsAsync } from 'expo-audio';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
@@ -87,9 +87,9 @@ export async function requestCameraPermission(): Promise<boolean> {
 // ─── Microphone Permission ────────────────────────────────────────────────────
 export async function requestMicrophonePermission(): Promise<boolean> {
   try {
-    const { status: existing } = await Audio.getPermissionsAsync();
+    const { status: existing } = await getRecordingPermissionsAsync();
     if (existing === 'granted') return true;
-    const { status } = await Audio.requestPermissionsAsync();
+    const { status } = await requestRecordingPermissionsAsync();
     return status === 'granted';
   } catch (err) {
     console.warn('[Permissions] Microphone permission failed:', err);

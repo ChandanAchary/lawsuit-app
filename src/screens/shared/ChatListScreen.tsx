@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { chatApi } from '../../services/api';
 import { socketService } from '../../services/socket';
+import { onChatSessionClosed, onChatSessionOpened } from '../../services/chatSyncEvents';
 import { useAuthStore } from '../../stores/authStore';
 import { Loading } from '../../components/Common';
 import { ChatMessage } from '../../types';
@@ -130,9 +131,27 @@ export const ChatListScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
     });
 
     // Track focus state so we can suppress unread increments for the open chat
-    const unsubFocus = navigation.addListener('focus', () => { activeChatRef.current = null; });
+    const unsubFocus = navigation.addListener('focus', () => {
+      activeChatRef.current = null;
+      fetchChats();
+    });
 
-    return () => { unsubMsg(); unsubRead(); unsubFocus(); };
+    // Sync chat list when Daily live chat sessions are opened/closed.
+    const unsubSessionOpened = onChatSessionOpened(({ chatId }) => {
+      setChats((prev) => normalizeChats(prev.map((c) => c.id === chatId ? { ...c, unreadCount: 0 } : c)));
+    });
+
+    const unsubSessionClosed = onChatSessionClosed(() => {
+      fetchChats();
+    });
+
+    return () => {
+      unsubMsg();
+      unsubRead();
+      unsubFocus();
+      unsubSessionOpened();
+      unsubSessionClosed();
+    };
   }, [fetchChats, user?.id, navigation, normalizeChats]);
 
   const onRefresh = () => { setRefreshing(true); fetchChats(); };

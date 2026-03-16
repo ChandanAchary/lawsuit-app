@@ -78,12 +78,6 @@
           "microphonePermission": "Lawsuit needs microphone access for video consultations."
         }
       ],
-      [
-        "expo-av",
-        {
-          "microphonePermission": "Lawsuit needs microphone access for audio and video consultations."
-        }
-      ],
       "expo-audio"
     ],
     "updates": {
