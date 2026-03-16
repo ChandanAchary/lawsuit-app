@@ -12,11 +12,22 @@ import { ChatTab } from '../../components/ChatTab';
 import { Button } from '../../components/Button';
 import { BottomSheet } from '../../components/Modals';
 
-type Tab = 'info' | 'timeline' | 'hearings' | 'chat' | 'documents' | 'resolution';
+interface CaseTask {
+  id: string;
+  title: string;
+  description?: string;
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'OVERDUE';
+  dueDate?: string;
+  assignedToId?: string;
+  assignedById?: string;
+}
+
+type Tab = 'info' | 'timeline' | 'hearings' | 'tasks' | 'chat' | 'documents' | 'resolution';
 const TABS: { key: Tab; label: string; icon: string }[] = [
   { key: 'info', label: 'Info', icon: 'information-circle-outline' },
   { key: 'timeline', label: 'Timeline', icon: 'git-branch-outline' },
   { key: 'hearings', label: 'Hearings', icon: 'calendar-outline' },
+  { key: 'tasks', label: 'Tasks', icon: 'checkbox-outline' },
   { key: 'chat', label: 'Chat', icon: 'chatbubble-outline' },
   { key: 'documents', label: 'Docs', icon: 'document-outline' },
   { key: 'resolution', label: 'Resolve', icon: 'checkmark-circle-outline' },
@@ -30,6 +41,11 @@ export const LawyerCaseDetailScreen: React.FC<{ navigation: any; route: any }> =
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [hearings, setHearings] = useState<Hearing[]>([]);
   const [documents, setDocuments] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<CaseTask[]>([]);
+  const [taskTitle, setTaskTitle] = useState('');
+  const [taskDesc, setTaskDesc] = useState('');
+  const [creatingTask, setCreatingTask] = useState(false);
+  const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
   const [chatId, setChatId] = useState<string | null>(null);
 
   // Add event/hearing forms
@@ -40,7 +56,10 @@ export const LawyerCaseDetailScreen: React.FC<{ navigation: any; route: any }> =
   const [hearingTitle, setHearingTitle] = useState('');
   const [hearingDate, setHearingDate] = useState('');
   const [showResolve, setShowResolve] = useState(false);
-  const [resolution, setResolution] = useState('');
+  const [closeStatus, setCloseStatus] = useState<'CLOSED' | 'SETTLED'>('CLOSED');
+  const [closureNotes, setClosureNotes] = useState('');
+  const [settlementAmount, setSettlementAmount] = useState('');
+  const [settlementTerms, setSettlementTerms] = useState('');
 
   useEffect(() => { fetchCase(); }, [caseId]);
 
@@ -48,6 +67,7 @@ export const LawyerCaseDetailScreen: React.FC<{ navigation: any; route: any }> =
     if (caseData) {
       if (activeTab === 'timeline') fetchTimeline();
       if (activeTab === 'hearings') fetchHearings();
+      if (activeTab === 'tasks') fetchTasks();
       if (activeTab === 'documents') fetchDocuments();
       if (activeTab === 'chat') fetchChat();
     }
@@ -61,6 +81,7 @@ export const LawyerCaseDetailScreen: React.FC<{ navigation: any; route: any }> =
   const fetchTimeline = async () => { try { const { data } = await casesApi.getTimeline(caseId); setTimeline(data.items || data.timeline || []); } catch {} };
   const fetchHearings = async () => { try { const { data } = await casesApi.getHearings(caseId); setHearings(data.items || data.hearings || []); } catch {} };
   const fetchDocuments = async () => { try { const { data } = await casesApi.getDocuments(caseId); setDocuments(data.items || data.documents || []); } catch {} };
+  const fetchTasks = async () => { try { const { data } = await casesApi.getTasks(caseId); setTasks(data.tasks || data.items || data.data || []); } catch { setTasks([]); } };
   const fetchChat = async () => { try { const { data } = await chatApi.getChats(); const f = (data.items || data.chats || []).find((c: any) => c.caseId === caseId); if (f) setChatId(f.id); } catch {} };
 
   const addTimelineEvent = async () => {
@@ -81,12 +102,48 @@ export const LawyerCaseDetailScreen: React.FC<{ navigation: any; route: any }> =
     } catch { Alert.alert('Error', 'Failed to add hearing'); }
   };
 
-  const resolveCase = async () => {
-    if (!resolution.trim()) return Alert.alert('Required', 'Enter resolution details');
+  const addTask = async () => {
+    if (!taskTitle.trim()) return Alert.alert('Required', 'Please enter task title');
+    setCreatingTask(true);
     try {
-      await casesApi.updateResolution(caseId, 'SETTLEMENT');
-      setShowResolve(false); fetchCase();
-      Alert.alert('Success', 'Case resolved');
+      await casesApi.createTask(caseId, { title: taskTitle.trim(), description: taskDesc.trim() || undefined });
+      setTaskTitle('');
+      setTaskDesc('');
+      fetchTasks();
+    } catch {
+      Alert.alert('Error', 'Failed to create task');
+    } finally {
+      setCreatingTask(false);
+    }
+  };
+
+  const setTaskStatus = async (taskId: string, status: CaseTask['status']) => {
+    setUpdatingTaskId(taskId);
+    try {
+      await casesApi.updateTask(taskId, { status });
+      fetchTasks();
+    } catch {
+      Alert.alert('Error', 'Failed to update task');
+    } finally {
+      setUpdatingTaskId(null);
+    }
+  };
+
+  const resolveCase = async () => {
+    if (!closureNotes.trim()) return Alert.alert('Required', 'Enter closure notes');
+    try {
+      await casesApi.closeCase(caseId, {
+        status: closeStatus,
+        closureNotes: closureNotes.trim(),
+        settlementAmount: closeStatus === 'SETTLED' && settlementAmount ? Number(settlementAmount) : undefined,
+        settlementTerms: closeStatus === 'SETTLED' ? (settlementTerms.trim() || undefined) : undefined,
+      });
+      setShowResolve(false);
+      setClosureNotes('');
+      setSettlementAmount('');
+      setSettlementTerms('');
+      fetchCase();
+      Alert.alert('Success', `Case ${closeStatus.toLowerCase()} successfully`);
     } catch { Alert.alert('Error', 'Failed to resolve case'); }
   };
 
@@ -164,6 +221,37 @@ export const LawyerCaseDetailScreen: React.FC<{ navigation: any; route: any }> =
         </ScrollView>
       )}
 
+      {activeTab === 'tasks' && (
+        <ScrollView contentContainerStyle={styles.tabPadding}>
+          <View style={styles.taskComposer}>
+            <TextInput style={styles.modalInput} placeholder="Task Title" value={taskTitle} onChangeText={setTaskTitle} placeholderTextColor={COLORS.textMuted} />
+            <TextInput style={[styles.modalInput, { height: 80 }]} placeholder="Task Description (optional)" value={taskDesc} onChangeText={setTaskDesc} multiline placeholderTextColor={COLORS.textMuted} />
+            <Button title={creatingTask ? 'Adding...' : 'Add Task'} onPress={addTask} size="sm" disabled={creatingTask} />
+          </View>
+          {tasks.length === 0 ? <EmptyState icon="✅" title="No Tasks" message="Create tasks to track progress" /> :
+            tasks.map((t) => (
+              <View key={t.id} style={styles.taskCard}>
+                <Text style={styles.taskTitle}>{t.title}</Text>
+                {!!t.description && <Text style={styles.taskDesc}>{t.description}</Text>}
+                <Text style={styles.taskMeta}>Status: {t.status}</Text>
+                <View style={styles.taskActions}>
+                  {(['PENDING', 'IN_PROGRESS', 'COMPLETED'] as const).map((s) => (
+                    <TouchableOpacity
+                      key={s}
+                      style={[styles.taskStatusBtn, t.status === s && styles.taskStatusBtnActive]}
+                      onPress={() => setTaskStatus(t.id, s)}
+                      disabled={updatingTaskId === t.id || t.status === s}
+                    >
+                      <Text style={[styles.taskStatusBtnText, t.status === s && styles.taskStatusBtnTextActive]}>{s}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            ))
+          }
+        </ScrollView>
+      )}
+
       {activeTab === 'chat' && (
         <View style={{ flex: 1 }}>
           {chatId ? <ChatTab chatId={chatId} /> : <EmptyState icon="💬" title="No Chat" message="Chat will start when case is active" />}
@@ -185,7 +273,7 @@ export const LawyerCaseDetailScreen: React.FC<{ navigation: any; route: any }> =
 
       {activeTab === 'resolution' && (
         <ScrollView contentContainerStyle={styles.tabPadding}>
-          {caseData.status === CaseStatus.RESOLVED ? (
+          {['CLOSED', 'RESOLVED', 'DISMISSED', 'WON', 'LOST', 'SETTLED'].includes(String(caseData.status)) ? (
             <View style={styles.resolvedCard}>
               <Ionicons name="checkmark-circle" size={48} color={COLORS.success} />
               <Text style={styles.resolvedTitle}>Case Resolved</Text>
@@ -216,7 +304,20 @@ export const LawyerCaseDetailScreen: React.FC<{ navigation: any; route: any }> =
 
       {/* Resolve Modal */}
       <BottomSheet visible={showResolve} onClose={() => setShowResolve(false)} title="Resolve Case">
-        <TextInput style={[styles.modalInput, { height: 100 }]} placeholder="Resolution details..." value={resolution} onChangeText={setResolution} multiline placeholderTextColor={COLORS.textMuted} />
+        <View style={styles.resolveTypeRow}>
+          {(['CLOSED', 'SETTLED'] as const).map((s) => (
+            <TouchableOpacity key={s} style={[styles.resolveTypeChip, closeStatus === s && styles.resolveTypeChipActive]} onPress={() => setCloseStatus(s)}>
+              <Text style={[styles.resolveTypeText, closeStatus === s && styles.resolveTypeTextActive]}>{s}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <TextInput style={[styles.modalInput, { height: 100 }]} placeholder="Closure notes..." value={closureNotes} onChangeText={setClosureNotes} multiline placeholderTextColor={COLORS.textMuted} />
+        {closeStatus === 'SETTLED' && (
+          <>
+            <TextInput style={styles.modalInput} placeholder="Settlement amount (optional)" keyboardType="numeric" value={settlementAmount} onChangeText={setSettlementAmount} placeholderTextColor={COLORS.textMuted} />
+            <TextInput style={[styles.modalInput, { height: 80 }]} placeholder="Settlement terms (optional)" value={settlementTerms} onChangeText={setSettlementTerms} multiline placeholderTextColor={COLORS.textMuted} />
+          </>
+        )}
         <Button title="Resolve Case" onPress={resolveCase} size="lg" />
       </BottomSheet>
     </View>
@@ -260,12 +361,40 @@ const styles = StyleSheet.create({
   hearTitle: { fontSize: FONT_SIZE.md, fontWeight: '700', color: COLORS.text },
   hearDate: { fontSize: FONT_SIZE.sm, color: COLORS.textSecondary, marginTop: 4 },
   hearNotes: { fontSize: FONT_SIZE.sm, color: COLORS.textMuted, marginTop: SPACING.sm },
+  taskComposer: {
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
+    marginBottom: SPACING.lg,
+    ...SHADOWS.sm,
+  },
+  taskCard: { backgroundColor: COLORS.white, borderRadius: BORDER_RADIUS.lg, padding: SPACING.lg, marginBottom: SPACING.md, ...SHADOWS.sm },
+  taskTitle: { fontSize: FONT_SIZE.md, fontWeight: '700', color: COLORS.text },
+  taskDesc: { fontSize: FONT_SIZE.sm, color: COLORS.textSecondary, marginTop: 4 },
+  taskMeta: { fontSize: FONT_SIZE.xs, color: COLORS.textMuted, marginTop: SPACING.sm },
+  taskActions: { flexDirection: 'row', gap: SPACING.xs, marginTop: SPACING.sm },
+  taskStatusBtn: {
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 6,
+    borderRadius: BORDER_RADIUS.full,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surfaceAlt,
+  },
+  taskStatusBtnActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  taskStatusBtnText: { fontSize: FONT_SIZE.xs, color: COLORS.textSecondary, fontWeight: '600' },
+  taskStatusBtnTextActive: { color: COLORS.white },
   docItem: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, backgroundColor: COLORS.white, borderRadius: BORDER_RADIUS.lg, padding: SPACING.lg, marginBottom: SPACING.md, ...SHADOWS.sm },
   docName: { flex: 1, fontSize: FONT_SIZE.md, fontWeight: '600', color: COLORS.text },
   resolvedCard: { alignItems: 'center', paddingVertical: SPACING.huge },
   resolvedTitle: { fontSize: FONT_SIZE.xxl, fontWeight: '900', color: COLORS.success, marginTop: SPACING.md },
   resolvedDesc: { fontSize: FONT_SIZE.md, color: COLORS.textSecondary, marginTop: SPACING.sm },
   resolveInfo: { fontSize: FONT_SIZE.md, color: COLORS.textSecondary, marginBottom: SPACING.xl, lineHeight: 22 },
+  resolveTypeRow: { flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.md },
+  resolveTypeChip: { paddingVertical: SPACING.sm, paddingHorizontal: SPACING.lg, borderRadius: BORDER_RADIUS.full, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surfaceAlt },
+  resolveTypeChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  resolveTypeText: { fontSize: FONT_SIZE.xs, fontWeight: '700', color: COLORS.textSecondary },
+  resolveTypeTextActive: { color: COLORS.white },
   modalInput: {
     backgroundColor: COLORS.surfaceAlt, borderRadius: BORDER_RADIUS.lg, paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md,
     fontSize: FONT_SIZE.md, color: COLORS.text, marginBottom: SPACING.md, textAlignVertical: 'top',

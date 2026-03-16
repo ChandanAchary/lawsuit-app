@@ -23,15 +23,80 @@ export const ChatListScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   // Track which chatId is currently open so we don't increment its unread count
   const activeChatRef = useRef<string | null>(null);
 
+  const getChatSortTime = useCallback((chat: any): number => {
+    const raw = chat?.lastMessage?.createdAt || chat?.lastMessageAt || chat?.updatedAt || chat?.createdAt;
+    const t = raw ? new Date(raw).getTime() : 0;
+    return Number.isFinite(t) ? t : 0;
+  }, []);
+
+  const getLastMessageTime = useCallback((chat: any): number => {
+    const raw = chat?.lastMessage?.createdAt || chat?.lastMessageAt;
+    const t = raw ? new Date(raw).getTime() : 0;
+    return Number.isFinite(t) ? t : 0;
+  }, []);
+
+  const hasChatHistory = useCallback((chat: any): boolean => {
+    if (!chat) return false;
+    const text = String(chat?.lastMessage?.text || chat?.lastMessageText || '').trim();
+    return !!text || getLastMessageTime(chat) > 0;
+  }, [getLastMessageTime]);
+
+  const getChatKey = useCallback((chat: any): string => {
+    const participants = chat?.participants || [];
+    const other = participants.find((p: any) => p?.userId !== user?.id && p?.id !== user?.id) || participants[0];
+    const otherId = other?.userId || other?.id;
+    return otherId ? `user:${otherId}` : `chat:${chat?.id}`;
+  }, [user?.id]);
+
+  const normalizeChats = useCallback((list: any[]): any[] => {
+    const grouped = new Map<string, any>();
+
+    (list || []).forEach((chat) => {
+      if (!chat || !chat.id) return;
+      const key = getChatKey(chat);
+      const existing = grouped.get(key);
+
+      if (!existing) {
+        grouped.set(key, { ...chat });
+        return;
+      }
+
+      const existingHasHistory = hasChatHistory(existing);
+      const incomingHasHistory = hasChatHistory(chat);
+
+      let latest = { ...existing };
+      if (!existingHasHistory && incomingHasHistory) {
+        latest = { ...chat };
+      } else if (existingHasHistory && !incomingHasHistory) {
+        latest = { ...existing };
+      } else {
+        const existingMsgTs = getLastMessageTime(existing);
+        const incomingMsgTs = getLastMessageTime(chat);
+        if (incomingMsgTs > existingMsgTs) {
+          latest = { ...chat };
+        } else if (incomingMsgTs === existingMsgTs) {
+          const existingTs = getChatSortTime(existing);
+          const incomingTs = getChatSortTime(chat);
+          latest = incomingTs >= existingTs ? { ...chat } : { ...existing };
+        }
+      }
+
+      latest.unreadCount = Math.max(0, Number(existing.unreadCount || 0) + Number(chat.unreadCount || 0));
+      grouped.set(key, latest);
+    });
+
+    return Array.from(grouped.values()).sort((a, b) => getChatSortTime(b) - getChatSortTime(a));
+  }, [getChatKey, getChatSortTime, getLastMessageTime, hasChatHistory]);
+
   const fetchChats = useCallback(async () => {
     try {
       const { data } = await chatApi.getChats();
-      setChats(data?.chats || data || []);
+      setChats(normalizeChats(data?.chats || data || []));
     } catch {} finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [normalizeChats]);
 
   useEffect(() => {
     fetchChats();
@@ -53,7 +118,7 @@ export const ChatListScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
           updated.unreadCount = (updated.unreadCount || 0) + 1;
         }
         const next = [updated, ...prev.filter((_, i) => i !== idx)];
-        return next;
+        return normalizeChats(next);
       });
     });
 
@@ -61,14 +126,14 @@ export const ChatListScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
     const unsubRead = socketService.on('chat:message:read', (payload: unknown) => {
       const { chatId } = payload as { chatId?: string; messageId?: string };
       if (!chatId) return;
-      setChats((prev) => prev.map((c) => c.id === chatId ? { ...c, unreadCount: 0 } : c));
+      setChats((prev) => normalizeChats(prev.map((c) => c.id === chatId ? { ...c, unreadCount: 0 } : c)));
     });
 
     // Track focus state so we can suppress unread increments for the open chat
     const unsubFocus = navigation.addListener('focus', () => { activeChatRef.current = null; });
 
     return () => { unsubMsg(); unsubRead(); unsubFocus(); };
-  }, [fetchChats, user?.id, navigation]);
+  }, [fetchChats, user?.id, navigation, normalizeChats]);
 
   const onRefresh = () => { setRefreshing(true); fetchChats(); };
 

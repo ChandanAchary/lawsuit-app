@@ -121,6 +121,16 @@ export const LawyerAppointmentsScreen: React.FC<{ navigation: any }> = ({ naviga
     } catch { Alert.alert('Error', 'Failed to mark as attended'); }
   };
 
+  const handleComplete = async (id: string) => {
+    try {
+      await appointmentsApi.complete(id);
+      Alert.alert('Success', 'Appointment marked as completed');
+      fetchAppointments(false);
+    } catch (err: any) {
+      Alert.alert('Error', formatErrorMessage(err.response?.data || err) || 'Failed to complete appointment');
+    }
+  };
+
   const handleCreateCase = async (appointment: Appointment) => {
     try {
       await casesApi.create({
@@ -199,6 +209,7 @@ export const LawyerAppointmentsScreen: React.FC<{ navigation: any }> = ({ naviga
           : undefined
       }
       onCreateCase={item.status === AppointmentStatus.ATTENDED ? () => handleCreateCase(item) : undefined}
+      onComplete={item.status === AppointmentStatus.ATTENDED ? () => handleComplete(item.id) : undefined}
       onReschedule={
         item.status === AppointmentStatus.CONFIRMED || item.status === AppointmentStatus.MISSED
           ? () => openReschedule(item.id) : undefined

@@ -24,6 +24,7 @@ interface AppointmentCardProps {
   onChat?: () => void;
   onViewAgreement?: () => void;
   onCreateCase?: () => void;
+  onComplete?: () => void;
   onReschedule?: () => void;
   onJoinVideo?: () => void;
   onViewClient?: () => void;
@@ -41,6 +42,7 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
   onChat,
   onViewAgreement,
   onCreateCase,
+  onComplete,
   onReschedule,
   onJoinVideo,
   onViewClient,
@@ -164,6 +166,12 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
             <TouchableOpacity style={[styles.actionBtn, styles.actionPrimary]} onPress={onCreateCase}>
               <Ionicons name="briefcase" size={14} color={COLORS.white} />
               <Text style={styles.actionTextWhite}>Create Case</Text>
+            </TouchableOpacity>
+          )}
+          {appointment.status === AppointmentStatus.ATTENDED && onComplete && role === 'LAWYER' && (
+            <TouchableOpacity style={[styles.actionBtn, styles.actionPrimary]} onPress={onComplete}>
+              <Ionicons name="checkmark-done" size={14} color={COLORS.white} />
+              <Text style={styles.actionTextWhite}>Complete</Text>
             </TouchableOpacity>
           )}
           {role === 'LAWYER' && onViewClient && (

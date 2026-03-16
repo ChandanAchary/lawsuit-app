@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, Alert, Dimensions, Linking,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, Alert, Dimensions, Linking, TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -30,6 +30,11 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
   const [showBooking, setShowBooking] = useState(false);
   const [booking, setBooking] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'razorpay'>('wallet');
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [showReviewSheet, setShowReviewSheet] = useState(false);
+  const [rating, setRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
   const balance = useWalletStore((s) => s.balance);
   const user = useAuthStore((s) => s.user);
   // Razorpay state
@@ -39,6 +44,7 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
 
   useEffect(() => {
     fetchLawyer();
+    fetchReviews();
   }, [lawyerId]);
 
   useEffect(() => {
@@ -132,6 +138,32 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
       setSlots([]);
     } finally {
       setSlotsLoading(false);
+    }
+  };
+
+  const fetchReviews = async () => {
+    try {
+      const { data } = await lawyersApi.getReviews(lawyerId, { page: 1, limit: 5 });
+      setReviews(data.items || data.reviews || data.data || []);
+    } catch {
+      setReviews([]);
+    }
+  };
+
+  const submitReview = async () => {
+    if (rating < 1 || rating > 5) return;
+    setSubmittingReview(true);
+    try {
+      await lawyersApi.postReview(lawyerId, { rating, comment: reviewComment.trim() || undefined });
+      setShowReviewSheet(false);
+      setRating(5);
+      setReviewComment('');
+      fetchReviews();
+      Alert.alert('Success', 'Review submitted successfully');
+    } catch (err: any) {
+      Alert.alert('Review Failed', formatErrorMessage(err.response?.data || err) || 'Could not submit review');
+    } finally {
+      setSubmittingReview(false);
     }
   };
 
@@ -321,6 +353,39 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
             </View>
           )}
 
+          {/* Reviews */}
+          <View style={styles.reviewSection}>
+            <View style={styles.reviewHeader}>
+              <Text style={styles.reviewTitle}>Client Reviews</Text>
+              <TouchableOpacity style={styles.addReviewBtn} onPress={() => setShowReviewSheet(true)}>
+                <Ionicons name="star-outline" size={14} color={COLORS.primary} />
+                <Text style={styles.addReviewBtnText}>Write Review</Text>
+              </TouchableOpacity>
+            </View>
+            {reviews.length === 0 ? (
+              <Text style={styles.noReviewText}>No reviews yet. Be the first to review.</Text>
+            ) : (
+              reviews.map((r, i) => (
+                <View key={r.id || i} style={styles.reviewCard}>
+                  <View style={styles.reviewTopRow}>
+                    <Text style={styles.reviewName}>{r.client?.name || 'Client'}</Text>
+                    <View style={styles.reviewStars}>
+                      {Array.from({ length: 5 }).map((_, idx) => (
+                        <Ionicons
+                          key={idx}
+                          name={idx < Number(r.rating || 0) ? 'star' : 'star-outline'}
+                          size={12}
+                          color={COLORS.accent}
+                        />
+                      ))}
+                    </View>
+                  </View>
+                  {!!r.comment && <Text style={styles.reviewComment}>{r.comment}</Text>}
+                </View>
+              ))
+            )}
+          </View>
+
           {/* Case Statistics */}
           {(lawyer as any).stats && (
             <View style={styles.statsSection}>
@@ -509,6 +574,28 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
           onError={(err) => { setShowRazorpay(false); Alert.alert('Payment Failed', err.description || 'Please try again'); }}
         />
       )}
+
+      <BottomSheet visible={showReviewSheet} onClose={() => setShowReviewSheet(false)} title="Write Review">
+        <View style={styles.reviewForm}>
+          <Text style={styles.reviewFormLabel}>Rating</Text>
+          <View style={styles.ratingRow}>
+            {Array.from({ length: 5 }).map((_, idx) => (
+              <TouchableOpacity key={idx} onPress={() => setRating(idx + 1)}>
+                <Ionicons name={idx < rating ? 'star' : 'star-outline'} size={28} color={COLORS.accent} />
+              </TouchableOpacity>
+            ))}
+          </View>
+          <TextInput
+            style={styles.reviewInput}
+            value={reviewComment}
+            onChangeText={setReviewComment}
+            placeholder="Share your experience (optional)"
+            placeholderTextColor={COLORS.textMuted}
+            multiline
+          />
+          <Button title={submittingReview ? 'Submitting...' : 'Submit Review'} onPress={submitReview} disabled={submittingReview} size="lg" />
+        </View>
+      </BottomSheet>
     </View>
   );
 };
@@ -571,6 +658,48 @@ const styles = StyleSheet.create({
   bioSection: { marginBottom: SPACING.xl },
   bioTitle: { fontSize: FONT_SIZE.lg, fontWeight: '700', color: COLORS.text, marginBottom: SPACING.sm },
   bioText: { fontSize: FONT_SIZE.md, color: COLORS.textSecondary, lineHeight: 22 },
+  reviewSection: { marginBottom: SPACING.xl },
+  reviewHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACING.sm },
+  reviewTitle: { fontSize: FONT_SIZE.lg, fontWeight: '700', color: COLORS.text },
+  addReviewBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    borderRadius: BORDER_RADIUS.full,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 6,
+  },
+  addReviewBtnText: { fontSize: FONT_SIZE.xs, color: COLORS.primary, fontWeight: '700' },
+  noReviewText: { fontSize: FONT_SIZE.sm, color: COLORS.textMuted },
+  reviewCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.md,
+    marginTop: SPACING.sm,
+    ...SHADOWS.sm,
+  },
+  reviewTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  reviewName: { fontSize: FONT_SIZE.sm, fontWeight: '700', color: COLORS.text },
+  reviewStars: { flexDirection: 'row', gap: 2 },
+  reviewComment: { fontSize: FONT_SIZE.sm, color: COLORS.textSecondary, marginTop: 6 },
+  reviewForm: { paddingBottom: SPACING.xl },
+  reviewFormLabel: { fontSize: FONT_SIZE.sm, fontWeight: '700', color: COLORS.text, marginBottom: SPACING.sm },
+  ratingRow: { flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.lg },
+  reviewInput: {
+    backgroundColor: COLORS.surfaceAlt,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: BORDER_RADIUS.lg,
+    minHeight: 96,
+    textAlignVertical: 'top',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.md,
+    fontSize: FONT_SIZE.md,
+    color: COLORS.text,
+    marginBottom: SPACING.lg,
+  },
   bookingSection: { marginTop: SPACING.md },
   bookingTitle: { fontSize: FONT_SIZE.xl, fontWeight: '800', color: COLORS.text, marginBottom: SPACING.lg },
   dateScroll: { marginBottom: SPACING.lg },

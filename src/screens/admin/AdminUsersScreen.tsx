@@ -31,11 +31,28 @@ export const AdminUsersScreen: React.FC<{ navigation: any }> = ({ navigation }) 
   const fetchUsers = useCallback(async (showLoader = true) => {
     if (showLoader) setLoading(true);
     try {
-      const params: any = {};
-      if (tab === UserRole.CLIENT || tab === UserRole.LAWYER) params.role = tab;
-      if (tab === 'pending') params.verified = false;
-      const { data } = await adminApi.getUsers(params);
-      setUsers(data.users || data || []);
+      if (tab === 'pending') {
+        const [clientsRes, lawyersRes] = await Promise.all([
+          adminApi.getNotVerifiedClients().catch(() => ({ data: [] })),
+          adminApi.getNotVerifiedLawyers().catch(() => ({ data: [] })),
+        ]);
+
+        const normalize = (arr: any, role: UserRole) => {
+          const list = arr?.users || arr?.items || arr?.data || arr || [];
+          return (Array.isArray(list) ? list : []).map((u: any) => ({ ...u, role: u.role || role }));
+        };
+
+        const pendingUsers = [
+          ...normalize(clientsRes.data, UserRole.CLIENT),
+          ...normalize(lawyersRes.data, UserRole.LAWYER),
+        ];
+        setUsers(pendingUsers as User[]);
+      } else {
+        const params: any = {};
+        if (tab === UserRole.CLIENT || tab === UserRole.LAWYER) params.role = tab;
+        const { data } = await adminApi.getUsers(params);
+        setUsers(data.users || data || []);
+      }
     } catch { setUsers([]); }
     finally { setLoading(false); setRefreshing(false); }
   }, [tab]);

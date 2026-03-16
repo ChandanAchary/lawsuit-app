@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList, Alert, ActivityIndicator,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList, Alert, ActivityIndicator, TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS, CASE_STATUS_COLORS } from '../../constants';
@@ -11,11 +11,23 @@ import { StatusBadge, Loading, EmptyState } from '../../components/Common';
 import { ChatTab } from '../../components/ChatTab';
 import { Button } from '../../components/Button';
 
-type Tab = 'info' | 'timeline' | 'hearings' | 'chat' | 'documents';
+interface CaseTask {
+  id: string;
+  title: string;
+  description?: string;
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'OVERDUE';
+  dueDate?: string;
+  assignedToId?: string;
+  assignedById?: string;
+  createdAt?: string;
+}
+
+type Tab = 'info' | 'timeline' | 'hearings' | 'tasks' | 'chat' | 'documents';
 const TABS: { key: Tab; label: string; icon: string }[] = [
   { key: 'info', label: 'Info', icon: 'information-circle-outline' },
   { key: 'timeline', label: 'Timeline', icon: 'git-branch-outline' },
   { key: 'hearings', label: 'Hearings', icon: 'calendar-outline' },
+  { key: 'tasks', label: 'Tasks', icon: 'checkbox-outline' },
   { key: 'chat', label: 'Chat', icon: 'chatbubble-outline' },
   { key: 'documents', label: 'Docs', icon: 'document-outline' },
 ];
@@ -28,6 +40,11 @@ export const CaseDetailScreen: React.FC<{ navigation: any; route: any }> = ({ na
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [hearings, setHearings] = useState<Hearing[]>([]);
   const [documents, setDocuments] = useState<CaseDoc[]>([]);
+  const [tasks, setTasks] = useState<CaseTask[]>([]);
+  const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [newTaskDesc, setNewTaskDesc] = useState('');
+  const [creatingTask, setCreatingTask] = useState(false);
+  const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
   const [chatId, setChatId] = useState<string | null>(null);
 
   useEffect(() => { fetchCase(); }, [caseId]);
@@ -36,6 +53,7 @@ export const CaseDetailScreen: React.FC<{ navigation: any; route: any }> = ({ na
     if (caseData) {
       if (activeTab === 'timeline') fetchTimeline();
       if (activeTab === 'hearings') fetchHearings();
+      if (activeTab === 'tasks') fetchTasks();
       if (activeTab === 'documents') fetchDocuments();
       if (activeTab === 'chat') fetchChat();
     }
@@ -72,6 +90,48 @@ export const CaseDetailScreen: React.FC<{ navigation: any; route: any }> = ({ na
       const { data } = await casesApi.getDocuments(caseId);
       setDocuments(data.items || data.documents || []);
     } catch {}
+  };
+
+  const fetchTasks = async () => {
+    try {
+      const { data } = await casesApi.getTasks(caseId);
+      setTasks(data.tasks || data.items || data.data || []);
+    } catch {
+      setTasks([]);
+    }
+  };
+
+  const handleCreateTask = async () => {
+    if (!newTaskTitle.trim()) {
+      Alert.alert('Required', 'Please enter task title');
+      return;
+    }
+    setCreatingTask(true);
+    try {
+      await casesApi.createTask(caseId, {
+        title: newTaskTitle.trim(),
+        description: newTaskDesc.trim() || undefined,
+      });
+      setNewTaskTitle('');
+      setNewTaskDesc('');
+      fetchTasks();
+    } catch {
+      Alert.alert('Error', 'Failed to create task');
+    } finally {
+      setCreatingTask(false);
+    }
+  };
+
+  const handleTaskStatus = async (taskId: string, status: CaseTask['status']) => {
+    setUpdatingTaskId(taskId);
+    try {
+      await casesApi.updateTask(taskId, { status });
+      fetchTasks();
+    } catch {
+      Alert.alert('Error', 'Failed to update task');
+    } finally {
+      setUpdatingTaskId(null);
+    }
   };
 
   const fetchChat = async () => {
@@ -192,6 +252,58 @@ export const CaseDetailScreen: React.FC<{ navigation: any; route: any }> = ({ na
         </ScrollView>
       )}
 
+      {activeTab === 'tasks' && (
+        <ScrollView style={styles.tabContent} contentContainerStyle={styles.tabPadding}>
+          <View style={styles.taskComposer}>
+            <TextInput
+              style={styles.taskInput}
+              value={newTaskTitle}
+              onChangeText={setNewTaskTitle}
+              placeholder="Task title"
+              placeholderTextColor={COLORS.textMuted}
+            />
+            <TextInput
+              style={[styles.taskInput, styles.taskInputMultiline]}
+              value={newTaskDesc}
+              onChangeText={setNewTaskDesc}
+              placeholder="Task description (optional)"
+              placeholderTextColor={COLORS.textMuted}
+              multiline
+            />
+            <Button
+              title={creatingTask ? 'Adding...' : 'Add Task'}
+              onPress={handleCreateTask}
+              disabled={creatingTask}
+              size="sm"
+            />
+          </View>
+
+          {tasks.length === 0 ? (
+            <EmptyState icon="✅" title="No Tasks" message="Create tasks to track case work" />
+          ) : (
+            tasks.map((task) => (
+              <View key={task.id} style={styles.taskCard}>
+                <Text style={styles.taskTitle}>{task.title}</Text>
+                {!!task.description && <Text style={styles.taskDesc}>{task.description}</Text>}
+                <Text style={styles.taskMeta}>Status: {task.status}</Text>
+                <View style={styles.taskActions}>
+                  {(['PENDING', 'IN_PROGRESS', 'COMPLETED'] as const).map((s) => (
+                    <TouchableOpacity
+                      key={s}
+                      style={[styles.taskStatusBtn, task.status === s && styles.taskStatusBtnActive]}
+                      onPress={() => handleTaskStatus(task.id, s)}
+                      disabled={updatingTaskId === task.id || task.status === s}
+                    >
+                      <Text style={[styles.taskStatusBtnText, task.status === s && styles.taskStatusBtnTextActive]}>{s}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            ))
+          )}
+        </ScrollView>
+      )}
+
       {activeTab === 'chat' && (
         <View style={styles.chatContainer}>
           {chatId ? (
@@ -292,6 +404,47 @@ const styles = StyleSheet.create({
   hearingDetailRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   hearingDetailText: { fontSize: FONT_SIZE.sm, color: COLORS.textSecondary },
   hearingNotes: { fontSize: FONT_SIZE.sm, color: COLORS.textMuted, marginTop: SPACING.sm, lineHeight: 20 },
+  taskComposer: {
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
+    marginBottom: SPACING.lg,
+    ...SHADOWS.sm,
+  },
+  taskInput: {
+    backgroundColor: COLORS.surfaceAlt,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: BORDER_RADIUS.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.text,
+    marginBottom: SPACING.sm,
+  },
+  taskInputMultiline: { minHeight: 72, textAlignVertical: 'top' },
+  taskCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
+    marginBottom: SPACING.md,
+    ...SHADOWS.sm,
+  },
+  taskTitle: { fontSize: FONT_SIZE.md, fontWeight: '700', color: COLORS.text },
+  taskDesc: { fontSize: FONT_SIZE.sm, color: COLORS.textSecondary, marginTop: 4 },
+  taskMeta: { fontSize: FONT_SIZE.xs, color: COLORS.textMuted, marginTop: SPACING.sm },
+  taskActions: { flexDirection: 'row', gap: SPACING.xs, marginTop: SPACING.sm },
+  taskStatusBtn: {
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 6,
+    borderRadius: BORDER_RADIUS.full,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surfaceAlt,
+  },
+  taskStatusBtnActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  taskStatusBtnText: { fontSize: FONT_SIZE.xs, color: COLORS.textSecondary, fontWeight: '600' },
+  taskStatusBtnTextActive: { color: COLORS.white },
   chatContainer: { flex: 1 },
   docRow: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING.md, backgroundColor: COLORS.white,

@@ -29,6 +29,7 @@ export const BankAccountsScreen: React.FC<{ navigation: any }> = ({ navigation }
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
 
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
+  const [editingAccount, setEditingAccount] = useState<BankAccount | null>(null);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('BANK');
@@ -66,9 +67,24 @@ export const BankAccountsScreen: React.FC<{ navigation: any }> = ({ navigation }
     setHolderName(''); setAccountNumber(''); setIfsc(''); setBankName('');
     setLabel(''); setIsDefault(false); setUpiId(''); setUpiVerified(false);
     setActiveTab('BANK');
+    setEditingAccount(null);
   };
 
   const openModal = () => { resetForm(); setModalVisible(true); };
+
+  const openEditModal = (acc: BankAccount) => {
+    setEditingAccount(acc);
+    setActiveTab(acc.type);
+    setHolderName(acc.accountHolderName || '');
+    setAccountNumber(acc.accountNumber || '');
+    setIfsc(acc.ifscCode || '');
+    setBankName(acc.bankName || '');
+    setLabel(acc.label || '');
+    setIsDefault(!!acc.isDefault);
+    setUpiId(acc.upiId || '');
+    setUpiVerified(acc.type === 'UPI');
+    setModalVisible(true);
+  };
 
   const handleIfscLookup = async (code: string) => {
     setIfsc(code);
@@ -112,8 +128,13 @@ export const BankAccountsScreen: React.FC<{ navigation: any }> = ({ navigation }
       const payload: Record<string, unknown> = activeTab === 'BANK'
         ? { type: 'BANK', accountHolderName: holderName, accountNumber, ifscCode: ifsc, bankName, label, isDefault }
         : { type: 'UPI', upiId, label, isDefault };
-      await bankAccountApi.create(payload);
+      if (editingAccount) {
+        await bankAccountApi.update(editingAccount.id, payload);
+      } else {
+        await bankAccountApi.create(payload);
+      }
       setModalVisible(false);
+      resetForm();
       fetchAccounts();
     } catch (err: any) {
       Alert.alert('Error', formatErrorMessage(err.response?.data?.message || err.response?.data || err));
@@ -157,6 +178,9 @@ export const BankAccountsScreen: React.FC<{ navigation: any }> = ({ navigation }
             </View>
           )}
         </View>
+        <TouchableOpacity onPress={() => openEditModal(acc)} style={styles.editBtn}>
+          <Ionicons name="create-outline" size={17} color={COLORS.info} />
+        </TouchableOpacity>
         <TouchableOpacity onPress={() => handleDelete(acc.id)} style={styles.deleteBtn}>
           <Ionicons name="trash-outline" size={18} color={COLORS.error} />
         </TouchableOpacity>
@@ -205,7 +229,7 @@ export const BankAccountsScreen: React.FC<{ navigation: any }> = ({ navigation }
           <View style={styles.modalContainer}>
             {/* Modal Header */}
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add Account</Text>
+              <Text style={styles.modalTitle}>{editingAccount ? 'Edit Account' : 'Add Account'}</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
                 <Ionicons name="close" size={24} color={COLORS.text} />
               </TouchableOpacity>
@@ -272,7 +296,7 @@ export const BankAccountsScreen: React.FC<{ navigation: any }> = ({ navigation }
 
             <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
               {saving ? <ActivityIndicator color={COLORS.white} /> : (
-                <Text style={styles.saveBtnText}>Add Account</Text>
+                <Text style={styles.saveBtnText}>{editingAccount ? 'Update Account' : 'Add Account'}</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -324,6 +348,10 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   deleteBtn: {
     width: 36, height: 36, borderRadius: 18,
     backgroundColor: COLORS.errorLight, alignItems: 'center', justifyContent: 'center',
+  },
+  editBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: COLORS.infoLight, alignItems: 'center', justifyContent: 'center',
   },
   // Modal
   modalOverlay: { flex: 1, backgroundColor: COLORS.overlay, justifyContent: 'flex-end' },
