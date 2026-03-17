@@ -16,6 +16,43 @@ import { WebView } from 'react-native-webview';
 import { videoApi } from '../../services/api';
 import { socketService } from '../../services/socket';
 
+const normalizeErrorMessage = (value: unknown): string => {
+  if (!value) return 'Call failed.';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (Array.isArray(value)) {
+    const parts = value.map((v) => normalizeErrorMessage(v)).filter(Boolean);
+    return parts.join(' | ') || 'Call failed.';
+  }
+  if (typeof value === 'object') {
+    const v = value as Record<string, unknown>;
+    const candidate =
+      v.message ??
+      v.errorMsg ??
+      v.error ??
+      v.info ??
+      (typeof v.details === 'string' ? v.details : undefined);
+    if (candidate) return normalizeErrorMessage(candidate);
+    try {
+      return JSON.stringify(v);
+    } catch {
+      return 'Call failed.';
+    }
+  }
+  return 'Call failed.';
+};
+
+const mapDailyMessage = (raw: string): string => {
+  const msg = raw.toLowerCase();
+  if (msg.includes('missing payment method')) {
+    return 'Daily account is missing a payment method. Add billing in Daily dashboard to enable calls.';
+  }
+  if (msg.includes('failed to create daily room')) {
+    return 'Unable to create Daily room right now. Please try again.';
+  }
+  return raw;
+};
+
 const ActionBtn: React.FC<{
   icon: string;
   label: string;
@@ -138,8 +175,8 @@ export const VideoCallScreen: React.FC<{ navigation: any; route: any }> = ({ nav
         setSessionError('Unable to start call: missing appointment or chat context.');
       } catch (err: any) {
         if (!mounted) return;
-        const msg = err?.response?.data?.error || err?.message || 'Failed to initialize call session.';
-        setSessionError(msg);
+        const raw = err?.response?.data?.error ?? err?.response?.data ?? err?.message ?? 'Failed to initialize call session.';
+        setSessionError(mapDailyMessage(normalizeErrorMessage(raw)));
       } finally {
         if (mounted) setSessionLoading(false);
       }
@@ -226,7 +263,7 @@ export const VideoCallScreen: React.FC<{ navigation: any; route: any }> = ({ nav
 
         frame.on('joined-meeting', () => post('joined'));
         frame.on('left-meeting', () => post('left'));
-        frame.on('error', (e) => post('error', { message: e?.errorMsg || 'Call error' }));
+        frame.on('error', (e) => post('error', { message: e }));
 
         await frame.join({
           url: meetingLink,
@@ -286,8 +323,10 @@ export const VideoCallScreen: React.FC<{ navigation: any; route: any }> = ({ nav
         return;
       }
       if (payload.event === 'error') {
-        const msg = payload.message || 'Call failed.';
-        setSessionError(String(msg));
+        const raw = payload.message ?? payload ?? 'Call failed.';
+        setSessionError(mapDailyMessage(normalizeErrorMessage(raw)));
+        stopTimer();
+        if (callState !== 'ended') setCallState('ended');
       }
     } catch {
       // ignore malformed webview messages
@@ -317,7 +356,7 @@ export const VideoCallScreen: React.FC<{ navigation: any; route: any }> = ({ nav
     <>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       <LinearGradient colors={bgColors} locations={[0, 0.5, 1]} style={s.container}>
-        {callHtml && (
+        {callHtml && !sessionError && callState !== 'ended' && (
           <WebView
             ref={webViewRef}
             source={{ html: callHtml, baseUrl: 'https://daily.co/' }}
