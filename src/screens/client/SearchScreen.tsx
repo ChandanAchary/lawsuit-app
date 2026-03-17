@@ -11,6 +11,7 @@ import { Lawyer, LawyerFilterOptions } from '../../types';
 import { BottomSheet } from '../../components/Modals';
 import { ChipGroup } from '../../components/TabBar';
 import { getCurrentLocation, UserLocation } from '../../utils/permissions';
+import { usersApi } from '../../services/api';
 
 export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
@@ -23,50 +24,153 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState('rating');
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
+  const [profilePincode, setProfilePincode] = useState<string | null>(null);
+  const [nearMeSource, setNearMeSource] = useState<'device' | 'profile' | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
-  const [sortedLawyers, setSortedLawyers] = useState<Lawyer[]>([]);
   const locationFetched = useRef(false);
 
   useEffect(() => {
     fetchLawyers({ ...filters, search, sortBy, sortOrder: 'desc' });
   }, []);
 
-  // Keep sortedLawyers in sync with lawyers list and sort mode
-  useEffect(() => {
-    if (sortBy === 'nearme' && userLocation) {
-      // Sort: lawyers in the same city first, then by rating
-      const sorted = [...lawyers].sort((a, b) => {
-        const userCity = (userLocation.city || '').toLowerCase();
-        const aMatch = a.location?.toLowerCase().includes(userCity) ? 0 : 1;
-        const bMatch = b.location?.toLowerCase().includes(userCity) ? 0 : 1;
-        if (aMatch !== bMatch) return aMatch - bMatch;
-        return b.rating - a.rating;
-      });
-      setSortedLawyers(sorted);
-    } else {
-      setSortedLawyers(lawyers);
-    }
-  }, [lawyers, sortBy, userLocation]);
-
   const handleSearch = useCallback(() => {
-    const effectiveSortBy = sortBy === 'nearme' ? 'rating' : sortBy;
-    fetchLawyers({ ...filters, search, sortBy: effectiveSortBy, sortOrder: 'desc' });
-  }, [search, filters, sortBy]);
+    if (sortBy === 'nearme' && userLocation) {
+      fetchLawyers({
+        ...filters,
+        search,
+        latitude: userLocation.latitude,
+        longitude: userLocation.longitude,
+        radius: 50,
+        sortBy: 'distance',
+        sortOrder: 'asc',
+      });
+      return;
+    }
+
+    if (sortBy === 'nearme' && profilePincode) {
+      fetchLawyers({
+        ...filters,
+        search,
+        clientPincode: profilePincode,
+        radius: 50,
+        sortBy: 'distance',
+        sortOrder: 'asc',
+      });
+      return;
+    }
+
+    fetchLawyers({ ...filters, search, sortBy, sortOrder: 'desc' });
+  }, [search, filters, sortBy, userLocation, profilePincode, fetchLawyers]);
+
+  const searchWithSavedProfileLocation = useCallback(async (): Promise<boolean> => {
+    try {
+      const { data } = await usersApi.getClientInformation();
+      const pin = String(data?.client?.pincode || '').trim();
+      if (!/^\d{6}$/.test(pin)) return false;
+
+      setUserLocation(null);
+      setProfilePincode(pin);
+      setNearMeSource('profile');
+      setSortBy('nearme');
+
+      const profileFilters: LawyerFilterOptions = {
+        ...filters,
+        location: undefined,
+        latitude: undefined,
+        longitude: undefined,
+        clientPincode: pin,
+        radius: 50,
+        sortBy: 'distance',
+        sortOrder: 'asc',
+      };
+
+      setFilters(profileFilters);
+      await fetchLawyers({ ...profileFilters, search });
+      return true;
+    } catch {
+      return false;
+    }
+  }, [filters, search, fetchLawyers]);
+
+  const handleUseMyLocation = useCallback(async () => {
+    setLocationLoading(true);
+    const loc = await getCurrentLocation();
+    locationFetched.current = true;
+
+    if (!loc) {
+      const fallbackApplied = await searchWithSavedProfileLocation();
+      setLocationLoading(false);
+      if (!fallbackApplied) {
+        setUserLocation(null);
+        setNearMeSource(null);
+      }
+      return;
+    }
+
+    setLocationLoading(false);
+
+    setUserLocation(loc);
+    setProfilePincode(null);
+    setNearMeSource('device');
+    setSortBy('nearme');
+
+    const locationFilters: LawyerFilterOptions = {
+      ...filters,
+      location: undefined,
+      clientPincode: undefined,
+      latitude: loc.latitude,
+      longitude: loc.longitude,
+      radius: 50,
+      sortBy: 'distance',
+      sortOrder: 'asc',
+    };
+
+    setFilters(locationFilters);
+    fetchLawyers({ ...locationFilters, search });
+  }, [filters, search, fetchLawyers, searchWithSavedProfileLocation]);
 
   const handleSortChange = async (s: string) => {
     setSortBy(s);
     if (s === 'nearme') {
-      if (!locationFetched.current) {
-        setLocationLoading(true);
-        const loc = await getCurrentLocation();
-        setUserLocation(loc);
-        setLocationLoading(false);
-        locationFetched.current = true;
+      if (locationFetched.current && userLocation) {
+        const locationFilters: LawyerFilterOptions = {
+          ...filters,
+          location: undefined,
+          clientPincode: undefined,
+          latitude: userLocation.latitude,
+          longitude: userLocation.longitude,
+          radius: 50,
+          sortBy: 'distance',
+          sortOrder: 'asc',
+        };
+        setFilters(locationFilters);
+        fetchLawyers({ ...locationFilters, search });
+      } else if (locationFetched.current && profilePincode) {
+        const profileFilters: LawyerFilterOptions = {
+          ...filters,
+          location: undefined,
+          latitude: undefined,
+          longitude: undefined,
+          clientPincode: profilePincode,
+          radius: 50,
+          sortBy: 'distance',
+          sortOrder: 'asc',
+        };
+        setNearMeSource('profile');
+        setFilters(profileFilters);
+        fetchLawyers({ ...profileFilters, search });
+      } else {
+        await handleUseMyLocation();
       }
-      // Fetch from server sorted by rating; client-side location sort applied in useEffect
-      fetchLawyers({ ...filters, search, sortBy: 'rating', sortOrder: 'desc' });
     } else {
-      fetchLawyers({ ...filters, search, sortBy: s, sortOrder: 'desc' });
+      const nextFilters = { ...filters };
+      delete nextFilters.latitude;
+      delete nextFilters.longitude;
+      delete nextFilters.radius;
+      delete nextFilters.clientPincode;
+      setNearMeSource(null);
+      setFilters(nextFilters);
+      fetchLawyers({ ...nextFilters, search, sortBy: s, sortOrder: 'desc' });
     }
   };
 
@@ -76,8 +180,32 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
   const handleLoadMore = () => {
     if (lawyers.length < total) {
-      const effectiveSortBy = sortBy === 'nearme' ? 'rating' : sortBy;
-      fetchLawyers({ ...filters, search, sortBy: effectiveSortBy, sortOrder: 'desc' }, page + 1);
+      if (sortBy === 'nearme' && userLocation) {
+        fetchLawyers({
+          ...filters,
+          search,
+          latitude: userLocation.latitude,
+          longitude: userLocation.longitude,
+          radius: 50,
+          sortBy: 'distance',
+          sortOrder: 'asc',
+        }, page + 1);
+        return;
+      }
+
+      if (sortBy === 'nearme' && profilePincode) {
+        fetchLawyers({
+          ...filters,
+          search,
+          clientPincode: profilePincode,
+          radius: 50,
+          sortBy: 'distance',
+          sortOrder: 'asc',
+        }, page + 1);
+        return;
+      }
+
+      fetchLawyers({ ...filters, search, sortBy, sortOrder: 'desc' }, page + 1);
     }
   };
 
@@ -110,20 +238,41 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         ))}
       </View>
 
+      <TouchableOpacity style={styles.locationActionButton} onPress={handleUseMyLocation} disabled={locationLoading}>
+        <Ionicons name="navigate" size={14} color={COLORS.white} />
+        <Text style={styles.locationActionText}>{locationLoading ? 'Fetching location...' : 'Use my location'}</Text>
+      </TouchableOpacity>
+
       {sortBy === 'nearme' && userLocation?.city && (
         <View style={styles.locationBanner}>
           <Ionicons name="location" size={14} color={COLORS.primary} />
           <Text style={styles.locationBannerText}>
-            Showing lawyers near{' '}
+            Showing lawyers within 50 km of{' '}
             <Text style={{ fontWeight: '700' }}>{userLocation.city}</Text>
           </Text>
         </View>
       )}
-      {sortBy === 'nearme' && !userLocation?.city && !locationLoading && (
+      {sortBy === 'nearme' && !userLocation?.city && !!userLocation && (
+        <View style={styles.locationBanner}>
+          <Ionicons name="location" size={14} color={COLORS.primary} />
+          <Text style={styles.locationBannerText}>
+            Showing lawyers within 50 km of your current location
+          </Text>
+        </View>
+      )}
+      {sortBy === 'nearme' && nearMeSource === 'profile' && !!profilePincode && (
+        <View style={styles.locationBanner}>
+          <Ionicons name="home" size={14} color={COLORS.primary} />
+          <Text style={styles.locationBannerText}>
+            Location permission denied. Showing lawyers within 50 km of your saved address ({profilePincode}).
+          </Text>
+        </View>
+      )}
+      {sortBy === 'nearme' && !userLocation && !locationLoading && !profilePincode && (
         <View style={styles.locationBanner}>
           <Ionicons name="location-outline" size={14} color={COLORS.textMuted} />
           <Text style={[styles.locationBannerText, { color: COLORS.textMuted }]}>
-            Could not detect location. Please enable location permission.
+            Could not detect location. Saved profile address will be used when available.
           </Text>
         </View>
       )}
@@ -156,8 +305,32 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               <TouchableOpacity
                 onPress={() => {
                   setSearch('');
-                  const effectiveSortBy = sortBy === 'nearme' ? 'rating' : sortBy;
-                  fetchLawyers({ ...filters, search: '', sortBy: effectiveSortBy, sortOrder: 'desc' });
+                  if (sortBy === 'nearme' && userLocation) {
+                    fetchLawyers({
+                      ...filters,
+                      search: '',
+                      latitude: userLocation.latitude,
+                      longitude: userLocation.longitude,
+                      radius: 50,
+                      sortBy: 'distance',
+                      sortOrder: 'asc',
+                    });
+                    return;
+                  }
+
+                  if (sortBy === 'nearme' && profilePincode) {
+                    fetchLawyers({
+                      ...filters,
+                      search: '',
+                      clientPincode: profilePincode,
+                      radius: 50,
+                      sortBy: 'distance',
+                      sortOrder: 'asc',
+                    });
+                    return;
+                  }
+
+                  fetchLawyers({ ...filters, search: '', sortBy, sortOrder: 'desc' });
                 }}
               >
                 <Ionicons name="close-circle" size={18} color={COLORS.textMuted} />
@@ -174,12 +347,9 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       </View>
 
       <FlatList
-        data={sortedLawyers}
+        data={lawyers}
         renderItem={({ item }) => {
-          const isNearMe =
-            sortBy === 'nearme' &&
-            !!userLocation?.city &&
-            !!item.location?.toLowerCase().includes((userLocation.city || '').toLowerCase());
+          const isNearMe = sortBy === 'nearme';
           return (
             <LawyerCard
               lawyer={item}
@@ -324,6 +494,22 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   },
   sortText: { fontSize: FONT_SIZE.sm, fontWeight: '600', color: COLORS.textSecondary },
   sortTextActive: { color: COLORS.white },
+  locationActionButton: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    backgroundColor: COLORS.primary,
+    borderRadius: BORDER_RADIUS.full,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    marginBottom: SPACING.sm,
+  },
+  locationActionText: {
+    color: COLORS.white,
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '700',
+  },
   locationBanner: {
     flexDirection: 'row',
     alignItems: 'center',

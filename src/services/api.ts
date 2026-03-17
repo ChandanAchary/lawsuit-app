@@ -120,7 +120,7 @@ export const appointmentsApi = {
   attend: (id: string, attended?: boolean) => api.post(`/appointments/${encodeURIComponent(id)}/attend`, { attended }),
   availability: (data: { lawyerId: string; date: string }) =>
     api.post('/appointments/availability', data),
-  updateAgreementUrl: (data: { appointmentId: string; aggrementUrl: string }) =>
+  updateAgreementUrl: (data: { appointmentId: string; agreementUrl: string }) =>
     api.post('/appointments/update-agreement-url', data),
   accept: (id: string) => api.post(`/appointments/${encodeURIComponent(id)}/accept`),
   reject: (id: string, reason?: string) => api.post(`/appointments/${encodeURIComponent(id)}/reject`, { reason }),

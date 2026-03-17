@@ -272,6 +272,7 @@ export interface LawyerFilterOptions {
   latitude?: number;
   longitude?: number;
   radius?: number;
+  clientPincode?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
 }

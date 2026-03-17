@@ -18,7 +18,11 @@ import { socketService } from '../../services/socket';
 
 const normalizeErrorMessage = (value: unknown): string => {
   if (!value) return 'Call failed.';
-  if (typeof value === 'string') return value;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed || trimmed === '[object Object]') return 'Call failed.';
+    return trimmed;
+  }
   if (typeof value === 'number' || typeof value === 'boolean') return String(value);
   if (Array.isArray(value)) {
     const parts = value.map((v) => normalizeErrorMessage(v)).filter(Boolean);
@@ -44,6 +48,9 @@ const normalizeErrorMessage = (value: unknown): string => {
 
 const mapDailyMessage = (raw: string): string => {
   const msg = raw.toLowerCase();
+  if (msg.includes('[object object]')) {
+    return 'Unable to connect the call right now. Please try again.';
+  }
   if (msg.includes('missing payment method')) {
     return 'Daily account is missing a payment method. Add billing in Daily dashboard to enable calls.';
   }
@@ -263,7 +270,13 @@ export const VideoCallScreen: React.FC<{ navigation: any; route: any }> = ({ nav
 
         frame.on('joined-meeting', () => post('joined'));
         frame.on('left-meeting', () => post('left'));
-        frame.on('error', (e) => post('error', { message: e }));
+        frame.on('error', (e) => {
+          const message =
+            (e && (e.errorMsg || e.error || e.message)) ||
+            (typeof e === 'string' ? e : null) ||
+            (e ? JSON.stringify(e) : 'Daily call error');
+          post('error', { message });
+        });
 
         await frame.join({
           url: meetingLink,

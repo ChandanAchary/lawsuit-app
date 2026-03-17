@@ -33,6 +33,10 @@ export const useLawyerStore = create<LawyerState>((set) => ({
       if (filters?.location) params.city = filters.location;
       if (filters?.maxFee) params.maxFee = filters.maxFee;
       if (filters?.language) params.languages = filters.language;
+      if (typeof filters?.latitude === 'number') params.latitude = filters.latitude;
+      if (typeof filters?.longitude === 'number') params.longitude = filters.longitude;
+      if (typeof filters?.radius === 'number') params.radiusKm = filters.radius;
+      if (filters?.clientPincode) params.clientPincode = filters.clientPincode;
       if (filters?.sortBy) params.sortBy = filters.sortBy;
       if (filters?.sortOrder) params.order = filters.sortOrder;
       const { data } = await lawyersApi.getAll(params);
