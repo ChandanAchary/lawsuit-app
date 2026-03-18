@@ -50,20 +50,37 @@ export const useLawyerStore = create<LawyerState>((set) => ({
         if (l.location) locs.add(l.location);
         (l.languages || []).forEach((lang: string) => langs.add(lang));
       });
+
+      const mappedLawyers = items.map((l: any) => ({
+        ...l,
+        avatar: l.avatar || l.avatarUrl || (l.user && (l.user.avatar || l.user.avatarUrl)) || undefined,
+        specialization: l.specializations || l.specialization || [],
+        experienceYears: Number(l.experienceYears ?? l.experience ?? 0),
+        location: [l.city, l.state].filter(Boolean).join(', ') || l.location || l.address || '',
+        // feePerConsultation is stored in paise — convert to rupees
+        fee: l.feePerConsultation != null ? Number(l.feePerConsultation) / 100 : (Number(l.fee) || 0),
+        reviewsCount: l.totalReviews || l.reviewsCount || 0,
+        rating: Number(l.rating ?? l.avgRating ?? 0),
+        bio: l.bio || null,
+        organisation: l.organisation || null,
+        barCouncil: l.barCouncil || null,
+      }));
+
+      // Fallback sort on client to keep list stable even if backend sort is inconsistent.
+      const sortBy = filters?.sortBy;
+      const sortOrder = filters?.sortOrder || 'desc';
+      if (sortBy === 'experience') {
+        mappedLawyers.sort((a: any, b: any) => sortOrder === 'asc'
+          ? a.experienceYears - b.experienceYears
+          : b.experienceYears - a.experienceYears);
+      } else if (sortBy === 'rating') {
+        mappedLawyers.sort((a: any, b: any) => sortOrder === 'asc' ? a.rating - b.rating : b.rating - a.rating);
+      } else if (sortBy === 'fee') {
+        mappedLawyers.sort((a: any, b: any) => sortOrder === 'asc' ? a.fee - b.fee : b.fee - a.fee);
+      }
+
       set({
-        lawyers: items.map((l: any) => ({
-          ...l,
-          avatar: l.avatar || l.avatarUrl || (l.user && (l.user.avatar || l.user.avatarUrl)) || undefined,
-          specialization: l.specializations || l.specialization || [],
-          location: [l.city, l.state].filter(Boolean).join(', ') || l.location || l.address || '',
-          // feePerConsultation is stored in paise — convert to rupees
-          fee: l.feePerConsultation != null ? Number(l.feePerConsultation) / 100 : (l.fee || 0),
-          reviewsCount: l.totalReviews || l.reviewsCount || 0,
-          rating: l.rating || l.avgRating || 0,
-          bio: l.bio || null,
-          organisation: l.organisation || null,
-          barCouncil: l.barCouncil || null,
-        })),
+        lawyers: mappedLawyers,
         total: data.total || items.length,
         page,
         limit,
