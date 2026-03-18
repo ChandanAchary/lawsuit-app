@@ -1,12 +1,14 @@
 import {  useThemeStore , useColors } from '../../stores/themeStore';
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS, COLORS as STATIC_COLORS } from '../../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { modelChatApi } from '../../services/api';
 import Markdown from 'react-native-markdown-display';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuthStore } from '../../stores/authStore';
 
 interface Message {
   id: string;
@@ -21,40 +23,96 @@ const SUGGESTIONS = [
   'What is bail and how to apply?',
 ];
 
+const AI_CHAT_HISTORY_KEY_PREFIX = 'ai_chat_history_v1';
+const MAX_HISTORY_MESSAGES = 100;
+
 export const AiChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
+  const userId = useAuthStore((s: any) => s.user?.id ?? 'guest');
   const COLORS = useColors();
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+  const markdownStyles = React.useMemo(() => getMarkdownStyles(COLORS), [isDark]);
+  const historyKey = `${AI_CHAT_HISTORY_KEY_PREFIX}:${userId}`;
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [historyReady, setHistoryReady] = useState(false);
   const flatRef = useRef<FlatList>(null);
+  const messagesRef = useRef<Message[]>([]);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadHistory = async () => {
+      try {
+        const raw = await AsyncStorage.getItem(historyKey);
+        if (!mounted) return;
+        if (!raw) {
+          setMessages([]);
+          return;
+        }
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          const sanitized = parsed
+            .filter((m: any) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+            .slice(-MAX_HISTORY_MESSAGES);
+          setMessages(sanitized);
+        } else {
+          setMessages([]);
+        }
+      } catch {
+        setMessages([]);
+      } finally {
+        if (mounted) setHistoryReady(true);
+      }
+    };
+
+    setHistoryReady(false);
+    loadHistory();
+    return () => {
+      mounted = false;
+    };
+  }, [historyKey]);
+
+  useEffect(() => {
+    if (!historyReady) return;
+    AsyncStorage.setItem(historyKey, JSON.stringify(messages.slice(-MAX_HISTORY_MESSAGES))).catch(() => {});
+  }, [historyReady, historyKey, messages]);
 
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || loading) return;
     const userMsg: Message = { id: Date.now().toString(), role: 'user', content: text.trim() };
-    setMessages((prev) => [...prev, userMsg]);
+    const nextHistory = [...messagesRef.current, userMsg].slice(-MAX_HISTORY_MESSAGES);
+    messagesRef.current = nextHistory;
+    setMessages(nextHistory);
     setInput('');
     setLoading(true);
     try {
-      const history = [...messages, userMsg].map((m) => ({ role: m.role, content: m.content }));
+      const history = nextHistory.map((m) => ({ role: m.role, content: m.content }));
       const { data } = await modelChatApi.chatCompletion(history);
       const assistantMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: data.response || data.message || data.reply || 'I could not generate a response.',
       };
-      setMessages((prev) => [...prev, assistantMsg]);
+      setMessages((prev) => {
+        const updated = [...prev, assistantMsg].slice(-MAX_HISTORY_MESSAGES);
+        messagesRef.current = updated;
+        return updated;
+      });
     } catch {
       setMessages((prev) => [
-        ...prev,
+        ...prev.slice(-(MAX_HISTORY_MESSAGES - 1)),
         { id: (Date.now() + 1).toString(), role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' },
       ]);
     } finally {
       setLoading(false);
     }
-  }, [messages, loading]);
+  }, [loading]);
 
   const renderMessage = ({ item }: { item: Message }) => {
     const isUser = item.role === 'user';
@@ -160,15 +218,25 @@ export const AiChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   );
 };
 
-const markdownStyles = StyleSheet.create({
-  body: { fontSize: FONT_SIZE.md, color: STATIC_COLORS.text, lineHeight: 22 },
-  heading1: { fontSize: FONT_SIZE.xl, fontWeight: '800' as any, marginBottom: 8 },
-  heading2: { fontSize: FONT_SIZE.lg, fontWeight: '700' as any, marginBottom: 6 },
-  paragraph: { marginBottom: 8 },
-  list_item: { marginBottom: 4 },
-  code_inline: { backgroundColor: STATIC_COLORS.surfaceAlt, paddingHorizontal: 4, borderRadius: 4, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
-  fence: { backgroundColor: STATIC_COLORS.surfaceAlt, padding: 12, borderRadius: 8, marginVertical: 8 },
-  strong: { fontWeight: '700' as any },
+const getMarkdownStyles = (COLORS: any) => StyleSheet.create({
+  body: { fontSize: FONT_SIZE.md, color: COLORS.text, lineHeight: 22 },
+  heading1: { fontSize: FONT_SIZE.xl, fontWeight: '800' as any, marginBottom: 8, color: COLORS.text },
+  heading2: { fontSize: FONT_SIZE.lg, fontWeight: '700' as any, marginBottom: 6, color: COLORS.text },
+  heading3: { fontSize: FONT_SIZE.md, fontWeight: '700' as any, marginBottom: 6, color: COLORS.text },
+  paragraph: { marginBottom: 8, color: COLORS.text },
+  bullet_list: { color: COLORS.text },
+  ordered_list: { color: COLORS.text },
+  list_item: { marginBottom: 4, color: COLORS.text },
+  text: { color: COLORS.text },
+  code_inline: {
+    backgroundColor: COLORS.surfaceAlt,
+    color: COLORS.text,
+    paddingHorizontal: 4,
+    borderRadius: 4,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  fence: { backgroundColor: COLORS.surfaceAlt, color: COLORS.text, padding: 12, borderRadius: 8, marginVertical: 8 },
+  strong: { fontWeight: '700' as any, color: COLORS.text },
 }) as any;
 
 const getStyles = (COLORS: any) => StyleSheet.create({
