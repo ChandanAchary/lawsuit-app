@@ -13,6 +13,7 @@ type RoleChoice = 'CLIENT' | 'LAWYER';
 
 export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
+  const { setMode: setThemeMode } = useThemeStore();
   const COLORS = useColors();
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
 
@@ -23,6 +24,10 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { login, isLoading, error, clearError } = useAuthStore();
 
   const [localError, setLocalError] = useState('');
+
+  const handleThemeToggle = () => {
+    setThemeMode(isDark ? 'light' : 'dark');
+  };
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -43,8 +48,12 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   if (!selectedRole) {
     return (
       <View style={styles.container}>
-        <StatusBar barStyle="dark-content" />
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
         <View style={styles.roleScreen}>
+          <TouchableOpacity style={styles.themeBtn} onPress={handleThemeToggle}>
+            <Ionicons name={isDark ? 'moon-outline' : 'sunny-outline'} size={20} color={COLORS.text} />
+          </TouchableOpacity>
+
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={24} color={COLORS.text} />
           </TouchableOpacity>
@@ -103,12 +112,16 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <ScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        <TouchableOpacity style={styles.themeBtn} onPress={handleThemeToggle}>
+          <Ionicons name={isDark ? 'moon-outline' : 'sunny-outline'} size={20} color={COLORS.text} />
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.backBtn} onPress={() => setSelectedRole(null)}>
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
@@ -188,8 +201,19 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 const getStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   scroll: { flexGrow: 1, paddingHorizontal: SPACING.xxl, paddingBottom: SPACING.xxxl },
-  backBtn: {
+  themeBtn: {
     marginTop: SPACING.huge,
+    alignSelf: 'flex-end',
+    width: 44,
+    height: 44,
+    borderRadius: BORDER_RADIUS.lg,
+    backgroundColor: COLORS.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...SHADOWS.sm,
+  },
+  backBtn: {
+    marginTop: SPACING.md,
     width: 44,
     height: 44,
     borderRadius: BORDER_RADIUS.lg,

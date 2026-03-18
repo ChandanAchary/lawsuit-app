@@ -322,6 +322,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ chatId, participants = [] }) =
           placeholder="Type a message..."
           placeholderTextColor={COLORS.textMuted}
           multiline
+          textAlignVertical="center"
           maxLength={2000}
         />
         <TouchableOpacity
@@ -386,7 +387,7 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     padding: SPACING.md,
-    paddingBottom: SPACING.lg,
+    paddingBottom: Platform.OS === 'ios' ? SPACING.lg : SPACING.sm,
     backgroundColor: COLORS.white,
     borderTopWidth: 1,
     borderTopColor: COLORS.borderLight,
@@ -397,9 +398,11 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     backgroundColor: COLORS.surfaceAlt,
     borderRadius: BORDER_RADIUS.xl,
     paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
+    paddingVertical: Platform.OS === 'ios' ? SPACING.md : SPACING.sm + 2,
     fontSize: FONT_SIZE.md,
+    lineHeight: 20,
     maxHeight: 100,
+    minHeight: 44,
     color: COLORS.text,
   },
   sendBtn: {

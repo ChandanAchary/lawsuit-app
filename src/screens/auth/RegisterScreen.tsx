@@ -27,6 +27,7 @@ const getPasswordStrength = (pw: string, COLORS: any): { label: string; color: s
 
 export const RegisterScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
+  const { setMode: setThemeMode } = useThemeStore();
   const COLORS = useColors();
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
 
@@ -43,6 +44,10 @@ export const RegisterScreen: React.FC<{ navigation: any; route: any }> = ({ navi
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const { register, requestOtp, applyReferral, isLoading, clearError } = useAuthStore();
+
+  const handleThemeToggle = () => {
+    setThemeMode(isDark ? 'light' : 'dark');
+  };
 
   // Auto-fill referral code from deep link params
   useEffect(() => {
@@ -125,6 +130,10 @@ export const RegisterScreen: React.FC<{ navigation: any; route: any }> = ({ navi
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          <TouchableOpacity style={styles.themeBtn} onPress={handleThemeToggle}>
+            <Ionicons name={isDark ? 'moon-outline' : 'sunny-outline'} size={20} color={COLORS.text} />
+          </TouchableOpacity>
+
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={24} color={COLORS.text} />
           </TouchableOpacity>
@@ -263,6 +272,10 @@ export const RegisterScreen: React.FC<{ navigation: any; route: any }> = ({ navi
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        <TouchableOpacity style={styles.themeBtn} onPress={handleThemeToggle}>
+          <Ionicons name={isDark ? 'moon-outline' : 'sunny-outline'} size={20} color={COLORS.text} />
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.backBtn} onPress={() => setStep('info')}>
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
@@ -359,8 +372,19 @@ export const RegisterScreen: React.FC<{ navigation: any; route: any }> = ({ navi
 const getStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   scroll: { flexGrow: 1, paddingHorizontal: SPACING.xxl, paddingBottom: SPACING.xxxl },
-  backBtn: {
+  themeBtn: {
     marginTop: SPACING.huge,
+    alignSelf: 'flex-end',
+    width: 44,
+    height: 44,
+    borderRadius: BORDER_RADIUS.lg,
+    backgroundColor: COLORS.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...SHADOWS.sm,
+  },
+  backBtn: {
+    marginTop: SPACING.md,
     width: 44,
     height: 44,
     borderRadius: BORDER_RADIUS.lg,

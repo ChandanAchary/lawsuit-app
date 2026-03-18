@@ -2,7 +2,7 @@ import {  useThemeStore , useColors } from '../../stores/themeStore';
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput,
-  Alert, ActivityIndicator, Modal, Switch, KeyboardAvoidingView, Platform,
+  Alert, ActivityIndicator, Modal, Switch, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
@@ -224,8 +224,13 @@ export const BankAccountsScreen: React.FC<{ navigation: any }> = ({ navigation }
       )}
 
       {/* Add Account Modal */}
-      <Modal visible={modalVisible} animationType="slide" transparent>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
+      <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={() => setModalVisible(false)}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+          style={styles.modalOverlay}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
           <View style={styles.modalContainer}>
             {/* Modal Header */}
             <View style={styles.modalHeader}>
@@ -254,7 +259,12 @@ export const BankAccountsScreen: React.FC<{ navigation: any }> = ({ navigation }
               ))}
             </View>
 
-            <ScrollView style={styles.modalScroll} contentContainerStyle={{ paddingBottom: 24 }}>
+            <ScrollView
+              style={styles.modalScroll}
+              contentContainerStyle={styles.modalScrollContent}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+            >
               {activeTab === 'BANK' ? (
                 <>
                   <FieldInput COLORS={COLORS} label="Account Holder Name" value={holderName} onChangeText={setHolderName} placeholder="Full name" />
@@ -267,7 +277,7 @@ export const BankAccountsScreen: React.FC<{ navigation: any }> = ({ navigation }
                 </>
               ) : (
                 <>
-                  <FieldInput COLORS={COLORS} label="UPI ID" value={upiId} onChangeText={(t) => { setUpiId(t); setUpiVerified(false); }} placeholder="name@upi" />
+                  <FieldInput COLORS={COLORS} label="UPI ID" value={upiId} onChangeText={(t: string) => { setUpiId(t); setUpiVerified(false); }} placeholder="name@upi" />
                   <TouchableOpacity
                     style={[styles.verifyBtn, upiVerified && styles.verifyBtnDone]}
                     onPress={handleVerifyUpi} disabled={verifyingUpi || upiVerified}
@@ -300,6 +310,7 @@ export const BankAccountsScreen: React.FC<{ navigation: any }> = ({ navigation }
               )}
             </TouchableOpacity>
           </View>
+          </TouchableWithoutFeedback>
         </KeyboardAvoidingView>
       </Modal>
     </View>
@@ -357,7 +368,7 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: COLORS.overlay, justifyContent: 'flex-end' },
   modalContainer: {
     backgroundColor: COLORS.white, borderTopLeftRadius: BORDER_RADIUS.xxl,
-    borderTopRightRadius: BORDER_RADIUS.xxl, maxHeight: '85%',
+    borderTopRightRadius: BORDER_RADIUS.xxl, maxHeight: '92%',
   },
   modalHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
@@ -374,6 +385,7 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   tabText: { fontSize: FONT_SIZE.sm, fontWeight: '600', color: COLORS.textSecondary },
   tabTextActive: { color: COLORS.white },
   modalScroll: { paddingHorizontal: SPACING.xl },
+  modalScrollContent: { paddingBottom: 24, flexGrow: 1 },
   verifyBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.sm,
     backgroundColor: COLORS.primary, paddingVertical: SPACING.md,
