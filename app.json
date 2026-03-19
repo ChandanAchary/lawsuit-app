@@ -92,11 +92,11 @@
     "runtimeVersion": {
       "policy": "sdkVersion"
     },
+    "owner": "chandanmatru",
     "extra": {
       "eas": {
-        "projectId": "df59adf1-1f7e-4175-8c41-34ed1d6e48a2"
+        "projectId": "9518db8b-6469-4bc2-8d22-d470212bffce"
       }
-    },
-    "owner": "msdchandan"
+    }
   }
 }
