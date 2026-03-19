@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { authApi, referralApi } from '../services/api';
+import { authApi, referralApi, usersApi } from '../services/api';
 import { storage } from '../services/storage';
 import { User, UserRole } from '../types';
 import { registerPushToken, unregisterPushToken } from '../utils/pushNotifications';
@@ -16,6 +16,7 @@ interface AuthState {
   requestOtp: (identifier: string) => Promise<void>;
   resetPassword: (identifier: string, code: string, password: string) => Promise<void>;
   applyReferral: (code: string) => Promise<void>;
+  deleteAccount: () => Promise<void>;
   logout: () => Promise<void>;
   restoreSession: () => Promise<void>;
   setUser: (user: User) => void;
@@ -110,6 +111,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ isLoading: false });
     } catch (err: any) {
       set({ error: err.response?.data?.error || err.response?.data?.message || 'Failed to apply referral', isLoading: false });
+      throw err;
+    }
+  },
+
+  deleteAccount: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      await usersApi.deleteMe();
+      // Unregister push token (non-blocking)
+      void unregisterPushToken();
+      await storage.clear();
+      set({ user: null, token: null, isAuthenticated: false, isLoading: false, error: null });
+    } catch (err: any) {
+      const msg = err.response?.data?.error || err.response?.data?.message || 'Failed to delete account';
+      set({ error: msg, isLoading: false });
       throw err;
     }
   },

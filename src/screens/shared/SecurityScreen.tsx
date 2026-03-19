@@ -2,7 +2,7 @@ import {  useThemeStore , useColors } from '../../stores/themeStore';
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  KeyboardAvoidingView, Platform, Animated,
+  KeyboardAvoidingView, Platform, Animated, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
@@ -18,7 +18,7 @@ export const SecurityScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   const COLORS = useColors();
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
 
-  const { user, requestOtp, resetPassword } = useAuthStore();
+  const { user, requestOtp, resetPassword, deleteAccount } = useAuthStore();
 
   const [step, setStep] = useState<Step>('send');
   const [otp, setOtp] = useState('');
@@ -27,6 +27,7 @@ export const SecurityScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   const [showNewPw, setShowNewPw] = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [error, setError] = useState('');
   const [resendTimer, setResendTimer] = useState(0);
 
@@ -123,6 +124,31 @@ export const SecurityScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   const verificationLabel =
     user?.isVerified === true ? 'Verified' : 'Pending';
 
+  const confirmDeleteAccount = () => {
+    Alert.alert(
+      'Delete account permanently?',
+      'This action is irreversible. Your profile and all related data will be permanently deleted.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Account',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleteLoading(true);
+            setError('');
+            try {
+              await deleteAccount();
+            } catch (err: any) {
+              setError(formatErrorMessage(err));
+            } finally {
+              setDeleteLoading(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.flex}
@@ -133,7 +159,7 @@ export const SecurityScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={20} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Security</Text>
+        <Text style={styles.headerTitle}>Security & Account</Text>
         <View style={{ width: 36 }} />
       </View>
 
@@ -286,6 +312,23 @@ export const SecurityScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
               {user?.role ?? '—'}
             </Text>
           </View>
+
+          <View style={styles.divider} />
+
+          <View style={styles.deleteWrap}>
+            <Text style={styles.deleteTitle}>Delete Account</Text>
+            <Text style={styles.deleteDesc}>
+              Permanently remove your account and all associated data from LawSoft.
+            </Text>
+            <Button
+              title={deleteLoading ? 'Deleting...' : 'Delete Account'}
+              variant="outline"
+              onPress={confirmDeleteAccount}
+              loading={deleteLoading}
+              disabled={deleteLoading}
+              style={styles.deleteBtn}
+            />
+          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -365,4 +408,23 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   divider: { height: 1, backgroundColor: COLORS.border },
   infoLabel: { fontSize: FONT_SIZE.md, color: COLORS.textMuted },
   infoValue: { fontSize: FONT_SIZE.md, fontWeight: '700' },
+
+  deleteWrap: {
+    paddingTop: SPACING.lg,
+    gap: SPACING.sm,
+  },
+  deleteTitle: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '700',
+    color: COLORS.error,
+  },
+  deleteDesc: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textSecondary,
+    lineHeight: 20,
+  },
+  deleteBtn: {
+    borderColor: COLORS.error,
+    marginTop: SPACING.xs,
+  },
 });

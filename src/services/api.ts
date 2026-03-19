@@ -157,7 +157,15 @@ export const casesApi = {
     api.post(`/cases/${encodeURIComponent(caseId)}/tasks`, data),
   updateTask: (taskId: string, data: Record<string, unknown>) =>
     api.put(`/cases/tasks/${encodeURIComponent(taskId)}`, data),
-  closeCase: (caseId: string, data: { settlementAmount?: number; settlementTerms?: string; closureNotes?: string }) =>
+  closeCase: (
+    caseId: string,
+    data: {
+      status: 'CLOSED' | 'WON' | 'LOST' | 'SETTLED';
+      settlementAmount?: number;
+      settlementTerms?: string;
+      closureNotes?: string;
+    },
+  ) =>
     api.post(`/cases/${encodeURIComponent(caseId)}/close`, data),
   getAllCases: () => api.get('/cases/getall/cases'),
   createByLawyer: (data: Record<string, unknown>) => api.post('/cases/create/case/details/lawyer', data),
@@ -173,6 +181,7 @@ export const casesApi = {
 export const usersApi = {
   getMe: () => api.get('/users/me'),
   updateMe: (data: Record<string, unknown>) => api.put('/users/me', data),
+  deleteMe: () => api.delete('/users/me'),
   getPresignedUrl: (fileName: string, mimeType: string) =>
     api.post('/users/presigned-url', { fileName, mimeType }),
   getUploadSignature: () => api.get('/users/me/upload-signature'),

@@ -12,6 +12,8 @@ interface ThemeStore {
   init: () => Promise<void>;
 }
 
+let themeSubscription: { remove: () => void } | null = null;
+
 const resolveIsDark = (mode: ThemeMode): boolean => {
   if (mode === 'system') return Appearance.getColorScheme() === 'dark';
   return mode === 'dark';
@@ -35,16 +37,15 @@ export const useThemeStore = create<ThemeStore>((set, get) => ({
       const mode = (stored as ThemeMode) || 'system';
       const isDark = resolveIsDark(mode);
       set({ mode, isDark });
-      
-      // Handle system theme changes
-      const subscription = Appearance.addChangeListener(({ colorScheme }) => {
+
+      // Re-register listener safely when init is called multiple times.
+      themeSubscription?.remove();
+      themeSubscription = Appearance.addChangeListener(({ colorScheme }) => {
         const current = get().mode;
         if (current === 'system') {
           set({ isDark: colorScheme === 'dark' });
         }
       });
-      
-      return () => subscription.remove();
     } catch (error) {
       console.error('Failed to initialize theme:', error);
     }
