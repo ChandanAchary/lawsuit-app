@@ -92,10 +92,10 @@
     "runtimeVersion": {
       "policy": "sdkVersion"
     },
-    "owner": "chandanmatru",
+    "owner": "expo-chandan",
     "extra": {
       "eas": {
-        "projectId": "9518db8b-6469-4bc2-8d22-d470212bffce"
+        "projectId": "a9f2b168-45a9-4dc7-a22e-b491ecd190ff"
       }
     }
   }

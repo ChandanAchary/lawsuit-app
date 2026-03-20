@@ -28,7 +28,8 @@ export const SecurityScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   const [showConfirmPw, setShowConfirmPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [deleteError, setDeleteError] = useState('');
   const [resendTimer, setResendTimer] = useState(0);
 
   // Toast state
@@ -57,14 +58,14 @@ export const SecurityScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
 
   const handleSendOtp = async () => {
     if (!user?.email) return;
-    setError('');
+    setPasswordError('');
     setLoading(true);
     try {
       await requestOtp(user.email);
       showToast('OTP sent to your email');
       setStep('reset');
     } catch (err: any) {
-      setError(formatErrorMessage(err));
+      setPasswordError(formatErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -72,14 +73,14 @@ export const SecurityScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
 
   const handleResendOtp = async () => {
     if (!user?.email) return;
-    setError('');
+    setPasswordError('');
     setLoading(true);
     try {
       await requestOtp(user.email);
       setResendTimer(30);
       showToast('OTP resent to your email');
     } catch (err: any) {
-      setError(formatErrorMessage(err));
+      setPasswordError(formatErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -87,17 +88,17 @@ export const SecurityScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
 
   const handleResetPassword = async () => {
     if (!user?.email) return;
-    setError('');
+    setPasswordError('');
     if (!otp.trim() || otp.length < 6) {
-      setError('Please enter the 6-digit OTP.');
+      setPasswordError('Please enter the 6-digit OTP.');
       return;
     }
     if (newPassword.length < 8) {
-      setError('Password must be at least 8 characters.');
+      setPasswordError('Password must be at least 8 characters.');
       return;
     }
     if (newPassword !== confirmPassword) {
-      setError('Passwords do not match.');
+      setPasswordError('Passwords do not match.');
       return;
     }
     setLoading(true);
@@ -109,7 +110,7 @@ export const SecurityScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
       setNewPassword('');
       setConfirmPassword('');
     } catch (err: any) {
-      setError(formatErrorMessage(err));
+      setPasswordError(formatErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -135,11 +136,11 @@ export const SecurityScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
           style: 'destructive',
           onPress: async () => {
             setDeleteLoading(true);
-            setError('');
+            setDeleteError('');
             try {
               await deleteAccount();
             } catch (err: any) {
-              setError(formatErrorMessage(err));
+              setDeleteError(formatErrorMessage(err));
             } finally {
               setDeleteLoading(false);
             }
@@ -193,7 +194,7 @@ export const SecurityScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
                 We'll send a one-time code to your registered email to verify your identity.
               </Text>
               <Text style={styles.emailText}>{user?.email}</Text>
-              {error ? <Text style={styles.errorText}>{error}</Text> : null}
+              {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
               <Button
                 title="Send OTP"
                 onPress={handleSendOtp}
@@ -209,7 +210,7 @@ export const SecurityScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
                 {' '}and set your new password.
               </Text>
 
-              {error ? <Text style={styles.errorText}>{error}</Text> : null}
+              {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
 
               <Input
                 label="OTP"
@@ -272,7 +273,7 @@ export const SecurityScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
                 <Button
                   title="Back"
                   variant="outline"
-                  onPress={() => { setStep('send'); setError(''); setOtp(''); setNewPassword(''); setConfirmPassword(''); }}
+                  onPress={() => { setStep('send'); setPasswordError(''); setOtp(''); setNewPassword(''); setConfirmPassword(''); }}
                   style={styles.btnHalf}
                 />
                 <Button
@@ -320,6 +321,7 @@ export const SecurityScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
             <Text style={styles.deleteDesc}>
               Permanently remove your account and all associated data from LawSoft.
             </Text>
+            {deleteError ? <Text style={styles.errorText}>{deleteError}</Text> : null}
             <Button
               title={deleteLoading ? 'Deleting...' : 'Delete Account'}
               variant="outline"
