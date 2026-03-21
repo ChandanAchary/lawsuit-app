@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { notificationsApi } from '../services/api';
 import { socketService } from '../services/socket';
-import { Notification } from '../types';
+import { Notification, NotificationType } from '../types';
+import { presentDomainNotification } from '../utils/localNotifications';
 
 interface NotificationState {
   notifications: Notification[];
@@ -110,6 +111,9 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       unreadCount: s.unreadCount + 1,
       toast: n,
     }));
+    if (n.type !== NotificationType.NEW_MESSAGE) {
+      void presentDomainNotification(n);
+    }
     setTimeout(() => set({ toast: null }), 4000);
   },
 

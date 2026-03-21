@@ -4,13 +4,14 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { formatErrorMessage } from '../../utils/formatError';
 import { Lawyer, AvailabilitySlot } from '../../types';
 import { lawyersApi, appointmentsApi } from '../../services/api';
 import { API_URL } from '../../constants';
 import { useWalletStore } from '../../stores/walletStore';
 import { useAuthStore } from '../../stores/authStore';
+import { useThemeStore, useColors } from '../../stores/themeStore';
 import { format, addDays } from 'date-fns';
 import { Button } from '../../components/Button';
 import { BottomSheet } from '../../components/Modals';
@@ -21,6 +22,9 @@ const { width } = Dimensions.get('window');
 
 export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
   const { lawyerId } = route.params;
+  const isDark = useThemeStore((s: any) => s.isDark);
+  const COLORS = useColors();
+  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
   const [lawyer, setLawyer] = useState<Lawyer | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -177,7 +181,7 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
       } else {
         scheduledAt = new Date(`${format(selectedDate, 'yyyy-MM-dd')}T${selectedSlot}`).toISOString();
       }
-      const { data } = await appointmentsApi.book({ lawyerId: lawyer.id, scheduledAt });
+      const { data } = await appointmentsApi.book({ lawyerId: lawyer.id, scheduledAt, paymentMethod });
       const appointment = data.appointment || data.data || data;
       const appointmentId = appointment?.id || data?.id;
 
@@ -187,7 +191,13 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
         navigation.goBack();
       } else {
         // Razorpay payment flow
-        const orderId = appointment?.payment?.razorpayOrderId || data?.orderId || data?.order?.id;
+        const payment = data?.payment || appointment?.payment || {};
+        const orderId =
+          payment?.providerOrderId ||
+          payment?.razorpayOrderId ||
+          payment?.metadata?.providerOrder?.id ||
+          data?.orderId ||
+          data?.order?.id;
         if (!orderId) {
           Alert.alert('Booked', 'Appointment created. Payment order unavailable — pay from wallet or try again.');
           setShowBooking(false);
@@ -218,6 +228,7 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
     try {
       if (pendingAppointmentId) {
         await appointmentsApi.confirmRazorpay(pendingAppointmentId, {
+          appointmentId: pendingAppointmentId,
           razorpay_order_id: result.razorpay_order_id,
           razorpay_payment_id: result.razorpay_payment_id,
           razorpay_signature: result.razorpay_signature,
@@ -600,7 +611,7 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: {

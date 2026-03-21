@@ -15,17 +15,12 @@ import { Platform } from 'react-native';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import { getRecordingPermissionsAsync, requestRecordingPermissionsAsync } from 'expo-audio';
-import Constants, { ExecutionEnvironment } from 'expo-constants';
-
-const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
 let Notifications: any;
-if (!isExpoGo) {
-  try {
-    Notifications = require('expo-notifications');
-  } catch (e) {
-    console.warn("expo-notifications is not available in Expo Go.");
-  }
+try {
+  Notifications = require('expo-notifications');
+} catch {
+  console.warn('[Permissions] expo-notifications module is unavailable in this runtime.');
 }
 
 // ─── Notification Permission ──────────────────────────────────────────────────
@@ -84,6 +79,19 @@ export async function requestCameraPermission(): Promise<boolean> {
   }
 }
 
+// ─── Media Library Permission ─────────────────────────────────────────────────
+export async function requestMediaLibraryPermission(): Promise<boolean> {
+  try {
+    const { status: existing } = await ImagePicker.getMediaLibraryPermissionsAsync();
+    if (existing === 'granted') return true;
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    return status === 'granted';
+  } catch (err) {
+    console.warn('[Permissions] Media library permission failed:', err);
+    return false;
+  }
+}
+
 // ─── Microphone Permission ────────────────────────────────────────────────────
 export async function requestMicrophonePermission(): Promise<boolean> {
   try {
@@ -102,6 +110,7 @@ export async function requestAllPermissions(): Promise<void> {
   // Run sequentially so Android shows each dialog one at a time
   await requestNotificationPermission();
   await requestLocationPermission();
+  await requestMediaLibraryPermission();
   await requestCameraPermission();
   await requestMicrophonePermission();
 }

@@ -11,6 +11,12 @@ import { useNotificationStore } from './src/stores/notificationStore';
 import { AuthStack, MainStack } from './src/navigation';
 import { requestAllPermissions } from './src/utils/permissions';
 import { socketService } from './src/services/socket';
+import {
+  addNotificationResponseListener,
+  configureLocalNotificationChannel,
+  handleInitialNotificationNavigation,
+  presentIncomingCallNotification,
+} from './src/utils/localNotifications';
 
 // Suppress Expo OTA update errors permanently — we don't use OTA updates
 LogBox.ignoreLogs(['Failed to download remote update']);
@@ -89,6 +95,7 @@ export default function App() {
         await Promise.all([initTheme(), restoreSession()]);
         // Request all runtime permissions on first launch
         await requestAllPermissions().catch(() => {});
+        await configureLocalNotificationChannel().catch(() => {});
       } catch (error) {
         console.error('App initialization error:', error);
       } finally {
@@ -99,6 +106,20 @@ export default function App() {
   }, [initTheme, restoreSession]);
 
   useEffect(() => {
+    const navigateFromNotification = (target: { name: string; params?: Record<string, unknown> }) => {
+      if (!navigationRef.isReady()) return;
+      navigationRef.navigate(target.name as never, target.params as never);
+    };
+
+    void handleInitialNotificationNavigation(navigateFromNotification);
+    const unsubNotificationResponse = addNotificationResponseListener(navigateFromNotification);
+
+    return () => {
+      unsubNotificationResponse();
+    };
+  }, []);
+
+  useEffect(() => {
     if (isAuthenticated) {
       socketService.connect().catch(() => {});
       const cleanupNotifications = initSocketListeners();
@@ -107,6 +128,12 @@ export default function App() {
       const unsubIncomingCall = socketService.on('call:incoming', (payload: unknown) => {
         const call = payload as IncomingCall;
         if (!call?.from || !call?.roomId) return;
+        void presentIncomingCallNotification({
+          callerName: call.callerName,
+          callType: call.callType,
+          roomId: call.roomId,
+          chatId: call.chatId,
+        });
         setIncomingCall(call);
       });
 

@@ -15,25 +15,43 @@ import { Platform } from 'react-native';
 import { usersApi } from '../services/api';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 
-const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
-
 let Notifications: any;
-if (!isExpoGo) {
-  try {
-    Notifications = require('expo-notifications');
-    // Configure how notifications are presented while the app is foregrounded
-    Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowAlert: true,   // Kept for back-compat (SDK <0.28)
-        shouldShowBanner: true,  // SDK >=0.29
-        shouldShowList: true,    // SDK >=0.29
-        shouldPlaySound: true,
-        shouldSetBadge: true,
-      }),
-    });
-  } catch (e) {
-    console.warn("expo-notifications is not available in Expo Go.");
+try {
+  Notifications = require('expo-notifications');
+  // Configure how notifications are presented while the app is foregrounded
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,   // Kept for back-compat (SDK <0.28)
+      shouldShowBanner: true,  // SDK >=0.29
+      shouldShowList: true,    // SDK >=0.29
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    }),
+  });
+} catch {
+  console.warn('[Push] expo-notifications module is unavailable in this runtime.');
+}
+
+async function resolvePushToken(): Promise<string | null> {
+  if (!Notifications) return null;
+
+  if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) {
+    console.warn('[Push] Native push token is unavailable in Expo Go. Use a development build or release build.');
+    return null;
   }
+
+  // Preferred path for this backend: native device token (FCM/APNs)
+  try {
+    const tokenData = await Notifications.getDevicePushTokenAsync();
+    const token = tokenData?.data as string | undefined;
+    if (token) return token;
+  } catch (err) {
+    console.warn('[Push] Native token unavailable:', err);
+    console.warn('[Push] Native push token is required for this backend (FCM/APNs).');
+    return null;
+  }
+
+  return null;
 }
 
 /**
@@ -69,10 +87,12 @@ export async function registerPushToken(): Promise<void> {
       });
     }
 
-    // 3. Get native device token (FCM on Android, APNs on iOS)
-    const tokenData = await Notifications.getDevicePushTokenAsync();
-    const token: string = tokenData.data;
-    if (!token) return;
+    // 3. Resolve a usable push token
+    const token = await resolvePushToken();
+    if (!token) {
+      console.warn('[Push] No push token available for this device/runtime.');
+      return;
+    }
 
     // 4. Register with backend
     await usersApi.registerFcmToken(token);
@@ -90,8 +110,7 @@ export async function unregisterPushToken(): Promise<void> {
   if (!Notifications) return;
 
   try {
-    const tokenData = await Notifications.getDevicePushTokenAsync();
-    const token: string | undefined = tokenData?.data;
+    const token = await resolvePushToken();
     if (token) {
       await usersApi.removeFcmToken(token);
       console.log('[Push] Token unregistered');

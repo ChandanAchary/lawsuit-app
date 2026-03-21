@@ -14,6 +14,7 @@ import {  useThemeStore , useColors } from '../../stores/themeStore';
 import { Loading } from '../../components/Common';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
+import { requestMediaLibraryPermission } from '../../utils/permissions';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -30,6 +31,20 @@ export const LawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigation 
   const [lawyerInfo, setLawyerInfo] = useState<Record<string, any> | null>(null);
   const [stats, setStats] = useState({ casesWon: 0, clients: 0, rating: 0 });
   const [showAppearance, setShowAppearance] = useState(false);
+
+  const showPermissionSettingsAlert = (message: string) => {
+    Alert.alert('Permission Required', message, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Go to Settings',
+        onPress: () => {
+          Linking.openSettings().catch(() => {
+            Alert.alert('Error', 'Unable to open app settings');
+          });
+        },
+      },
+    ]);
+  };
 
   useEffect(() => { getUser(); fetchLawyerInfo(); fetchStats(); }, []);
 
@@ -58,6 +73,11 @@ export const LawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigation 
 
   const pickAndUploadAvatar = async () => {
     try {
+      const granted = await requestMediaLibraryPermission();
+      if (!granted) {
+        showPermissionSettingsAlert('Please allow photos/media access to upload profile photo.');
+        return;
+      }
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.7,
       });

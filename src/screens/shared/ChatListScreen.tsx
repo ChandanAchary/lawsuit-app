@@ -11,6 +11,7 @@ import { onChatSessionClosed, onChatSessionOpened } from '../../services/chatSyn
 import { useAuthStore } from '../../stores/authStore';
 import { Loading } from '../../components/Common';
 import { ChatMessage } from '../../types';
+import { presentChatMessageNotification } from '../../utils/localNotifications';
 
 export const ChatListScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
@@ -106,6 +107,16 @@ export const ChatListScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
     const unsubMsg = socketService.on('chat:message:new', (payload: unknown) => {
       const { message } = payload as { message: ChatMessage };
       if (!message) return;
+
+      if (message.senderId !== user?.id && activeChatRef.current !== message.chatId) {
+        void presentChatMessageNotification({
+          chatId: message.chatId,
+          senderName: 'Someone',
+          text: message.text,
+          messageId: message.id,
+        });
+      }
+
       setChats((prev) => {
         const idx = prev.findIndex((c) => c.id === message.chatId);
         if (idx === -1) {

@@ -18,6 +18,7 @@ import { Input } from '../../components/Input';
 import { Loading } from '../../components/Common';
 import { LocationPicker } from '../../components/LocationPicker';
 import { MultiSelectChips } from '../../components/MultiSelectChips';
+import { requestMediaLibraryPermission } from '../../utils/permissions';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -35,6 +36,20 @@ export const EditProfileScreen: React.FC<{ navigation: any }> = ({ navigation })
   const [uploadingDoc, setUploadingDoc] = useState<{ incomeProofUrl: boolean; casteProofUrl: boolean }>({ incomeProofUrl: false, casteProofUrl: false });
   const [clientInfo, setClientInfo] = useState<Record<string, any>>({});
   const [showDobPicker, setShowDobPicker] = useState(false);
+
+  const showPermissionSettingsAlert = (message: string) => {
+    Alert.alert('Permission Required', message, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Go to Settings',
+        onPress: () => {
+          Linking.openSettings().catch(() => {
+            Alert.alert('Error', 'Unable to open app settings');
+          });
+        },
+      },
+    ]);
+  };
 
   useEffect(() => { getUser(); fetchClientInfo(); }, []);
 
@@ -59,6 +74,11 @@ export const EditProfileScreen: React.FC<{ navigation: any }> = ({ navigation })
 
   const pickAndUploadAvatar = async () => {
     try {
+      const granted = await requestMediaLibraryPermission();
+      if (!granted) {
+        showPermissionSettingsAlert('Please allow photos/media access to upload profile photo.');
+        return;
+      }
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.7,
       });
@@ -86,6 +106,11 @@ export const EditProfileScreen: React.FC<{ navigation: any }> = ({ navigation })
 
   const pickAndUploadDocument = async (field: 'incomeProofUrl' | 'casteProofUrl') => {
     try {
+      const granted = await requestMediaLibraryPermission();
+      if (!granted) {
+        showPermissionSettingsAlert('Please allow photos/media access to upload documents.');
+        return;
+      }
       const result = await DocumentPicker.getDocumentAsync({
         type: ['image/*', 'application/pdf'],
         copyToCacheDirectory: true,

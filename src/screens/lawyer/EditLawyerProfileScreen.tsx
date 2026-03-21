@@ -17,6 +17,7 @@ import { Input } from '../../components/Input';
 import { Loading } from '../../components/Common';
 import { LocationPicker } from '../../components/LocationPicker';
 import { MultiSelectChips } from '../../components/MultiSelectChips';
+import { requestMediaLibraryPermission } from '../../utils/permissions';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -43,6 +44,20 @@ export const EditLawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigat
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [showFullPhoto, setShowFullPhoto] = useState(false);
+
+  const showPermissionSettingsAlert = (message: string) => {
+    Alert.alert('Permission Required', message, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Go to Settings',
+        onPress: () => {
+          Linking.openSettings().catch(() => {
+            Alert.alert('Error', 'Unable to open app settings');
+          });
+        },
+      },
+    ]);
+  };
 
   useEffect(() => { fetchLawyerInfo(); }, []);
 
@@ -86,6 +101,11 @@ export const EditLawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigat
 
   const uploadDocument = async (docKey: 'licenseProofUrl' | 'barCouncilProofUrl') => {
     try {
+      const granted = await requestMediaLibraryPermission();
+      if (!granted) {
+        showPermissionSettingsAlert('Please allow photos/media access to upload documents.');
+        return;
+      }
       const result = await DocumentPicker.getDocumentAsync({
         type: ['image/*', 'application/pdf'],
         copyToCacheDirectory: true,
@@ -161,6 +181,11 @@ export const EditLawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigat
 
   const pickAndUploadAvatar = async () => {
     try {
+      const granted = await requestMediaLibraryPermission();
+      if (!granted) {
+        showPermissionSettingsAlert('Please allow photos/media access to upload profile photo.');
+        return;
+      }
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.7,
       });

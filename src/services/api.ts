@@ -106,7 +106,7 @@ export const lawyersApi = {
 // ─── Appointments API ───────────────────────────────────────
 export const appointmentsApi = {
   create: (data: Record<string, unknown>) => api.post('/appointments', data),
-  book: (data: { lawyerId: string; scheduledAt: string; durationMins?: number; notes?: string }) =>
+  book: (data: { lawyerId: string; scheduledAt: string; durationMins?: number; notes?: string; paymentMethod?: 'wallet' | 'razorpay' }) =>
     api.post('/appointments/book', data),
   confirmPayment: (data: { appointmentId: string; razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) =>
     api.post('/appointments/confirm-payment', data),
@@ -125,7 +125,7 @@ export const appointmentsApi = {
   accept: (id: string) => api.post(`/appointments/${encodeURIComponent(id)}/accept`),
   reject: (id: string, reason?: string) => api.post(`/appointments/${encodeURIComponent(id)}/reject`, { reason }),
   complete: (id: string) => api.post(`/appointments/${encodeURIComponent(id)}/complete`),
-  confirmRazorpay: (id: string, data: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) =>
+  confirmRazorpay: (id: string, data: { appointmentId: string; razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) =>
     api.post(`/appointments/${encodeURIComponent(id)}/confirm-payment`, data),
   getAllAppointments: () => api.get('/appointments/getall'),
 };
