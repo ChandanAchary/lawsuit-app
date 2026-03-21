@@ -15,12 +15,17 @@ import { Platform } from 'react-native';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import { getRecordingPermissionsAsync, requestRecordingPermissionsAsync } from 'expo-audio';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
+
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
 let Notifications: any;
-try {
-  Notifications = require('expo-notifications');
-} catch {
-  console.warn('[Permissions] expo-notifications module is unavailable in this runtime.');
+if (!isExpoGo) {
+  try {
+    Notifications = require('expo-notifications');
+  } catch {
+    console.warn('[Permissions] expo-notifications module is unavailable in this runtime.');
+  }
 }
 
 // ─── Notification Permission ──────────────────────────────────────────────────

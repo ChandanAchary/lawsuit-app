@@ -1,11 +1,16 @@
 import { Platform } from 'react-native';
 import { Notification as AppNotification, NotificationType } from '../types';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
+
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
 let Notifications: any;
-try {
-  Notifications = require('expo-notifications');
-} catch {
-  Notifications = null;
+if (!isExpoGo) {
+  try {
+    Notifications = require('expo-notifications');
+  } catch {
+    Notifications = null;
+  }
 }
 
 const recentNotificationKeys = new Map<string, number>();

@@ -15,27 +15,31 @@ import { Platform } from 'react-native';
 import { usersApi } from '../services/api';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
 let Notifications: any;
-try {
-  Notifications = require('expo-notifications');
-  // Configure how notifications are presented while the app is foregrounded
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,   // Kept for back-compat (SDK <0.28)
-      shouldShowBanner: true,  // SDK >=0.29
-      shouldShowList: true,    // SDK >=0.29
-      shouldPlaySound: true,
-      shouldSetBadge: true,
-    }),
-  });
-} catch {
-  console.warn('[Push] expo-notifications module is unavailable in this runtime.');
+if (!isExpoGo) {
+  try {
+    Notifications = require('expo-notifications');
+    // Configure how notifications are presented while the app is foregrounded
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,   // Kept for back-compat (SDK <0.28)
+        shouldShowBanner: true,  // SDK >=0.29
+        shouldShowList: true,    // SDK >=0.29
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+      }),
+    });
+  } catch {
+    console.warn('[Push] expo-notifications module is unavailable in this runtime.');
+  }
 }
 
 async function resolvePushToken(): Promise<string | null> {
   if (!Notifications) return null;
 
-  if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) {
+  if (isExpoGo) {
     console.warn('[Push] Native push token is unavailable in Expo Go. Use a development build or release build.');
     return null;
   }

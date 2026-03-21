@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { walletApi } from '../services/api';
-import { WalletTransaction, TransactionType } from '../types';
+import { WalletTransaction } from '../types';
 
 interface WalletState {
   balance: number;
@@ -38,8 +38,11 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       const params: Record<string, unknown> = { page, limit };
       if (type) params.type = type;
       const { data } = await walletApi.getTransactions(params as any);
+      const incoming = data.items || data.transactions || [];
       set({
-        transactions: data.items || data.transactions || [],
+        transactions: page > 1
+          ? [...get().transactions, ...incoming.filter((next: WalletTransaction) => !get().transactions.some((prev) => prev.id === next.id))]
+          : incoming,
         totalTransactions: data.total || 0,
         currentPage: page,
         loading: false,

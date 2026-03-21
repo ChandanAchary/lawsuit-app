@@ -26,6 +26,24 @@ const TX_TABS = [
   { key: TransactionType.DEBIT, label: 'Debits' },
 ];
 
+const isCreditTransaction = (tx: WalletTransaction): boolean => {
+  if (tx.type === TransactionType.CREDIT || tx.type === TransactionType.REFUND) return true;
+  if (tx.type === TransactionType.TRANSFER) {
+    const description = String(tx.description || '').toLowerCase();
+    return description.includes('received') || description.includes('credited');
+  }
+  return false;
+};
+
+const isDebitTransaction = (tx: WalletTransaction): boolean => {
+  if (tx.type === TransactionType.DEBIT || tx.type === TransactionType.WITHDRAWAL || tx.type === TransactionType.PAYMENT) return true;
+  if (tx.type === TransactionType.TRANSFER) {
+    const description = String(tx.description || '').toLowerCase();
+    return description.includes('sent') || description.includes('debited') || !description.includes('received');
+  }
+  return false;
+};
+
 export const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
   const COLORS = useColors();
@@ -55,9 +73,11 @@ export const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     fetchTransactions(1);
   }, []);
 
-  useEffect(() => {
-    fetchTransactions(1, undefined, txTab === 'all' ? undefined : txTab);
-  }, [txTab]);
+  const filteredTransactions = React.useMemo(() => {
+    if (txTab === 'all') return transactions;
+    if (txTab === TransactionType.CREDIT) return transactions.filter(isCreditTransaction);
+    return transactions.filter(isDebitTransaction);
+  }, [transactions, txTab]);
 
   const handleAddMoney = async () => {
     const num = Number(amount);
@@ -153,8 +173,8 @@ export const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   };
 
   const loadMore = () => {
-    if (transactions.length < totalTransactions) {
-      fetchTransactions(currentPage + 1, undefined, txTab === 'all' ? undefined : txTab);
+    if (transactions.length < totalTransactions && !loading) {
+      fetchTransactions(currentPage + 1);
     }
   };
 
@@ -209,7 +229,7 @@ export const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
       {loading && transactions.length === 0 ? <Loading /> : (
         <FlatList
-          data={transactions}
+          data={filteredTransactions}
           keyExtractor={(t) => t.id}
           renderItem={renderTransaction}
           contentContainerStyle={styles.txList}
