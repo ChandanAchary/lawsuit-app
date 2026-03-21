@@ -74,7 +74,7 @@ export const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       setRazorpayOrder({
         orderId,
         amount: num * 100,
-        name: 'LawSuit',
+        name: 'NyayaX',
         description: 'Add money to wallet',
         prefillEmail: user?.email || '',
         prefillPhone: user?.phone || '',

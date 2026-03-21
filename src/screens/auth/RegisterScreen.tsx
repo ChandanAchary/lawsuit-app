@@ -140,7 +140,7 @@ export const RegisterScreen: React.FC<{ navigation: any; route: any }> = ({ navi
 
           <View style={styles.headerSection}>
             <Text style={styles.title}>Create Account</Text>
-            <Text style={styles.subtitle}>Join Lawsuit to access legal services</Text>
+            <Text style={styles.subtitle}>Join NyayaX to access legal services</Text>
           </View>
 
           {/* Step indicator */}

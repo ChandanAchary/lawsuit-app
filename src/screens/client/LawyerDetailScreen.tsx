@@ -197,7 +197,7 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
         setRazorpayOrder({
           orderId,
           amount: (lawyer.fee || 0) * 100,
-          name: 'LawSuit',
+          name: 'NyayaX',
           description: `Consultation with ${lawyer.name}`,
           prefillEmail: user?.email || '',
           prefillPhone: user?.phone || '',

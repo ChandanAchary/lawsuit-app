@@ -118,7 +118,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
       {/* Benefits */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Why Choose Lawsuit?</Text>
+        <Text style={styles.sectionTitle}>Why Choose NyayaX?</Text>
         {[
           { icon: 'shield-checkmark', title: 'Verified Lawyers', desc: 'All lawyers are thoroughly verified' },
           { icon: 'flash', title: 'Instant Booking', desc: 'Book appointments in seconds' },

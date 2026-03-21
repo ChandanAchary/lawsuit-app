@@ -59,7 +59,7 @@ export const ReferralScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   const handleShare = async () => {
     if (!code) return;
     await Share.share({
-      message: `Join Lawsuit - Your Legal Companion! Use my referral code: ${code}\n\nDownload and sign up to get started!`,
+      message: `Join NyayaX - Your Legal Companion! Use my referral code: ${code}\n\nDownload and sign up to get started!`,
     });
   };
 

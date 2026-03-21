@@ -32,7 +32,7 @@ export function buildRazorpayCheckoutHTML(options: RazorpayOrderOptions): string
     orderId,
     amount,
     currency = 'INR',
-    name = 'LawSuit',
+    name = 'NyayaX',
     description = 'Payment',
     prefillEmail = '',
     prefillPhone = '',
@@ -80,7 +80,7 @@ export function buildRazorpayCheckoutHTML(options: RazorpayOrderOptions): string
 </head>
 <body>
   <div class="loading" id="loadingDiv">
-    <h2>LawSuit</h2>
+    <h2>NyayaX</h2>
     <p>Initializing secure payment...</p>
   </div>
   <div class="error" id="errorDiv" style="display:none;">

@@ -88,7 +88,7 @@ export const ProSubscriptionScreen: React.FC<{ navigation: any }> = ({ navigatio
       setRazorpayOrder({
         orderId,
         amount: 999 * 100,
-        name: 'LawSuit Pro',
+        name: 'NyayaX Pro',
         description: 'Pro Subscription - ₹999/month',
         prefillEmail: user?.email || '',
         prefillPhone: user?.phone || '',
@@ -155,7 +155,7 @@ export const ProSubscriptionScreen: React.FC<{ navigation: any }> = ({ navigatio
       {/* Hero */}
       <LinearGradient colors={['#7C3AED', '#4F46E5']} style={styles.heroCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
         <Ionicons name="diamond" size={48} color="#FCD34D" />
-        <Text style={styles.heroTitle}>Lawsuit Pro</Text>
+        <Text style={styles.heroTitle}>NyayaX Pro</Text>
         <Text style={styles.heroPrice}>₹999<Text style={styles.heroPeriod}>/month</Text></Text>
         <Text style={styles.heroDesc}>Unlock premium features and grow your practice</Text>
       </LinearGradient>

@@ -33,7 +33,7 @@ export const LandingScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
                 <Text style={styles.logoIcon}>⚖️</Text>
               </View>
             </View>
-            <Text style={styles.appName}>Lawsuit</Text>
+            <Text style={styles.appName}>NyayaX</Text>
             <Text style={styles.tagline}>Your Legal Companion</Text>
           </View>
 

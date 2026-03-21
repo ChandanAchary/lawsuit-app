@@ -1,4 +1,16 @@
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://lawsuit-server.onrender.com';
+const DEFAULT_API_BASE_URL = 'https://lawsuit-server.onrender.com';
+
+const ensureProtocol = (value: string): string => {
+  if (/^https?:\/\//i.test(value)) return value;
+  return `https://${value}`;
+};
+
+const stripTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
+
+const rawApiBaseUrl = (process.env.EXPO_PUBLIC_API_URL || DEFAULT_API_BASE_URL).trim();
+const normalizedApiBaseUrl = stripTrailingSlash(ensureProtocol(rawApiBaseUrl)).replace(/\/api\/v1$/i, '');
+
+export const API_BASE_URL = normalizedApiBaseUrl;
 export const API_URL = `${API_BASE_URL}/api/v1`;
 
 export const COLORS = {

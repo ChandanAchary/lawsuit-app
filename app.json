@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Lawsuit",
+    "name": "NyayaX",
     "slug": "lawsuit-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -17,11 +17,11 @@
       "buildNumber": "1",
       "bundleIdentifier": "com.msdchandan.lawsuitapp",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Lawsuit needs your location to find lawyers near you.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Lawsuit needs your location to find lawyers near you.",
-        "NSCameraUsageDescription": "Lawsuit needs camera access to upload your profile photo and documents.",
-        "NSMicrophoneUsageDescription": "Lawsuit needs microphone access for audio and video consultations.",
-        "NSPhotoLibraryUsageDescription": "Lawsuit needs photo library access to upload documents and profile photos.",
+        "NSLocationWhenInUseUsageDescription": "NyayaX needs your location to find lawyers near you.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "NyayaX needs your location to find lawyers near you.",
+        "NSCameraUsageDescription": "NyayaX needs camera access to upload your profile photo and documents.",
+        "NSMicrophoneUsageDescription": "NyayaX needs microphone access for audio and video consultations.",
+        "NSPhotoLibraryUsageDescription": "NyayaX needs photo library access to upload documents and profile photos.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -69,16 +69,16 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Lawsuit needs your location to show lawyers near you.",
-          "locationWhenInUsePermission": "Lawsuit needs your location to show lawyers near you."
+          "locationAlwaysAndWhenInUsePermission": "NyayaX needs your location to show lawyers near you.",
+          "locationWhenInUsePermission": "NyayaX needs your location to show lawyers near you."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Lawsuit needs access to your photos to upload profile pictures and documents.",
-          "cameraPermission": "Lawsuit needs camera access to take profile pictures and document photos.",
-          "microphonePermission": "Lawsuit needs microphone access for video consultations."
+          "photosPermission": "NyayaX needs access to your photos to upload profile pictures and documents.",
+          "cameraPermission": "NyayaX needs camera access to take profile pictures and document photos.",
+          "microphonePermission": "NyayaX needs microphone access for video consultations."
         }
       ],
       "expo-audio"
