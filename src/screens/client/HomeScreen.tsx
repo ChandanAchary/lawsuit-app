@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Dimensions, Image,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
@@ -22,9 +23,16 @@ const FEATURES = [
 export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const user = useAuthStore((s) => s.user);
   const balance = useWalletStore((s) => s.balance);
+  const fetchBalance = useWalletStore((s) => s.fetchBalance);
   const isDark = useThemeStore((s) => s.isDark);
   const COLORS = useColors();
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      void fetchBalance();
+    }, [fetchBalance]),
+  );
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
