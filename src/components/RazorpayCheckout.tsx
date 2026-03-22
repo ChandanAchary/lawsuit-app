@@ -6,9 +6,9 @@ import {
   StyleSheet,
   TouchableOpacity,
   Text,
-  SafeAreaView,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import { SPACING, FONT_SIZE, BORDER_RADIUS } from '../constants';

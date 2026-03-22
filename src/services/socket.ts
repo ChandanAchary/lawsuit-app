@@ -7,7 +7,12 @@ class SocketService {
   private handlers: Map<string, Set<(...args: unknown[]) => void>> = new Map();
 
   async connect(): Promise<void> {
-    if (this.socket?.connected) return;
+    if (this.socket) {
+      // Reuse existing client instance; Socket.IO will reconnect when needed.
+      if (!this.socket.connected) this.socket.connect();
+      return;
+    }
+
     const token = await storage.getToken();
     if (!token) return;
 
@@ -17,6 +22,7 @@ class SocketService {
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 2000,
+      autoConnect: true,
     });
 
     this.socket.on('connect', () => {
@@ -24,16 +30,13 @@ class SocketService {
     });
 
     this.socket.on('disconnect', (reason) => {
+      // Transport errors are transient during reload/network changes.
+      if (reason === 'transport error' || reason === 'transport close') return;
       console.log('[Socket] Disconnected:', reason);
     });
 
-    // Re-register existing handlers on reconnect
-    this.socket.on('connect', () => {
-      this.handlers.forEach((callbacks, event) => {
-        callbacks.forEach((cb) => {
-          this.socket?.on(event, cb as (...args: unknown[]) => void);
-        });
-      });
+    this.socket.on('connect_error', (err) => {
+      console.warn('[Socket] Connect error:', err?.message || 'unknown error');
     });
   }
 

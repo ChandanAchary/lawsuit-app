@@ -192,6 +192,23 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
       } else {
         // Razorpay payment flow
         const payment = data?.payment || appointment?.payment || {};
+        const expectedFeeRupees = Number(lawyer.fee || 0);
+        const backendAmountRupees = Number(payment?.amount || 0);
+        const effectiveAmountRupees = backendAmountRupees || expectedFeeRupees;
+
+        if (
+          expectedFeeRupees > 0 &&
+          backendAmountRupees > 0 &&
+          (backendAmountRupees > expectedFeeRupees * 2 || backendAmountRupees < expectedFeeRupees / 2)
+        ) {
+          Alert.alert(
+            'Payment Amount Mismatch',
+            `Expected consultation fee ₹${expectedFeeRupees.toLocaleString('en-IN')}, but payment request is ₹${backendAmountRupees.toLocaleString('en-IN')}. Please try again later.`,
+          );
+          setShowBooking(false);
+          return;
+        }
+
         const orderId =
           payment?.providerOrderId ||
           payment?.razorpayOrderId ||
@@ -206,7 +223,7 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
         setPendingAppointmentId(appointmentId);
         setRazorpayOrder({
           orderId,
-          amount: (lawyer.fee || 0) * 100,
+          amount: Math.round(effectiveAmountRupees * 100),
           name: 'NyayaX',
           description: `Consultation with ${lawyer.name}`,
           prefillEmail: user?.email || '',
