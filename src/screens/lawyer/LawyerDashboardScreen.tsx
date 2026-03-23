@@ -6,10 +6,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
+import { API_BASE_URL, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { useAuthStore } from '../../stores/authStore';
 import { useWalletStore } from '../../stores/walletStore';
-import { dashboardApi, referralApi, subscriptionApi } from '../../services/api';
+import { dashboardApi, referralApi, subscriptionApi, usersApi } from '../../services/api';
 import { Appointment } from '../../types';
 import { format } from 'date-fns';
 
@@ -38,10 +38,12 @@ export const LawyerDashboardScreen: React.FC<{ navigation: any }> = ({ navigatio
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
 
   const user = useAuthStore((s) => s.user);
+  const setAuthUser = useAuthStore((s) => s.setUser);
   const { balance, fetchBalance } = useWalletStore();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [referral, setReferral] = useState<ReferralInfo | null>(null);
   const [subscription, setSubscription] = useState<any>(null);
+  const [displayName, setDisplayName] = useState('Advocate');
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -82,6 +84,33 @@ export const LawyerDashboardScreen: React.FC<{ navigation: any }> = ({ navigatio
 
   useEffect(() => { fetchData(); }, []);
 
+  useEffect(() => {
+    const localName = String(user?.name || '').trim();
+    if (localName) {
+      setDisplayName(localName);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await usersApi.getMe();
+        const me = (data?.user || data?.data || data || {}) as any;
+        const fetchedName = String(me?.name || '').trim();
+        if (cancelled || !fetchedName) return;
+
+        setDisplayName(fetchedName);
+        setAuthUser(me);
+      } catch {
+        if (!cancelled) setDisplayName('Advocate');
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.name, setAuthUser]);
+
   const onRefresh = () => {
     setRefreshing(true);
     fetchData().finally(() => setRefreshing(false));
@@ -102,6 +131,24 @@ export const LawyerDashboardScreen: React.FC<{ navigation: any }> = ({ navigatio
 
   const isPro = subscription?.plan === 'PRO' && subscription?.status === 'ACTIVE';
 
+  const getClientAvatarUri = (appt: Appointment): string | null => {
+    const client: any = appt?.client || {};
+    const raw =
+      client.avatarUrl ||
+      client.avatar ||
+      client.profilePhoto ||
+      client.profileImage ||
+      client.image ||
+      null;
+
+    if (!raw || typeof raw !== 'string') return null;
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    if (trimmed.startsWith('/')) return `${API_BASE_URL}${trimmed}`;
+    return `${API_BASE_URL}/${trimmed}`;
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -121,7 +168,7 @@ export const LawyerDashboardScreen: React.FC<{ navigation: any }> = ({ navigatio
         <View style={styles.greetingRow}>
           <View style={{ flex: 1 }}>
             <Text style={styles.greeting}>{greeting()},</Text>
-            <Text style={styles.name}>{user?.name || 'Advocate'} ⚖️</Text>
+            <Text style={styles.name}>{displayName} ⚖️</Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <TouchableOpacity style={styles.alertBtn} onPress={() => navigation.navigate('Notifications')}>
@@ -234,33 +281,36 @@ export const LawyerDashboardScreen: React.FC<{ navigation: any }> = ({ navigatio
             <Text style={styles.emptyText}>No upcoming consultations</Text>
           </View>
         ) : (
-          stats.upcomingAppointments.map((appt) => (
-            <TouchableOpacity
-              key={appt.id}
-              style={styles.apptCard}
-              activeOpacity={0.7}
-              onPress={() => navigation.navigate('LawyerClientDetail', { clientId: appt.clientId, name: appt.client?.name })}
-            >
-              <View style={styles.apptAvatar}>
-                {appt.client?.avatar ? (
-                  <Image source={{ uri: appt.client.avatar }} style={styles.apptAvatarImg} />
-                ) : (
-                  <Ionicons name="person" size={20} color={COLORS.primary} />
-                )}
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.apptName}>{appt.client?.name || 'Client'}</Text>
-                <Text style={styles.apptTime}>
-                  {format(new Date(appt.scheduledAt), 'dd MMM, hh:mm a')} · {appt.durationMins}min
-                </Text>
-              </View>
-              <View style={[styles.statusBadge, { backgroundColor: appt.status === 'CONFIRMED' ? COLORS.successLight : COLORS.warningLight }]}>
-                <Text style={[styles.statusText, { color: appt.status === 'CONFIRMED' ? COLORS.success : COLORS.warning }]}>
-                  {appt.status === 'CONFIRMED' ? 'Confirmed' : appt.status === 'PENDING' ? 'Pending' : appt.status}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))
+          stats.upcomingAppointments.map((appt) => {
+            const avatarUri = getClientAvatarUri(appt);
+            return (
+              <TouchableOpacity
+                key={appt.id}
+                style={styles.apptCard}
+                activeOpacity={0.7}
+                onPress={() => navigation.navigate('LawyerClientDetail', { clientId: appt.clientId, name: appt.client?.name })}
+              >
+                <View style={styles.apptAvatar}>
+                  {avatarUri ? (
+                    <Image source={{ uri: avatarUri }} style={styles.apptAvatarImg} />
+                  ) : (
+                    <Ionicons name="person" size={20} color={COLORS.primary} />
+                  )}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.apptName}>{appt.client?.name || 'Client'}</Text>
+                  <Text style={styles.apptTime}>
+                    {format(new Date(appt.scheduledAt), 'dd MMM, hh:mm a')} · {appt.durationMins}min
+                  </Text>
+                </View>
+                <View style={[styles.statusBadge, { backgroundColor: appt.status === 'CONFIRMED' ? COLORS.successLight : COLORS.warningLight }]}>
+                  <Text style={[styles.statusText, { color: appt.status === 'CONFIRMED' ? COLORS.success : COLORS.warning }]}>
+                    {appt.status === 'CONFIRMED' ? 'Confirmed' : appt.status === 'PENDING' ? 'Pending' : appt.status}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })
         )}
       </View>
 

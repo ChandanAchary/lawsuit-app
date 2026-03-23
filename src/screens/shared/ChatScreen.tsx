@@ -1,5 +1,5 @@
 import { useThemeStore, useColors } from '../../stores/themeStore';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text, ActivityIndicator, Image, Alert, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { FONT_SIZE, SPACING, SHADOWS } from '../../constants';
@@ -8,6 +8,24 @@ import { chatApi } from '../../services/api';
 import { socketService } from '../../services/socket';
 import { ChatParticipant } from '../../types';
 import { useAuthStore } from '../../stores/authStore';
+
+const normalizeChats = (payload: any): any[] => payload?.chats || payload?.items || payload || [];
+
+const extractChatSortTime = (chat: any): number => {
+  const raw = chat?.lastMessage?.createdAt || chat?.lastMessageAt || chat?.updatedAt || chat?.createdAt;
+  const ts = raw ? new Date(raw).getTime() : 0;
+  return Number.isFinite(ts) ? ts : 0;
+};
+
+const hasMessages = (chat: any): boolean => {
+  const text = String(chat?.lastMessage?.text || chat?.lastMessageText || '').trim();
+  return text.length > 0;
+};
+
+const getParticipantId = (p: any): string => String(p?.id || p?.userId || p?.user?.id || '').trim();
+const getParticipantName = (p: any): string => String(p?.name || p?.user?.name || '').trim();
+const getParticipantAvatar = (p: any): string =>
+  String(p?.avatarUrl || p?.avatar || p?.user?.avatarUrl || p?.user?.avatar || '').trim();
 
 export const ChatScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
@@ -22,47 +40,110 @@ export const ChatScreen: React.FC<{ navigation: any; route: any }> = ({ navigati
   const [isOnline, setIsOnline] = useState(false);
   const currentUser = useAuthStore((s: any) => s.user);
 
-  // Determine the other participant's display info
   const other: ChatParticipant | null = otherUser || null;
-  const displayName = other?.name || name || 'Chat';
-  const displayAvatar = other?.avatarUrl || other?.avatar || null;
-  const otherId = other?.id || otherUserId;
+  const conversationOther = useMemo(() => {
+    const meId = String(currentUser?.id || '').trim();
+    return participants.find((p: any) => {
+      const pid = getParticipantId(p);
+      if (!pid) return false;
+      if (otherUserId && pid === String(otherUserId)) return true;
+      return meId ? pid !== meId : true;
+    }) || null;
+  }, [participants, currentUser?.id, otherUserId]);
+
+  const displayName = getParticipantName(conversationOther) || other?.name || name || 'Chat';
+  const displayAvatar = getParticipantAvatar(conversationOther) || other?.avatarUrl || other?.avatar || null;
+  const otherId = getParticipantId(conversationOther) || String(other?.id || otherUserId || '').trim();
 
   const generateRoomId = () => `call_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+  const resolveExistingChatId = async (): Promise<string | null> => {
+    if (!otherUserId) return null;
+
+    try {
+      const { data } = await chatApi.getChats();
+      const chats = normalizeChats(data);
+      const matches = chats.filter((chat: any) => {
+        const participants = chat?.participants || [];
+        return participants.some(
+          (p: any) => p?.id === otherUserId || p?.userId === otherUserId || p?.user?.id === otherUserId,
+        );
+      });
+
+      if (!matches.length) return null;
+
+      const caseScoped = caseId ? matches.filter((chat: any) => chat?.caseId === caseId) : [];
+      const pool = caseScoped.length ? caseScoped : matches;
+
+      const sorted = pool.slice().sort((a: any, b: any) => extractChatSortTime(b) - extractChatSortTime(a));
+      const preferred = sorted.find((chat: any) => hasMessages(chat)) || sorted[0];
+      const id = String(preferred?.id || '').trim();
+      return id || null;
+    } catch {
+      return null;
+    }
+  };
 
   const initiateCall = (callType: 'audio' | 'video') => {
     if (!otherId) return Alert.alert('Error', 'Cannot determine call recipient');
     if (!chatId) return Alert.alert('Please wait', 'Chat is still loading. Try the call again in a moment.');
     const roomId = generateRoomId();
     socketService.emit('call:initiate', { to: otherId, callType, roomId, chatId });
-    navigation.navigate('VideoCall', { roomId, callType, otherUser: other, isOutgoing: true, chatId });
+    navigation.navigate('VideoCall', {
+      roomId,
+      callType,
+      otherUser: {
+        id: otherId,
+        name: displayName,
+        avatarUrl: displayAvatar || undefined,
+      },
+      isOutgoing: true,
+      chatId,
+    });
   };
 
   useEffect(() => {
+    let isMounted = true;
+
     const init = async () => {
+      setError('');
+      setParticipants([]);
+      setLoading(!initialChatId);
+
       try {
-        let resolvedChatId = chatId;
+        let resolvedChatId: string | null = initialChatId || null;
+        if (!resolvedChatId) {
+          resolvedChatId = await resolveExistingChatId();
+        }
+
         if (!resolvedChatId && appointmentId) {
           const { data } = await chatApi.getOrCreateAppointmentChat(appointmentId);
           resolvedChatId = data.chat?.id || data.id;
-          setChatId(resolvedChatId);
-        } else if (!resolvedChatId && otherUserId) {
+        }
+
+        if (!resolvedChatId && otherUserId) {
           const { data } = await chatApi.createChat(otherUserId, caseId);
           resolvedChatId = data.chat?.id || data.id;
-          setChatId(resolvedChatId);
         }
+
+        if (!isMounted) return;
+
+        setChatId(resolvedChatId);
         if (resolvedChatId) {
-          // Load participants
+          // Load participants for the resolved thread every time route params change.
           const { data } = await chatApi.getParticipants(resolvedChatId);
+          if (!isMounted) return;
           const list: ChatParticipant[] = data.participants || data || [];
           setParticipants(list);
         }
       } catch (err: any) {
+        if (!isMounted) return;
         setError(err.response?.data?.error || 'Failed to load chat');
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
+
     init();
 
     // Online presence
@@ -75,8 +156,12 @@ export const ChatScreen: React.FC<{ navigation: any; route: any }> = ({ navigati
       if (userId === otherId) setIsOnline(false);
     });
 
-    return () => { unsubOnline(); unsubOffline(); };
-  }, []);
+    return () => {
+      isMounted = false;
+      unsubOnline();
+      unsubOffline();
+    };
+  }, [initialChatId, otherUserId, caseId, appointmentId, otherId]);
 
   return (
     <View style={styles.container}>

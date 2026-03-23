@@ -1,27 +1,64 @@
 import { io, Socket } from 'socket.io-client';
 import { API_BASE_URL } from '../constants';
+import { authApi } from './api';
 import { storage } from './storage';
 
 class SocketService {
   private socket: Socket | null = null;
   private handlers: Map<string, Set<(...args: unknown[]) => void>> = new Map();
+  private lastConnectErrorLogAt = 0;
+  private lastConnectErrorMessage = '';
+  private recoveringAuth = false;
+
+  private async getSocketAuth() {
+    const token = await storage.getToken();
+    return token ? { token } : null;
+  }
+
+  private async recoverAuthAndReconnect(): Promise<void> {
+    if (this.recoveringAuth) return;
+    this.recoveringAuth = true;
+    try {
+      // This request uses the existing axios interceptor, which can refresh
+      // access tokens with refresh token when needed.
+      await authApi.getMe();
+      const nextAuth = await this.getSocketAuth();
+      if (this.socket && nextAuth) {
+        this.socket.auth = nextAuth;
+        if (!this.socket.connected) this.socket.connect();
+      }
+    } catch {
+      // No-op: auth store/app flow handles invalid sessions.
+    } finally {
+      this.recoveringAuth = false;
+    }
+  }
 
   async connect(): Promise<void> {
     if (this.socket) {
       // Reuse existing client instance; Socket.IO will reconnect when needed.
-      if (!this.socket.connected) this.socket.connect();
+      if (!this.socket.connected) {
+        const auth = await this.getSocketAuth();
+        if (!auth) return;
+        this.socket.auth = auth;
+        this.socket.connect();
+      }
       return;
     }
 
-    const token = await storage.getToken();
-    if (!token) return;
+    const auth = await this.getSocketAuth();
+    if (!auth) return;
 
     this.socket = io(API_BASE_URL, {
-      auth: { token },
-      transports: ['websocket'],
+      auth,
+      // Allow polling fallback when websocket handshake is slow/blocked on mobile networks.
+      transports: ['websocket', 'polling'],
+      timeout: 30000,
+      upgrade: true,
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 2000,
+      reconnectionDelayMax: 10000,
       autoConnect: true,
     });
 
@@ -35,8 +72,28 @@ class SocketService {
       console.log('[Socket] Disconnected:', reason);
     });
 
+    this.socket.io.on('reconnect_attempt', async () => {
+      // Keep auth in sync when access token is refreshed in API interceptors.
+      const nextAuth = await this.getSocketAuth();
+      if (nextAuth) this.socket!.auth = nextAuth;
+    });
+
     this.socket.on('connect_error', (err) => {
-      console.warn('[Socket] Connect error:', err?.message || 'unknown error');
+      const message = err?.message || 'unknown error';
+      const now = Date.now();
+      const shouldLog =
+        message !== this.lastConnectErrorMessage ||
+        now - this.lastConnectErrorLogAt >= 15000;
+
+      if (shouldLog) {
+        console.warn('[Socket] Connect error:', message);
+        this.lastConnectErrorMessage = message;
+        this.lastConnectErrorLogAt = now;
+      }
+
+      if (message === 'Authentication error') {
+        void this.recoverAuthAndReconnect();
+      }
     });
   }
 

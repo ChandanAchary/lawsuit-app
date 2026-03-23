@@ -43,19 +43,12 @@ export const ChatListScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
     return !!text || getLastMessageTime(chat) > 0;
   }, [getLastMessageTime]);
 
-  const getChatKey = useCallback((chat: any): string => {
-    const participants = chat?.participants || [];
-    const other = participants.find((p: any) => p?.userId !== user?.id && p?.id !== user?.id) || participants[0];
-    const otherId = other?.userId || other?.id;
-    return otherId ? `user:${otherId}` : `chat:${chat?.id}`;
-  }, [user?.id]);
-
   const normalizeChats = useCallback((list: any[]): any[] => {
     const grouped = new Map<string, any>();
 
     (list || []).forEach((chat) => {
       if (!chat || !chat.id) return;
-      const key = getChatKey(chat);
+      const key = String(chat.id);
       const existing = grouped.get(key);
 
       if (!existing) {
@@ -83,12 +76,12 @@ export const ChatListScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
         }
       }
 
-      latest.unreadCount = Math.max(0, Number(existing.unreadCount || 0) + Number(chat.unreadCount || 0));
+      latest.unreadCount = Math.max(Number(existing.unreadCount || 0), Number(chat.unreadCount || 0));
       grouped.set(key, latest);
     });
 
     return Array.from(grouped.values()).sort((a, b) => getChatSortTime(b) - getChatSortTime(a));
-  }, [getChatKey, getChatSortTime, getLastMessageTime, hasChatHistory]);
+  }, [getChatSortTime, getLastMessageTime, hasChatHistory]);
 
   const fetchChats = useCallback(async () => {
     try {

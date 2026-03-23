@@ -31,6 +31,11 @@ export const AdminDashboardScreen: React.FC<{ navigation: any }> = ({ navigation
 
   const onRefresh = () => { setRefreshing(true); fetchStats().finally(() => setRefreshing(false)); };
 
+  const totalUsers = stats?.users?.total ?? stats?.users ?? stats?.totalUsers ?? '—';
+  const totalLawyers = stats?.users?.lawyers ?? stats?.lawyers ?? stats?.totalLawyers ?? '—';
+  const totalCases = stats?.cases?.total ?? stats?.cases ?? stats?.totalCases ?? '—';
+  const totalAppointments = stats?.appointments?.total ?? stats?.appointments ?? stats?.totalAppointments ?? '—';
+
   return (
     <ScrollView
       style={styles.container}
@@ -44,10 +49,10 @@ export const AdminDashboardScreen: React.FC<{ navigation: any }> = ({ navigation
       </LinearGradient>
 
       <View style={styles.statsGrid}>
-        <StatCard icon="people" color="#3B82F6" label="Total Users" value={stats?.users ?? stats?.totalUsers ?? '—'} COLORS={COLORS} styles={styles} />
-        <StatCard icon="briefcase" color={COLORS.accent} label="Lawyers" value={stats?.lawyers ?? stats?.totalLawyers ?? '—'} COLORS={COLORS} styles={styles} />
-        <StatCard icon="folder-open" color={COLORS.success} label="Cases" value={stats?.cases ?? stats?.totalCases ?? '—'} COLORS={COLORS} styles={styles} />
-        <StatCard icon="calendar" color="#8B5CF6" label="Appointments" value={stats?.appointments ?? stats?.totalAppointments ?? '—'} COLORS={COLORS} styles={styles} />
+        <StatCard icon="people" color="#3B82F6" label="Total Users" value={totalUsers} COLORS={COLORS} styles={styles} />
+        <StatCard icon="briefcase" color={COLORS.accent} label="Lawyers" value={totalLawyers} COLORS={COLORS} styles={styles} />
+        <StatCard icon="folder-open" color={COLORS.success} label="Cases" value={totalCases} COLORS={COLORS} styles={styles} />
+        <StatCard icon="calendar" color="#8B5CF6" label="Appointments" value={totalAppointments} COLORS={COLORS} styles={styles} />
       </View>
 
       <View style={styles.section}>

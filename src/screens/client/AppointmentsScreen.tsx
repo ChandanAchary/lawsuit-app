@@ -152,7 +152,7 @@ export const AppointmentsScreen: React.FC<{ navigation: any }> = ({ navigation }
       }
       onChat={
         item.status === AppointmentStatus.CONFIRMED || item.status === AppointmentStatus.ATTENDED || item.status === AppointmentStatus.COMPLETED
-          ? () => navigation.navigate('ChatScreen', { otherUserId: item.lawyerId, name: item.lawyer?.name, appointmentId: item.id })
+          ? () => navigation.navigate('ChatScreen', { otherUserId: item.lawyerId, name: item.lawyer?.name })
           : undefined
       }
       onViewAgreement={item.agreementUrl ? () => handleViewAgreement(item.agreementUrl!) : undefined}

@@ -109,7 +109,7 @@ export const appointmentsApi = {
   book: (data: { lawyerId: string; scheduledAt: string; durationMins?: number; notes?: string; paymentMethod?: 'wallet' | 'razorpay' }) =>
     api.post('/appointments/book', data),
   confirmPayment: (data: { appointmentId: string; razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) =>
-    api.post('/appointments/confirm-payment', data),
+    api.post(`/appointments/${encodeURIComponent(data.appointmentId)}/confirm-payment`, data),
   getAll: (params?: Record<string, unknown>) => api.get('/appointments', { params }),
   getById: (id: string) => api.get(`/appointments/${encodeURIComponent(id)}`),
   reschedule: (id: string, scheduledAt: string) =>
@@ -190,7 +190,7 @@ export const usersApi = {
   getLawyerInformation: () => api.get('/users/lawyer-information'),
   postLawyerInformation: (data: Record<string, unknown>) => api.post('/users/lawyer-information', data),
   registerFcmToken: (token: string) => api.post('/users/fcm-token', { fcmToken: token }),
-  removeFcmToken: (token: string) => api.delete('/users/fcm-token', { data: { token } }),
+  removeFcmToken: (token: string) => api.delete('/users/fcm-token', { data: { fcmToken: token } }),
   getUserById: (id: string) => api.get(`/users/${encodeURIComponent(id)}`),
 };
 
@@ -258,11 +258,12 @@ export const adminApi = {
     api.get('/admin/payments', { params }),
   getWallets: () => api.get('/admin/wallets'),
   getWithdrawals: () => api.get('/admin/wallets/withdrawals'),
-  reverseWithdrawal: (id: string) => api.put(`/admin/wallets/withdrawals/${encodeURIComponent(id)}/reverse`),
-  creditWallet: (userId: string, amount: number, reason: string) =>
-    api.post('/admin/wallets/credit', { userId, amount, reason }),
-  debitWallet: (userId: string, amount: number, reason: string) =>
-    api.post('/admin/wallets/debit', { userId, amount, reason }),
+  reverseWithdrawal: (id: string, reason: string) =>
+    api.put(`/admin/wallets/withdrawals/${encodeURIComponent(id)}/reverse`, { reason }),
+  creditWallet: (userId: string, amount: number, description: string) =>
+    api.post('/admin/wallets/credit', { userId, amount, description }),
+  debitWallet: (userId: string, amount: number, description: string) =>
+    api.post('/admin/wallets/debit', { userId, amount, description }),
   getNotVerifiedClients: () => api.get('/admin/not-verified-client'),
   getNotVerifiedLawyers: () => api.get('/admin/not-verified-lawyers'),
   verifyLawyer: (id: string) => api.put(`/admin/${encodeURIComponent(id)}/verifylawyer`),
@@ -344,6 +345,8 @@ export const videoApi = {
     api.post(`/video/chat/${encodeURIComponent(chatId)}/session`),
   getChatSession: (chatId: string) =>
     api.get(`/video/chat/${encodeURIComponent(chatId)}/session`),
+  endChatSession: (chatId: string) =>
+    api.post(`/video/chat/${encodeURIComponent(chatId)}/session/end`),
 };
 
 // ─── Payments API ───────────────────────────────────────────

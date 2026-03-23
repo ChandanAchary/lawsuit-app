@@ -48,6 +48,9 @@ const normalizeErrorMessage = (value: unknown): string => {
 
 const mapDailyMessage = (raw: string): string => {
   const msg = raw.toLowerCase();
+  if (msg.includes('route not found')) {
+    return 'Call service is unavailable on server. Please update/redeploy the backend and try again.';
+  }
   if (msg.includes('[object object]')) {
     return 'Unable to connect the call right now. Please try again.';
   }
@@ -58,6 +61,12 @@ const mapDailyMessage = (raw: string): string => {
     return 'Unable to create Daily room right now. Please try again.';
   }
   return raw;
+};
+
+const isNotFoundRouteError = (err: any): boolean => {
+  const code = err?.response?.data?.error?.code;
+  const msg = String(err?.response?.data?.error?.message || '').toLowerCase();
+  return code === 'not_found' || msg.includes('route not found');
 };
 
 const ActionBtn: React.FC<{
@@ -120,6 +129,7 @@ export const VideoCallScreen: React.FC<{ navigation: any; route: any }> = ({ nav
     }
     webViewRef.current?.injectJavaScript("window.__handleNativeCmd && window.__handleNativeCmd({ type: 'end' }); true;");
     if (appointmentId) videoApi.endMeeting(appointmentId).catch(() => {});
+    if (chatId) videoApi.endChatSession(chatId).catch(() => {});
     stopTimer();
     setCallState('ended');
     setTimeout(() => navigation.goBack(), 900);
@@ -165,14 +175,32 @@ export const VideoCallScreen: React.FC<{ navigation: any; route: any }> = ({ nav
       setSessionError(null);
       try {
         if (appointmentId) {
-          const { data } = await videoApi.getMeeting(appointmentId);
+          // Support both get-first and create-first server implementations.
+          let data: any;
+          try {
+            const res = await videoApi.getMeeting(appointmentId);
+            data = res.data;
+          } catch (err: any) {
+            if (!isNotFoundRouteError(err)) throw err;
+            const res = await videoApi.createMeeting({ appointmentId, meetingType: isVideoCall ? 'VIDEO_CALL' : 'AUDIO_CALL' });
+            data = res.data;
+          }
           if (!mounted) return;
           setMeetingLink(data.meetingLink || null);
           setMeetingToken(data.token || null);
           return;
         }
         if (chatId) {
-          const { data } = await videoApi.getChatSession(chatId);
+          // Prefer create-session for compatibility with servers that only expose POST.
+          let data: any;
+          try {
+            const res = await videoApi.createChatSession(chatId);
+            data = res.data;
+          } catch (err: any) {
+            if (!isNotFoundRouteError(err)) throw err;
+            const res = await videoApi.getChatSession(chatId);
+            data = res.data;
+          }
           if (!mounted) return;
           setMeetingLink(data.meetingLink || null);
           setMeetingToken(data.token || null);
@@ -435,12 +463,14 @@ export const VideoCallScreen: React.FC<{ navigation: any; route: any }> = ({ nav
         )}
 
         <View style={s.bottomBar}>
-          <ActionBtn
-            icon={isVideoCall ? (isCameraOff ? 'videocam-off' : 'videocam') : 'volume-medium-outline'}
-            label={isVideoCall ? 'Camera' : 'Speaker'}
-            onPress={isVideoCall ? toggleCamera : toggleSpeaker}
-            active={isVideoCall ? isCameraOff : isSpeakerOn}
-          />
+          {isVideoCall && (
+            <ActionBtn
+              icon={isCameraOff ? 'videocam-off' : 'videocam'}
+              label="Camera"
+              onPress={toggleCamera}
+              active={isCameraOff}
+            />
+          )}
           <ActionBtn
             icon={isSpeakerOn ? 'volume-high' : 'volume-medium-outline'}
             label="Speaker"
@@ -533,17 +563,17 @@ const s = StyleSheet.create({
   statusText: { color: 'rgba(255,255,255,0.6)', fontSize: 15 },
   bottomBar: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-evenly',
     alignItems: 'center',
     paddingBottom: Platform.OS === 'ios' ? 44 : 28,
     paddingTop: 18,
-    paddingHorizontal: 8,
+    paddingHorizontal: 12,
     backgroundColor: 'rgba(0,0,0,0.52)',
     borderRadius: 28,
     marginHorizontal: 10,
     marginBottom: 16,
   },
-  actionItem: { alignItems: 'center', gap: 7, minWidth: 56 },
+  actionItem: { alignItems: 'center', gap: 7, minWidth: 70 },
   actionBtn: {
     width: 54,
     height: 54,

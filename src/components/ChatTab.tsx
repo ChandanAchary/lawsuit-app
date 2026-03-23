@@ -10,6 +10,7 @@ import { chatApi } from '../services/api';
 import { socketService } from '../services/socket';
 import { useAuthStore } from '../stores/authStore';
 import { formatTime } from '../utils/date';
+import { format, isToday, isYesterday, isSameDay, parseISO } from 'date-fns';
 
 interface ChatTabProps {
   chatId: string;
@@ -181,8 +182,24 @@ export const ChatTab: React.FC<ChatTabProps> = ({ chatId, participants = [] }) =
     return p?.avatarUrl || p?.avatar || null;
   };
 
+  const getDateLabel = (value: string) => {
+    const d = parseISO(value);
+    if (isToday(d)) return 'Today';
+    if (isYesterday(d)) return 'Yesterday';
+    return format(d, 'dd MMM yyyy');
+  };
+
+  const shouldShowDateHeader = (index: number) => {
+    if (index === 0) return true;
+    const prev = messages[index - 1];
+    const current = messages[index];
+    if (!prev || !current) return false;
+    return !isSameDay(parseISO(prev.createdAt), parseISO(current.createdAt));
+  };
+
   const renderMessage = ({ item, index }: { item: ChatMessage; index: number }) => {
     const isMine = item.senderId === currentUser?.id;
+    const showDateHeader = shouldShowDateHeader(index);
 
     // ─── Call history message ───────────────────────────────────────
     if (item.messageType === 'CALL') {
@@ -199,22 +216,31 @@ export const ChatTab: React.FC<ChatTabProps> = ({ chatId, participants = [] }) =
       const arrowColor = missed ? '#e4091d' : '#4CAF50';
 
       return (
-        <View style={styles.callLogRow}>
-          <View style={styles.callLogBubble}>
-            <View style={styles.callLogIconWrap}>
-              <Ionicons name={iconName as any} size={18} color={COLORS.primary} />
+        <View>
+          {showDateHeader && (
+            <View style={styles.dateDividerRow}>
+              <View style={styles.dateDividerPill}>
+                <Text style={styles.dateDividerText}>{getDateLabel(item.createdAt)}</Text>
+              </View>
             </View>
-            <View style={styles.callLogInfo}>
-              <View style={styles.callLogTop}>
-                <Ionicons name={arrowIcon as any} size={14} color={arrowColor} />
-                <Text style={styles.callLogLabel}>
-                  {missed ? 'Missed' : isOutgoing ? 'Outgoing' : 'Incoming'}{' '}
-                  {callType === 'video' ? 'video' : 'voice'} call
+          )}
+          <View style={styles.callLogRow}>
+            <View style={styles.callLogBubble}>
+              <View style={styles.callLogIconWrap}>
+                <Ionicons name={iconName as any} size={18} color={COLORS.primary} />
+              </View>
+              <View style={styles.callLogInfo}>
+                <View style={styles.callLogTop}>
+                  <Ionicons name={arrowIcon as any} size={14} color={arrowColor} />
+                  <Text style={styles.callLogLabel}>
+                    {missed ? 'Missed' : isOutgoing ? 'Outgoing' : 'Incoming'}{' '}
+                    {callType === 'video' ? 'video' : 'voice'} call
+                  </Text>
+                </View>
+                <Text style={styles.callLogTime}>
+                  {durationStr ? durationStr + ' • ' : ''}{formatTime(item.createdAt)}
                 </Text>
               </View>
-              <Text style={styles.callLogTime}>
-                {durationStr ? durationStr + ' • ' : ''}{formatTime(item.createdAt)}
-              </Text>
             </View>
           </View>
         </View>
@@ -228,37 +254,48 @@ export const ChatTab: React.FC<ChatTabProps> = ({ chatId, participants = [] }) =
     const avatarUri = !isMine ? getParticipantAvatar(item.senderId) : null;
 
     return (
-      <View style={[styles.msgRow, isMine ? styles.msgRowRight : styles.msgRowLeft]}>
-        {!isMine && (
-          <View style={styles.avatarSlot}>
-            {showAvatar ? (
-              avatarUri ? (
-                <Image source={{ uri: avatarUri }} style={styles.msgAvatar} />
-              ) : (
-                <View style={[styles.msgAvatar, styles.msgAvatarPH]}>
-                  <Ionicons name="person" size={14} color={COLORS.textMuted} />
-                </View>
-              )
-            ) : null}
+      <View>
+        {showDateHeader && (
+          <View style={styles.dateDividerRow}>
+            <View style={styles.dateDividerPill}>
+              <Text style={styles.dateDividerText}>{getDateLabel(item.createdAt)}</Text>
+            </View>
           </View>
         )}
-        <View style={[styles.msgBubble, isMine ? styles.myBubble : styles.otherBubble, isTemp && styles.tempBubble]}>
-          <Text style={[styles.msgText, isMine ? styles.myText : styles.otherText]}>{item.text}</Text>
-          <View style={styles.msgMeta}>
-            <Text style={[styles.msgTime, isMine ? styles.myTime : styles.otherTime]}>
-              {formatTime(item.createdAt)}
-            </Text>
-            {isMine && (
-              item.isRead ? (
-                <Ionicons name="eye" size={14} color="#7ee8f5" style={{ marginLeft: 4 }} />
-              ) : isTemp ? (
-                <Ionicons name="time-outline" size={13} color="rgba(255,255,255,0.55)" style={{ marginLeft: 4 }} />
-              ) : item.isDelivered ? (
-                <Ionicons name="checkmark-done" size={14} color="rgba(255,255,255,0.75)" style={{ marginLeft: 4 }} />
+        <View style={[styles.msgRow, isMine ? styles.msgRowRight : styles.msgRowLeft]}>
+          {!isMine && (
+            <View style={styles.avatarSlot}>
+              {showAvatar ? (
+                avatarUri ? (
+                  <Image source={{ uri: avatarUri }} style={styles.msgAvatar} />
+                ) : (
+                  <View style={[styles.msgAvatar, styles.msgAvatarPH]}>
+                    <Ionicons name="person" size={14} color={COLORS.textMuted} />
+                  </View>
+                )
               ) : (
-                <Ionicons name="checkmark" size={13} color="rgba(255,255,255,0.55)" style={{ marginLeft: 4 }} />
-              )
-            )}
+                null
+              )}
+            </View>
+          )}
+          <View style={[styles.msgBubble, isMine ? styles.myBubble : styles.otherBubble, isTemp && styles.tempBubble]}>
+            <Text style={[styles.msgText, isMine ? styles.myText : styles.otherText]}>{item.text}</Text>
+            <View style={styles.msgMeta}>
+              <Text style={[styles.msgTime, isMine ? styles.myTime : styles.otherTime]}>
+                {formatTime(item.createdAt)}
+              </Text>
+              {isMine && (
+                item.isRead ? (
+                  <Ionicons name="eye" size={14} color="#7ee8f5" style={{ marginLeft: 4 }} />
+                ) : isTemp ? (
+                  <Ionicons name="time-outline" size={13} color="rgba(255,255,255,0.55)" style={{ marginLeft: 4 }} />
+                ) : item.isDelivered ? (
+                  <Ionicons name="checkmark-done" size={14} color="rgba(255,255,255,0.75)" style={{ marginLeft: 4 }} />
+                ) : (
+                  <Ionicons name="checkmark" size={13} color="rgba(255,255,255,0.55)" style={{ marginLeft: 4 }} />
+                )
+              )}
+            </View>
           </View>
         </View>
       </View>
@@ -345,6 +382,16 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingMore: { alignItems: 'center', paddingVertical: SPACING.sm },
+  dateDividerRow: { alignItems: 'center', marginVertical: SPACING.xs },
+  dateDividerPill: {
+    backgroundColor: COLORS.surfaceAlt,
+    borderRadius: 999,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  dateDividerText: { fontSize: FONT_SIZE.xs, color: COLORS.textMuted, fontWeight: '600' },
   messageList: { padding: SPACING.lg, paddingBottom: SPACING.sm },
   msgRow: { marginBottom: SPACING.sm, flexDirection: 'row', alignItems: 'flex-end' },
   msgRowRight: { justifyContent: 'flex-end' },

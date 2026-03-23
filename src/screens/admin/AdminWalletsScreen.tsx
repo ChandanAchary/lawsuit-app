@@ -31,6 +31,8 @@ export const AdminWalletsScreen: React.FC<{ navigation: any }> = ({ navigation }
   const [actionUserId, setActionUserId] = useState('');
   const [actionAmount, setActionAmount] = useState('');
   const [actionReason, setActionReason] = useState('');
+  const [reverseWithdrawalId, setReverseWithdrawalId] = useState<string | null>(null);
+  const [reverseReason, setReverseReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const fetchData = useCallback(async (showLoader = true) => {
@@ -71,19 +73,26 @@ export const AdminWalletsScreen: React.FC<{ navigation: any }> = ({ navigation }
   };
 
   const handleReverseWithdrawal = (id: string) => {
-    Alert.prompt?.('Reverse Withdrawal', 'Enter reason for reversal:', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Reverse', style: 'destructive', onPress: async (reason?: string) => {
-        if (!reason?.trim()) return Alert.alert('Error', 'Reason is required');
-        try {
-          await adminApi.reverseWithdrawal(id);
-          Alert.alert('Success', 'Withdrawal reversed');
-          fetchData(false);
-        } catch (err: any) {
-          Alert.alert('Error', err.response?.data?.error || 'Failed to reverse');
-        }
-      }},
-    ]) ?? Alert.alert('Reverse', 'Reversal is supported on iOS only at this time.');
+    setReverseWithdrawalId(id);
+    setReverseReason('');
+  };
+
+  const submitReverseWithdrawal = async () => {
+    if (!reverseWithdrawalId) return;
+    if (!reverseReason.trim()) return Alert.alert('Error', 'Reason is required');
+
+    setSubmitting(true);
+    try {
+      await adminApi.reverseWithdrawal(reverseWithdrawalId, reverseReason.trim());
+      Alert.alert('Success', 'Withdrawal reversed');
+      setReverseWithdrawalId(null);
+      setReverseReason('');
+      fetchData(false);
+    } catch (err: any) {
+      Alert.alert('Error', err.response?.data?.error || 'Failed to reverse');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const renderWallet = ({ item }: { item: any }) => (
@@ -194,6 +203,35 @@ export const AdminWalletsScreen: React.FC<{ navigation: any }> = ({ navigation }
               <Button
                 title={showAction === 'credit' ? 'Credit Wallet' : 'Debit Wallet'}
                 onPress={handleCreditDebit}
+                loading={submitting}
+                size="lg"
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={!!reverseWithdrawalId} transparent animationType="slide" onRequestClose={() => setReverseWithdrawalId(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Reverse Withdrawal</Text>
+              <TouchableOpacity onPress={() => setReverseWithdrawalId(null)}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.modalBody}>
+              <TextInput
+                style={[styles.input, { height: 90, textAlignVertical: 'top' }]}
+                value={reverseReason}
+                onChangeText={setReverseReason}
+                placeholder="Reason for reversal"
+                placeholderTextColor={COLORS.textMuted}
+                multiline
+              />
+              <Button
+                title="Reverse Withdrawal"
+                onPress={submitReverseWithdrawal}
                 loading={submitting}
                 size="lg"
               />

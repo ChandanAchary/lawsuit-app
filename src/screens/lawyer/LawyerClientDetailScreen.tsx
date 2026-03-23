@@ -7,7 +7,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
-import { appointmentsApi, usersApi, casesApi } from '../../services/api';
+import { appointmentsApi, usersApi, casesApi, chatApi } from '../../services/api';
 import { Appointment, AppointmentStatus, Case, User } from '../../types';
 
 interface Props {
@@ -67,8 +67,70 @@ export const LawyerClientDetailScreen: React.FC<Props> = ({ navigation, route })
     fetchData();
   };
 
-  const handleChat = () => {
-    navigation.navigate('ChatScreen', { otherUserId: clientId, name: client?.name || name });
+  const pickAppointmentForChat = (): Appointment | null => {
+    if (!appointments.length) return null;
+
+    const sorted = appointments
+      .slice()
+      .sort((a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime());
+
+    const preferred = sorted.find((a) => a.status !== AppointmentStatus.CANCELLED);
+    return preferred || sorted[0] || null;
+  };
+
+  const getAppointmentChatId = (appt: Appointment | null): string | null => {
+    if (!appt) return null;
+    const raw = (appt as any)?.chatId || (appt as any)?.chat?.id || null;
+    if (!raw || typeof raw !== 'string') return null;
+    const trimmed = raw.trim();
+    return trimmed || null;
+  };
+
+  const findExistingChatForClient = async (): Promise<string | null> => {
+    try {
+      const { data } = await chatApi.getChats();
+      const chats: any[] = data?.chats || data?.items || data || [];
+
+      const matches = chats.filter((chat: any) => {
+        const participants = chat?.participants || [];
+        return participants.some((p: any) => p?.id === clientId || p?.userId === clientId);
+      });
+
+      if (!matches.length) return null;
+
+      const sorted = matches.sort((a: any, b: any) => {
+        const aTime = new Date(a?.lastMessage?.createdAt || a?.lastMessageAt || a?.updatedAt || a?.createdAt || 0).getTime();
+        const bTime = new Date(b?.lastMessage?.createdAt || b?.lastMessageAt || b?.updatedAt || b?.createdAt || 0).getTime();
+        return bTime - aTime;
+      });
+
+      const preferred = sorted.find((chat: any) => {
+        const text = String(chat?.lastMessage?.text || chat?.lastMessageText || '').trim();
+        return text.length > 0;
+      }) || sorted[0];
+
+      const id = typeof preferred?.id === 'string' ? preferred.id.trim() : '';
+      return id || null;
+    } catch {
+      return null;
+    }
+  };
+
+  const handleChat = async () => {
+    const selectedAppointment = pickAppointmentForChat();
+    let resolvedChatId = getAppointmentChatId(selectedAppointment);
+
+    if (!resolvedChatId) {
+      resolvedChatId = await findExistingChatForClient();
+    }
+
+    navigation.navigate('ChatScreen', {
+      chatId: resolvedChatId || undefined,
+      appointmentId: resolvedChatId ? undefined : selectedAppointment?.id,
+      otherUserId: clientId,
+      name: client?.name || name,
+      otherUser: client || undefined,
+    });
   };
 
   const handleOpenCase = (caseItem: Case) => {

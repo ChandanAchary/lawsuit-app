@@ -7,7 +7,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS, APPOINTMENT_STATUS_COLORS } from '../../constants';
-import { appointmentsApi } from '../../services/api';
+import { appointmentsApi, paymentsApi } from '../../services/api';
 import { Appointment, AppointmentStatus } from '../../types';
 import { useAuthStore } from '../../stores/authStore';
 import { Button } from '../../components/Button';
@@ -26,6 +26,7 @@ export const AppointmentDetailScreen: React.FC<Props> = ({ navigation, route }) 
   const role = useAuthStore((s) => s.user?.role);
 
   const [appointment, setAppointment] = useState<Appointment | null>(passedAppt || null);
+  const [paymentDetails, setPaymentDetails] = useState<any | null>((passedAppt as any)?.payment || null);
   const [loading, setLoading] = useState(!passedAppt);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -43,14 +44,49 @@ export const AppointmentDetailScreen: React.FC<Props> = ({ navigation, route }) 
 
   useEffect(() => { fetchAppointment(); }, []);
 
+  useEffect(() => {
+    const inlinePayment = (appointment as any)?.payment;
+    if (inlinePayment) {
+      setPaymentDetails(inlinePayment);
+      return;
+    }
+
+    const paymentId = (appointment as any)?.paymentId;
+    if (!appointment || !paymentId) {
+      setPaymentDetails(null);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await paymentsApi.getById(paymentId);
+        const p = data?.payment || data?.data || data || null;
+        if (!cancelled) setPaymentDetails(p);
+      } catch {
+        if (!cancelled) setPaymentDetails(null);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [appointment?.id, (appointment as any)?.paymentId, (appointment as any)?.payment]);
+
   const onRefresh = () => { setRefreshing(true); fetchAppointment(); };
 
   const handleChat = () => {
     if (!appointment) return;
     const isClient = role === 'CLIENT';
     const otherId = isClient ? appointment.lawyerId : appointment.clientId;
-    const otherName = isClient ? appointment.lawyer?.name : appointment.client?.name;
-    navigation.navigate('ChatScreen', { otherUserId: otherId, name: otherName, appointmentId: appointment.id });
+    const other = isClient ? appointment.lawyer : appointment.client;
+    const otherName = other?.name;
+    navigation.navigate('ChatScreen', {
+      appointmentId: appointment.id,
+      otherUserId: otherId,
+      name: otherName,
+      otherUser: other,
+    });
   };
 
   const handleCancel = () => {
@@ -119,6 +155,17 @@ export const AppointmentDetailScreen: React.FC<Props> = ({ navigation, route }) 
     appointment.status === 'COMPLETED' as any;
   const canCancel = appointment.status === AppointmentStatus.PENDING || appointment.status === AppointmentStatus.CONFIRMED;
   const canAcceptReject = !isClient && appointment.status === AppointmentStatus.PENDING;
+  const effectivePayment = paymentDetails || (appointment as any).payment || null;
+  const shouldShowPaymentCard = !!effectivePayment || !!(appointment as any).paymentId;
+  const paymentAmount = Number((effectivePayment as any)?.amount ?? 0);
+  const paymentAmountText = Number.isFinite(paymentAmount)
+    ? `₹${paymentAmount.toLocaleString('en-IN')}`
+    : 'N/A';
+  const paymentStatusRaw = String((effectivePayment as any)?.status || '').trim();
+  const paymentStatusText = paymentStatusRaw
+    ? paymentStatusRaw.charAt(0) + paymentStatusRaw.slice(1).toLowerCase()
+    : 'Unknown';
+  const paymentIdText = String((effectivePayment as any)?.id || (appointment as any)?.paymentId || '').trim();
 
   return (
     <View style={styles.root}>
@@ -184,17 +231,17 @@ export const AppointmentDetailScreen: React.FC<Props> = ({ navigation, route }) 
         </View>
 
         {/* Payment Card */}
-        {appointment.payment && (
+        {shouldShowPaymentCard && (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Payment Details</Text>
-            <InfoRow icon="cash" label="Amount" value={`₹${(appointment.payment.amount / 100).toLocaleString('en-IN')}`} />
+            <InfoRow icon="cash" label="Amount" value={paymentAmountText} />
             <InfoRow
               icon="checkmark-circle"
               label="Payment Status"
-              value={appointment.payment.status.charAt(0) + appointment.payment.status.slice(1).toLowerCase()}
+              value={paymentStatusText}
             />
-            {appointment.paymentId && (
-              <InfoRow icon="receipt" label="Payment ID" value={appointment.paymentId} />
+            {paymentIdText && (
+              <InfoRow icon="receipt" label="Payment ID" value={paymentIdText} />
             )}
           </View>
         )}

@@ -205,7 +205,7 @@ export const LawyerAppointmentsScreen: React.FC<{ navigation: any }> = ({ naviga
       onReject={item.status === AppointmentStatus.PENDING ? () => handleReject(item.id) : undefined}
       onChat={
         item.status === AppointmentStatus.CONFIRMED || item.status === AppointmentStatus.ATTENDED || item.status === 'COMPLETED' as any
-          ? () => navigation.navigate('ChatScreen', { otherUserId: item.clientId, name: item.client?.name, appointmentId: item.id })
+          ? () => navigation.navigate('ChatScreen', { otherUserId: item.clientId, name: item.client?.name })
           : undefined
       }
       onCreateCase={item.status === AppointmentStatus.ATTENDED ? () => handleCreateCase(item) : undefined}
