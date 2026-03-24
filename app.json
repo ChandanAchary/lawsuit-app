@@ -1,12 +1,12 @@
 {
   "expo": {
     "name": "NyayaX",
-    "slug": "lawsuit-app",
+    "slug": "NyayaX",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "scheme": "lawsuit",
+    "scheme": "nyayax",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -15,7 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "buildNumber": "1",
-      "bundleIdentifier": "com.msdchandan.lawsuitapp",
+      "bundleIdentifier": "com.chandan.NyayaX",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "NyayaX needs your location to find lawyers near you.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "NyayaX needs your location to find lawyers near you.",
@@ -95,7 +95,7 @@
     "owner": "expo-chandan",
     "extra": {
       "eas": {
-        "projectId": "a9f2b168-45a9-4dc7-a22e-b491ecd190ff"
+        "projectId": "1e1c6b7b-203e-49dd-a24f-87bd82c4d2bc"
       }
     }
   }

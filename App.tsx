@@ -29,7 +29,7 @@ if (typeof ErrorUtils !== 'undefined') {
 }
 
 const linking: LinkingOptions<any> = {
-  prefixes: ['lawsuit://', 'https://lawsuit-app.com'],
+  prefixes: ['lawsuit://', 'https://nyayax.com'],
   config: {
     screens: {
       Register: {

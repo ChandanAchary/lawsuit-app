@@ -1,5 +1,5 @@
 {
-  "name": "lawsuit-app",
+  "name": "NyayaX",
   "version": "1.0.0",
   "main": "index.ts",
   "scripts": {
@@ -33,9 +33,9 @@
     "expo-linear-gradient": "~15.0.8",
     "expo-location": "~19.0.8",
     "expo-notifications": "~0.32.16",
-    "expo-print": "^55.0.9",
+    "expo-print": "~15.0.8",
     "expo-secure-store": "~15.0.8",
-    "expo-sharing": "^55.0.14",
+    "expo-sharing": "~14.0.8",
     "expo-splash-screen": "~31.0.13",
     "expo-status-bar": "~3.0.9",
     "expo-web-browser": "~15.0.10",
