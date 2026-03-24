@@ -92,6 +92,13 @@ export const CourtAdminLoginScreen: React.FC<{ navigation: any }> = ({ navigatio
         </View>
 
         <Button title="Sign In" onPress={handleLogin} loading={loading} size="lg" />
+
+        <TouchableOpacity
+          style={styles.registerCta}
+          onPress={() => navigation.navigate('CourtAdminRegister')}
+        >
+          <Text style={styles.registerCtaText}>New Court Admin? Register Here</Text>
+        </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
@@ -123,4 +130,15 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   },
   inputIcon: { marginRight: SPACING.sm },
   input: { flex: 1, fontSize: FONT_SIZE.md, color: COLORS.text, paddingVertical: SPACING.lg },
+  registerCta: {
+    marginTop: SPACING.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.sm,
+  },
+  registerCtaText: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '700',
+    color: COLORS.primary,
+  },
 });

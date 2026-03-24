@@ -298,6 +298,12 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
                 <Ionicons name="checkmark-circle" size={22} color={COLORS.success} />
               )}
             </View>
+            {!lawyer.isVerified && (
+              <View style={styles.unverifiedTag}>
+                <Ionicons name="alert-circle-outline" size={13} color={COLORS.warning} />
+                <Text style={styles.unverifiedTagText}>Not Verified by Any Court</Text>
+              </View>
+            )}
             {lawyer.specialization?.length > 0 && (
               <Text style={styles.spec}>{lawyer.specialization.join(' · ')}</Text>
             )}
@@ -633,6 +639,24 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     paddingBottom: SPACING.xxxl,
     borderBottomLeftRadius: BORDER_RADIUS.xxl + 4,
     borderBottomRightRadius: BORDER_RADIUS.xxl + 4,
+  },
+  unverifiedTag: {
+    marginTop: SPACING.xs,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(245, 158, 11, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.45)',
+    borderRadius: BORDER_RADIUS.full,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 4,
+  },
+  unverifiedTagText: {
+    color: '#FCD34D',
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '700',
   },
   backBtn: {
     marginLeft: SPACING.xl,

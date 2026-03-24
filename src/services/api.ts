@@ -82,7 +82,24 @@ api.interceptors.response.use(
 // ─── Auth API ───────────────────────────────────────────────
 export const authApi = {
   login: (email: string, password: string) => api.post('/auth/login', { email, password }),
-  register: (data: { name: string; email: string; phone: string; password: string; role: string }) =>
+  register: (data: {
+    name: string;
+    email: string;
+    phone: string;
+    password: string;
+    role: string;
+    courtId?: string;
+    courtDetails?: {
+      name: string;
+      type: string;
+      address: string;
+      pincode: string;
+      state: string;
+      district: string;
+      city?: string;
+    };
+    registrationNumber?: string;
+  }) =>
     api.post('/auth/register', data),
   verifyOtp: (identifier: string, code: string) => api.post('/auth/verify-otp', { identifier, code }),
   requestOtp: (identifier: string) => api.post('/auth/request-otp', { identifier }),
@@ -296,6 +313,7 @@ export const teleLawApi = {
 // ─── Address API ────────────────────────────────────────────
 export const addressApi = {
   getStates: () => api.get('/address/states'),
+  getDistrictsByState: (state: string) => api.get(`/address/districts/${encodeURIComponent(state)}`),
   lookupPincode: (pincode: string) => api.get(`/address/pincode/${encodeURIComponent(pincode)}`),
 };
 
@@ -359,6 +377,20 @@ export const paymentsApi = {
 // ─── Court Admin API ────────────────────────────────────────
 export const courtAdminApi = {
   login: (email: string, password: string) => api.post('/court-admin/login', { email, password }),
+  getMe: () => api.get('/court-admin/me'),
+  updateMe: (data: { name?: string; email?: string; phone?: string; avatarUrl?: string; registrationNumber?: string }) =>
+    api.put('/court-admin/me', data),
+  updateMyCourt: (data: {
+    name?: string;
+    type?: string;
+    pincode?: string;
+    state?: string;
+    district?: string;
+    city?: string;
+    address?: string;
+  }) => api.put('/court-admin/me/court', data),
+  getPublicCourtsByPincode: (pincode: string) => api.get(`/court-admin/public/courts/by-pincode/${encodeURIComponent(pincode)}`),
+  getPublicAdminsByPincode: (pincode: string) => api.get(`/court-admin/public/admins/by-pincode/${encodeURIComponent(pincode)}`),
   createCourt: (data: Record<string, unknown>) => api.post('/court-admin/courts', data),
   getCourts: () => api.get('/court-admin/courts'),
   getCourtById: (id: string) => api.get(`/court-admin/courts/${encodeURIComponent(id)}`),
@@ -368,8 +400,26 @@ export const courtAdminApi = {
   getAdmins: () => api.get('/court-admin/admins'),
   getAdminById: (id: string) => api.get(`/court-admin/admins/${encodeURIComponent(id)}`),
   updateAdminStatus: (id: string, status: string) => api.put(`/court-admin/admins/${encodeURIComponent(id)}/status`, { status }),
+  submitVerificationRequest: (courtAdminId: string) => api.post('/court-admin/verifications/request', { courtAdminId }),
+  getMyVerificationRequests: () => api.get('/court-admin/verifications/my-requests'),
   getPendingVerifications: () => api.get('/court-admin/verifications/pending'),
-  getMyVerifications: () => api.get('/court-admin/verifications'),
+  getMyVerifications: (params?: { statuses?: string; page?: number; limit?: number }) => api.get('/court-admin/verifications', { params }),
+  getVerificationDocuments: async (lawyerId: string) => {
+    const safeLawyerId = encodeURIComponent(lawyerId);
+    try {
+      return await api.get(`/court-admin/verifications/${safeLawyerId}/documents`);
+    } catch (err: any) {
+      const status = err?.response?.status;
+      const rawMessage = err?.response?.data?.error || err?.response?.data?.message || '';
+      const msg = String(rawMessage).toLowerCase();
+
+      // Backward-compatible fallback for deployments using legacy route naming.
+      if (status === 404 || msg.includes('route not found')) {
+        return api.get(`/court-admin/verify/${safeLawyerId}/documents`);
+      }
+      throw err;
+    }
+  },
   verifyLawyer: (lawyerId: string, data: { status: string; remarks?: string }) =>
     api.post(`/court-admin/verify/${encodeURIComponent(lawyerId)}`, data),
 };

@@ -15,6 +15,7 @@ import { RegisterScreen } from '../screens/auth/RegisterScreen';
 import { OtpVerifyScreen } from '../screens/auth/OtpVerifyScreen';
 import { ForgotPasswordScreen } from '../screens/auth/ForgotPasswordScreen';
 import { AdminLoginScreen } from '../screens/auth/AdminLoginScreen';
+import { CourtAdminRegisterScreen } from '../screens/auth/CourtAdminRegisterScreen';
 
 // Client screens
 import { HomeScreen } from '../screens/client/HomeScreen';
@@ -39,6 +40,7 @@ import { EditLawyerProfileScreen } from '../screens/lawyer/EditLawyerProfileScre
 import { LawyerTemplatesScreen } from '../screens/lawyer/LawyerTemplatesScreen';
 import { ProSubscriptionScreen } from '../screens/lawyer/ProSubscriptionScreen';
 import { LawyerClientDetailScreen } from '../screens/lawyer/LawyerClientDetailScreen';
+import { LawyerVerificationRequestScreen } from '../screens/lawyer/LawyerVerificationRequestScreen';
 
 // Admin screens
 import { AdminDashboardScreen } from '../screens/admin/AdminDashboardScreen';
@@ -51,6 +53,8 @@ import { CourtAdminManagementScreen } from '../screens/admin/CourtAdminManagemen
 // Court Admin screens
 import { CourtAdminDashboardScreen } from '../screens/courtAdmin/CourtAdminDashboardScreen';
 import { LawyerVerificationScreen } from '../screens/courtAdmin/LawyerVerificationScreen';
+import { CourtAdminProfileScreen } from '../screens/courtAdmin/CourtAdminProfileScreen';
+import { EditCourtAdminProfileScreen } from '../screens/courtAdmin/EditCourtAdminProfileScreen';
 
 // Shared screens
 import { ChatScreen } from '../screens/shared/ChatScreen';
@@ -82,6 +86,7 @@ export const AuthStack = () => (
     <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
     <Stack.Screen name="AdminLogin" component={AdminLoginScreen} />
     <Stack.Screen name="CourtAdminLogin" component={CourtAdminLoginScreen} />
+    <Stack.Screen name="CourtAdminRegister" component={CourtAdminRegisterScreen} />
   </Stack.Navigator>
 );
 
@@ -240,6 +245,7 @@ const CourtAdminTabs = () => {
           const icons: Record<string, string> = {
             CourtAdminDashboard: focused ? 'shield-checkmark' : 'shield-checkmark-outline',
             LawyerVerification: focused ? 'checkmark-done-circle' : 'checkmark-done-circle-outline',
+            CourtAdminProfile: focused ? 'person' : 'person-outline',
           };
           return <Ionicons name={icons[route.name] as any} size={22} color={color} />;
         },
@@ -247,6 +253,7 @@ const CourtAdminTabs = () => {
     >
       <Tab.Screen name="CourtAdminDashboard" component={CourtAdminDashboardScreen} options={{ title: 'Dashboard' }} />
       <Tab.Screen name="LawyerVerification" component={LawyerVerificationScreen} options={{ title: 'Verifications' }} />
+      <Tab.Screen name="CourtAdminProfile" component={CourtAdminProfileScreen} options={{ title: 'Profile' }} />
     </Tab.Navigator>
   );
 };
@@ -256,7 +263,7 @@ const getRoleTabs = (role: UserRole | string) => {
   switch (role) {
     case UserRole.LAWYER: return LawyerTabs;
     case UserRole.ADMIN: return AdminTabs;
-    case 'COURT_ADMIN': return CourtAdminTabs;
+    case UserRole.COURT_ADMIN: return CourtAdminTabs;
     default: return ClientTabs;
   }
 };
@@ -281,6 +288,8 @@ export const MainStack = () => {
       <Stack.Screen name="BankAccounts" component={BankAccountsScreen} />
       <Stack.Screen name="EditProfile" component={EditProfileScreen} />
       <Stack.Screen name="EditLawyerProfile" component={EditLawyerProfileScreen} />
+      <Stack.Screen name="EditCourtAdminProfile" component={EditCourtAdminProfileScreen} />
+      <Stack.Screen name="LawyerVerificationRequest" component={LawyerVerificationRequestScreen} />
       <Stack.Screen name="LawyerTemplates" component={LawyerTemplatesScreen} />
       <Stack.Screen name="ProSubscription" component={ProSubscriptionScreen} />
       <Stack.Screen name="About" component={AboutScreen} />

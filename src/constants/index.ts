@@ -1,3 +1,6 @@
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
+
 const DEFAULT_API_BASE_URL = 'https://lawsuit-server.onrender.com';
 
 const ensureProtocol = (value: string): string => {
@@ -7,8 +10,25 @@ const ensureProtocol = (value: string): string => {
 
 const stripTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
 
+const resolveLocalhostForDevice = (value: string): string => {
+  if (Platform.OS === 'web') return value;
+  if (!/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(value)) return value;
+
+  const anyConstants = Constants as any;
+  const hostUri =
+    anyConstants?.expoConfig?.hostUri ||
+    anyConstants?.manifest2?.extra?.expoGo?.debuggerHost ||
+    anyConstants?.manifest?.debuggerHost ||
+    '';
+
+  const host = typeof hostUri === 'string' ? hostUri.split(':')[0] : '';
+  if (!host || host === 'localhost' || host === '127.0.0.1') return value;
+
+  return value.replace(/\/\/(localhost|127\.0\.0\.1)/i, `//${host}`);
+};
+
 const rawApiBaseUrl = (process.env.EXPO_PUBLIC_API_URL || DEFAULT_API_BASE_URL).trim();
-const normalizedApiBaseUrl = stripTrailingSlash(ensureProtocol(rawApiBaseUrl)).replace(/\/api\/v1$/i, '');
+const normalizedApiBaseUrl = stripTrailingSlash(ensureProtocol(resolveLocalhostForDevice(rawApiBaseUrl))).replace(/\/api\/v1$/i, '');
 
 export const API_BASE_URL = normalizedApiBaseUrl;
 export const API_URL = `${API_BASE_URL}/api/v1`;

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, Modal, Dimensions,
-  ActivityIndicator, StatusBar,
+  ActivityIndicator, StatusBar, Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -188,6 +188,8 @@ export const LawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigation 
         <View style={styles.menuCard}>
           <MenuItem icon="person-outline" label="Edit Profile" subtitle="Name, specializations, experience"
             onPress={() => navigation.navigate('EditLawyerProfile')} />
+          <MenuItem icon="shield-checkmark-outline" label="Court Verification Request" subtitle="Send request to nearest court admin"
+            onPress={() => navigation.navigate('LawyerVerificationRequest')} />
           <MenuItem icon="wallet-outline" label="Wallet" subtitle="Balance & transactions"
             onPress={() => navigation.navigate('Wallet')} />
           <MenuItem icon="card-outline" label="Bank & UPI Accounts" subtitle="Manage withdrawal accounts"

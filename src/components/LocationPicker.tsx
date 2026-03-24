@@ -10,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../constants';
 import { addressApi } from '../services/api';
+import { loadDistrictOptions, loadStateOptions } from '../utils/addressOptions';
 import { Input } from './Input';
 
 interface LocationData {
@@ -36,7 +37,11 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ value, onChange,
 
   const [states, setStates] = useState<string[]>([]);
   const [showStatePicker, setShowStatePicker] = useState(false);
+  const [showDistrictPicker, setShowDistrictPicker] = useState(false);
   const [stateSearch, setStateSearch] = useState('');
+  const [districtSearch, setDistrictSearch] = useState('');
+  const [districts, setDistricts] = useState<string[]>([]);
+  const [loadingDistricts, setLoadingDistricts] = useState(false);
   const [postOffices, setPostOffices] = useState<any[]>([]);
   const [showPlacePicker, setShowPlacePicker] = useState(false);
   const [loadingPincode, setLoadingPincode] = useState(false);
@@ -48,13 +53,26 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ value, onChange,
   const filteredPostOffices = areaSearch
     ? postOffices.filter((po: any) => (po.name || po.postOfficeName || '').toLowerCase().includes(areaSearch.toLowerCase()))
     : postOffices;
+  const filteredDistricts = districtSearch
+    ? districts.filter((d) => d.toLowerCase().includes(districtSearch.toLowerCase()))
+    : districts;
 
   useEffect(() => {
-    addressApi.getStates().then(({ data }) => {
-      const list = data?.data?.states || data?.states || [];
-      setStates(Array.isArray(list) ? list : []);
-    }).catch(() => {});
+    void loadStateOptions().then((resolved) => setStates(resolved));
   }, []);
+
+  useEffect(() => {
+    const currentState = value.state?.trim();
+    if (!currentState) {
+      setDistricts([]);
+      return;
+    }
+
+    setLoadingDistricts(true);
+    void loadDistrictOptions(currentState)
+      .then((list) => setDistricts(list))
+      .finally(() => setLoadingDistricts(false));
+  }, [value.state]);
 
   const handlePincodeLookup = async (pincode: string, silent = false) => {
     if (!silent) onChange({ pincode });
@@ -72,8 +90,14 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ value, onChange,
       const cached = pincodeResultsCache.get(pincode)!;
       setPostOffices(cached);
       setPincodeError('');
-      if (!silent && cached.length > 0) {
-        const first = cached[0];
+      const filtered = cached.filter((po: any) => {
+        const stateOk = !value.state || po.state?.toLowerCase() === value.state.toLowerCase();
+        const districtOk = !value.district || po.district?.toLowerCase() === value.district.toLowerCase();
+        return stateOk && districtOk;
+      });
+      setPostOffices(filtered);
+      if (!silent && filtered.length > 0) {
+        const first = filtered[0];
         onChange({ pincode, state: first.state || value.state, district: first.district || value.district });
       }
       return;
@@ -85,17 +109,22 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ value, onChange,
     try {
       const { data } = await addressApi.lookupPincode(pincode);
       const offices = data?.postOffices || data?.data?.postOffices || [];
+      const filtered = (offices as any[]).filter((po: any) => {
+        const stateOk = !value.state || po.state?.toLowerCase() === value.state.toLowerCase();
+        const districtOk = !value.district || po.district?.toLowerCase() === value.district.toLowerCase();
+        return stateOk && districtOk;
+      });
       const success = data?.success !== false && offices.length > 0;
       if (success) {
         pincodeResultsCache.set(pincode, offices);
-        setPostOffices(offices);
-        const first = offices[0];
-        onChange({
-          pincode,
-          state: first.state || value.state,
-          district: first.district || value.district,
-        });
-        if (offices.length === 1) {
+        setPostOffices(filtered);
+        const first = filtered[0];
+        if (!first) {
+          if (!silent) setPincodeError('No records found for selected state/district and pincode');
+          return;
+        }
+        onChange({ pincode, state: first.state || value.state, district: first.district || value.district });
+        if (filtered.length === 1) {
           onChange({
             pincode,
             state: first.state,
@@ -160,6 +189,23 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ value, onChange,
           {value.state || 'Select your state'}
         </Text>
         <Ionicons name="chevron-down" size={18} color={COLORS.textMuted} />
+      </TouchableOpacity>
+
+      {/* District Picker */}
+      <Text style={styles.fieldLabel}>District</Text>
+      <TouchableOpacity
+        style={[styles.dropdown, !value.state && styles.dropdownDisabled]}
+        disabled={!value.state}
+        onPress={() => setShowDistrictPicker(true)}
+      >
+        <Text style={value.district ? styles.dropdownText : styles.dropdownPlaceholder}>
+          {value.district || (value.state ? 'Select district' : 'Select state first')}
+        </Text>
+        {loadingDistricts ? (
+          <ActivityIndicator size="small" color={COLORS.primary} />
+        ) : (
+          <Ionicons name="chevron-down" size={18} color={COLORS.textMuted} />
+        )}
       </TouchableOpacity>
 
       {/* Pincode */}
@@ -265,12 +311,70 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ value, onChange,
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={[styles.listItem, item === value.state && styles.listItemActive]}
-                  onPress={() => { onChange({ state: item }); setShowStatePicker(false); setStateSearch(''); }}
+                  onPress={() => {
+                    onChange({
+                      state: item,
+                      district: '',
+                      pincode: '',
+                      city: '',
+                      postOfficeName: '',
+                    });
+                    setPostOffices([]);
+                    setShowStatePicker(false);
+                    setStateSearch('');
+                  }}
                 >
                   <Text style={[styles.listItemText, item === value.state && styles.listItemTextActive]}>{item}</Text>
                   {item === value.state && <Ionicons name="checkmark" size={20} color={COLORS.primary} />}
                 </TouchableOpacity>
               )}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* District Picker Modal */}
+      <Modal visible={showDistrictPicker} transparent animationType="slide" onRequestClose={() => setShowDistrictPicker(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select District</Text>
+              <TouchableOpacity onPress={() => setShowDistrictPicker(false)}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.searchBox}>
+              <Ionicons name="search" size={18} color={COLORS.textMuted} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search district..."
+                placeholderTextColor={COLORS.textMuted}
+                value={districtSearch}
+                onChangeText={setDistrictSearch}
+              />
+            </View>
+            <FlatList
+              data={filteredDistricts}
+              keyExtractor={(item) => item}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[styles.listItem, item === value.district && styles.listItemActive]}
+                  onPress={() => {
+                    onChange({ district: item, pincode: '', city: '', postOfficeName: '' });
+                    setPostOffices([]);
+                    setShowDistrictPicker(false);
+                    setDistrictSearch('');
+                  }}
+                >
+                  <Text style={[styles.listItemText, item === value.district && styles.listItemTextActive]}>{item}</Text>
+                  {item === value.district && <Ionicons name="checkmark" size={20} color={COLORS.primary} />}
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <View style={{ padding: SPACING.xl }}>
+                  <Text style={styles.listItemSub}>No districts found.</Text>
+                </View>
+              }
             />
           </View>
         </View>
@@ -366,6 +470,7 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   },
   dropdownText: { fontSize: FONT_SIZE.md, color: COLORS.text },
   dropdownPlaceholder: { fontSize: FONT_SIZE.md, color: COLORS.textMuted },
+  dropdownDisabled: { opacity: 0.6 },
   pincodeRow: { flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.lg },
   pincodeInput: {
     flex: 1, backgroundColor: COLORS.surfaceAlt, borderRadius: BORDER_RADIUS.lg,

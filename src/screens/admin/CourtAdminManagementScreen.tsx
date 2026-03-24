@@ -24,7 +24,7 @@ export const CourtAdminManagementScreen: React.FC<{ navigation: any }> = ({ navi
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
-  const [formData, setFormData] = useState({ name: '', email: '', phone: '', password: '', courtId: '' });
+  const [formData, setFormData] = useState({ name: '', email: '', phone: '', password: '', courtId: '', registrationNumber: '' });
   const [submitting, setSubmitting] = useState(false);
   const [courts, setCourts] = useState<any[]>([]);
 
@@ -47,7 +47,7 @@ export const CourtAdminManagementScreen: React.FC<{ navigation: any }> = ({ navi
   useEffect(() => { fetchAdmins(); fetchCourts(); }, []);
 
   const handleCreate = async () => {
-    if (!formData.name.trim() || !formData.email.trim() || !formData.phone.trim() || !formData.password.trim() || !formData.courtId) {
+    if (!formData.name.trim() || !formData.email.trim() || !formData.phone.trim() || !formData.password.trim() || !formData.courtId || !formData.registrationNumber.trim()) {
       return Alert.alert('Error', 'All fields are required');
     }
     setSubmitting(true);
@@ -55,7 +55,7 @@ export const CourtAdminManagementScreen: React.FC<{ navigation: any }> = ({ navi
       await courtAdminApi.createAdmin(formData);
       Alert.alert('Success', 'Court admin created');
       setShowCreate(false);
-      setFormData({ name: '', email: '', phone: '', password: '', courtId: '' });
+      setFormData({ name: '', email: '', phone: '', password: '', courtId: '', registrationNumber: '' });
       fetchAdmins(false);
     } catch (err: any) {
       Alert.alert('Error', err.response?.data?.error || 'Failed to create');
@@ -144,6 +144,7 @@ export const CourtAdminManagementScreen: React.FC<{ navigation: any }> = ({ navi
               <TextInput style={styles.input} value={formData.name} onChangeText={(v) => setFormData(p => ({ ...p, name: v }))} placeholder="Full Name *" placeholderTextColor={COLORS.textMuted} />
               <TextInput style={styles.input} value={formData.email} onChangeText={(v) => setFormData(p => ({ ...p, email: v }))} placeholder="Email *" placeholderTextColor={COLORS.textMuted} keyboardType="email-address" autoCapitalize="none" />
               <TextInput style={styles.input} value={formData.phone} onChangeText={(v) => setFormData(p => ({ ...p, phone: v }))} placeholder="Phone *" placeholderTextColor={COLORS.textMuted} keyboardType="phone-pad" />
+              <TextInput style={styles.input} value={formData.registrationNumber} onChangeText={(v) => setFormData(p => ({ ...p, registrationNumber: v }))} placeholder="Registration Number *" placeholderTextColor={COLORS.textMuted} autoCapitalize="characters" />
               <TextInput style={styles.input} value={formData.password} onChangeText={(v) => setFormData(p => ({ ...p, password: v }))} placeholder="Password *" placeholderTextColor={COLORS.textMuted} secureTextEntry />
               <Text style={styles.selectLabel}>Select Court *</Text>
               <View style={styles.courtList}>

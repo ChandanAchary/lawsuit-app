@@ -21,7 +21,7 @@ export const CourtManagementScreen: React.FC<{ navigation: any }> = ({ navigatio
   const [refreshing, setRefreshing] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingCourt, setEditingCourt] = useState<any>(null);
-  const [formData, setFormData] = useState({ name: '', code: '', type: 'DISTRICT_COURT', state: '', district: '', city: '', address: '' });
+  const [formData, setFormData] = useState({ name: '', code: '', type: 'DISTRICT_COURT', pincode: '', state: '', district: '', city: '', address: '' });
   const [submitting, setSubmitting] = useState(false);
 
   const fetchCourts = useCallback(async (showLoader = true) => {
@@ -36,7 +36,7 @@ export const CourtManagementScreen: React.FC<{ navigation: any }> = ({ navigatio
   useEffect(() => { fetchCourts(); }, []);
 
   const resetForm = () => {
-    setFormData({ name: '', code: '', type: 'DISTRICT_COURT', state: '', district: '', city: '', address: '' });
+    setFormData({ name: '', code: '', type: 'DISTRICT_COURT', pincode: '', state: '', district: '', city: '', address: '' });
     setEditingCourt(null);
   };
 
@@ -45,7 +45,7 @@ export const CourtManagementScreen: React.FC<{ navigation: any }> = ({ navigatio
     setEditingCourt(court);
     setFormData({
       name: court.name || '', code: court.code || '', type: court.type || 'DISTRICT_COURT',
-      state: court.state || '', district: court.district || '', city: court.city || '', address: court.address || '',
+      pincode: court.pincode || '', state: court.state || '', district: court.district || '', city: court.city || '', address: court.address || '',
     });
     setShowForm(true);
   };
@@ -96,9 +96,9 @@ export const CourtManagementScreen: React.FC<{ navigation: any }> = ({ navigatio
           <Text style={styles.cardSub}>{item.code} · {(item.type || '').replace(/_/g, ' ')}</Text>
         </View>
       </View>
-      {(item.city || item.state) && (
+      {(item.city || item.state || item.pincode) && (
         <Text style={styles.cardLocation}>
-          {[item.city, item.district, item.state].filter(Boolean).join(', ')}
+          {[item.city, item.district, item.state, item.pincode].filter(Boolean).join(', ')}
         </Text>
       )}
       <View style={styles.cardActions}>
@@ -159,6 +159,7 @@ export const CourtManagementScreen: React.FC<{ navigation: any }> = ({ navigatio
               <TextInput style={styles.input} value={formData.state} onChangeText={(v) => setFormData(p => ({ ...p, state: v }))} placeholder="State" placeholderTextColor={COLORS.textMuted} />
               <TextInput style={styles.input} value={formData.district} onChangeText={(v) => setFormData(p => ({ ...p, district: v }))} placeholder="District" placeholderTextColor={COLORS.textMuted} />
               <TextInput style={styles.input} value={formData.city} onChangeText={(v) => setFormData(p => ({ ...p, city: v }))} placeholder="City" placeholderTextColor={COLORS.textMuted} />
+              <TextInput style={styles.input} value={formData.pincode} onChangeText={(v) => setFormData(p => ({ ...p, pincode: v }))} placeholder="Pincode" placeholderTextColor={COLORS.textMuted} keyboardType="number-pad" maxLength={6} />
               <TextInput style={styles.input} value={formData.address} onChangeText={(v) => setFormData(p => ({ ...p, address: v }))} placeholder="Address" placeholderTextColor={COLORS.textMuted} />
               <Button title={editingCourt ? 'Update Court' : 'Create Court'} onPress={handleSave} loading={submitting} size="lg" />
             </View>

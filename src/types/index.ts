@@ -2,6 +2,7 @@
 export enum UserRole {
   CLIENT = 'CLIENT',
   LAWYER = 'LAWYER',
+  COURT_ADMIN = 'COURT_ADMIN',
   ADMIN = 'ADMIN',
 }
 

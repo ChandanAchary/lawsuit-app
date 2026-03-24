@@ -108,7 +108,7 @@ export default function App() {
   useEffect(() => {
     const navigateFromNotification = (target: { name: string; params?: Record<string, unknown> }) => {
       if (!navigationRef.isReady()) return;
-      navigationRef.navigate(target.name as never, target.params as never);
+      (navigationRef as any).navigate(target.name, target.params);
     };
 
     void handleInitialNotificationNavigation(navigateFromNotification);

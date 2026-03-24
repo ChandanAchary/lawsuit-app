@@ -16,14 +16,20 @@ export const CourtAdminDashboardScreen: React.FC<{ navigation: any }> = ({ navig
 
   const user = useAuthStore((s) => s.user);
   const [pendingCount, setPendingCount] = useState(0);
+  const [pendingItems, setPendingItems] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchPending = useCallback(async () => {
     try {
       const { data } = await courtAdminApi.getPendingVerifications();
-      const lawyers = data.lawyers || data || [];
-      setPendingCount(Array.isArray(lawyers) ? lawyers.length : 0);
-    } catch { setPendingCount(0); }
+      const items = data.items || data.lawyers || data || [];
+      const arr = Array.isArray(items) ? items : [];
+      setPendingItems(arr);
+      setPendingCount(arr.length);
+    } catch {
+      setPendingItems([]);
+      setPendingCount(0);
+    }
   }, []);
 
   useEffect(() => { fetchPending(); }, []);
@@ -37,6 +43,9 @@ export const CourtAdminDashboardScreen: React.FC<{ navigation: any }> = ({ navig
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />}
     >
       <LinearGradient colors={[COLORS.midnight, COLORS.primary]} style={styles.hero}>
+        <TouchableOpacity style={styles.notificationBtn} onPress={() => navigation.navigate('Notifications')}>
+          <Ionicons name="notifications-outline" size={22} color={COLORS.white} />
+        </TouchableOpacity>
         <View style={styles.heroIcon}>
           <Ionicons name="shield-checkmark" size={32} color={COLORS.accent} />
         </View>
@@ -55,7 +64,7 @@ export const CourtAdminDashboardScreen: React.FC<{ navigation: any }> = ({ navig
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Actions</Text>
+        <Text style={styles.sectionTitle}>New Pending Requests</Text>
         <MenuItem
           icon="time-outline"
           label="Pending Verifications"
@@ -65,22 +74,32 @@ export const CourtAdminDashboardScreen: React.FC<{ navigation: any }> = ({ navig
           COLORS={COLORS}
           styles={styles}
         />
-        <MenuItem
-          icon="checkmark-done-outline"
-          label="My Verifications"
-          desc="View your verification history"
-          onPress={() => navigation.navigate('LawyerVerification', { tab: 'history' })}
-          COLORS={COLORS}
-          styles={styles}
-        />
-        <MenuItem
-          icon="notifications-outline"
-          label="Notifications"
-          desc="View alerts"
-          onPress={() => navigation.navigate('Notifications')}
-          COLORS={COLORS}
-          styles={styles}
-        />
+
+        {pendingItems.slice(0, 5).map((item: any, index: number) => (
+          <TouchableOpacity
+            key={item?.id || `${item?.lawyer?.id || 'lawyer'}-${index}`}
+            style={styles.requestItem}
+            onPress={() => navigation.navigate('LawyerVerification', { tab: 'pending' })}
+          >
+            <View style={styles.requestAvatar}>
+              <Ionicons name="person-outline" size={18} color={COLORS.primary} />
+            </View>
+            <View style={styles.requestInfo}>
+              <Text style={styles.requestName}>{item?.lawyer?.name || 'Lawyer'}</Text>
+              <Text style={styles.requestMeta}>
+                {[item?.lawyer?.city, item?.lawyer?.state].filter(Boolean).join(', ') || 'Location unavailable'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} />
+          </TouchableOpacity>
+        ))}
+
+        {pendingCount === 0 && (
+          <View style={styles.emptyBox}>
+            <Ionicons name="checkmark-done-circle-outline" size={24} color={COLORS.success} />
+            <Text style={styles.emptyText}>No new pending requests</Text>
+          </View>
+        )}
       </View>
     </ScrollView>
   );
@@ -111,6 +130,17 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     paddingHorizontal: SPACING.xl, paddingTop: SPACING.huge + SPACING.md, paddingBottom: SPACING.xxxl,
     borderBottomLeftRadius: BORDER_RADIUS.xxl, borderBottomRightRadius: BORDER_RADIUS.xxl,
     alignItems: 'center',
+  },
+  notificationBtn: {
+    position: 'absolute',
+    top: SPACING.huge,
+    right: SPACING.xl,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.16)',
   },
   heroIcon: {
     width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(255,255,255,0.1)',
@@ -147,4 +177,34 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     paddingHorizontal: SPACING.sm, paddingVertical: 2, marginRight: SPACING.sm,
   },
   menuBadgeText: { fontSize: FONT_SIZE.xs, fontWeight: '800', color: COLORS.white },
+  requestItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.lg,
+    marginBottom: SPACING.sm,
+    ...SHADOWS.sm,
+  },
+  requestAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: COLORS.primaryLight + '20',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  requestInfo: { flex: 1, marginLeft: SPACING.md },
+  requestName: { fontSize: FONT_SIZE.sm, fontWeight: '700', color: COLORS.text },
+  requestMeta: { fontSize: FONT_SIZE.xs, color: COLORS.textMuted, marginTop: 2 },
+  emptyBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.lg,
+    ...SHADOWS.sm,
+  },
+  emptyText: { color: COLORS.textSecondary, fontSize: FONT_SIZE.sm, fontWeight: '600' },
 });

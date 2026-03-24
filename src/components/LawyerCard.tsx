@@ -40,6 +40,12 @@ export const LawyerCard: React.FC<LawyerCardProps> = ({ lawyer, onPress, style, 
 
         <View style={styles.info}>
           <Text style={styles.name} numberOfLines={1}>{lawyer.name}</Text>
+          {!lawyer.isVerified && (
+            <View style={styles.unverifiedBadge}>
+              <Ionicons name="alert-circle-outline" size={12} color={COLORS.warning} />
+              <Text style={styles.unverifiedBadgeText}>Not Verified by Any Court</Text>
+            </View>
+          )}
           {lawyer.specialization?.length > 0 && (
             <Text style={styles.specialization} numberOfLines={1}>
               {lawyer.specialization.slice(0, 2).join(' · ')}
@@ -128,6 +134,22 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     color: COLORS.primary,
     fontWeight: '500',
     marginTop: 2,
+  },
+  unverifiedBadge: {
+    marginTop: 4,
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: COLORS.warningLight,
+    borderRadius: BORDER_RADIUS.sm,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  unverifiedBadgeText: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.warning,
+    fontWeight: '700',
   },
   metaRow: {
     flexDirection: 'row',

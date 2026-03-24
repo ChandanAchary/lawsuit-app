@@ -92,6 +92,7 @@ export const RegisterScreen: React.FC<{ navigation: any; route: any }> = ({ navi
       Alert.alert('Error', 'Please enter a valid email address');
       return;
     }
+
     setStep('password');
   };
 
@@ -106,7 +107,13 @@ export const RegisterScreen: React.FC<{ navigation: any; route: any }> = ({ navi
     }
     clearError();
     try {
-      await register({ name: name.trim(), email: email.trim(), phone: phone.trim(), password, role });
+      await register({
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        password,
+        role,
+      });
 
       // Pass referral code to OTP screen — it will be applied after verification when auth token exists
       navigation.navigate('OtpVerify', { identifier: email.trim(), referralCode: referralCode.trim() || undefined });
@@ -206,7 +213,6 @@ export const RegisterScreen: React.FC<{ navigation: any; route: any }> = ({ navi
               icon={<Ionicons name="call-outline" size={20} color={COLORS.textMuted} />}
             />
 
-            {/* Referral Code Toggle */}
             {!showReferral ? (
               <TouchableOpacity
                 style={styles.referralToggle}

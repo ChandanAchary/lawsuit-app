@@ -11,7 +11,24 @@ interface AuthState {
   isLoading: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (data: { name: string; email: string; phone: string; password: string; role: string }) => Promise<void>;
+  register: (data: {
+    name: string;
+    email: string;
+    phone: string;
+    password: string;
+    role: string;
+    courtId?: string;
+    courtDetails?: {
+      name: string;
+      type: string;
+      address: string;
+      pincode: string;
+      state: string;
+      district: string;
+      city?: string;
+    };
+    registrationNumber?: string;
+  }) => Promise<void>;
   verifyOtp: (identifier: string, code: string) => Promise<void>;
   requestOtp: (identifier: string) => Promise<void>;
   resetPassword: (identifier: string, code: string, password: string) => Promise<void>;
