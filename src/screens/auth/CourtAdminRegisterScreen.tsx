@@ -70,10 +70,12 @@ export const CourtAdminRegisterScreen: React.FC<{ navigation: any }> = ({ naviga
   const [stateSearch, setStateSearch] = useState('');
   const [districtSearch, setDistrictSearch] = useState('');
   const [locationSearch, setLocationSearch] = useState('');
+  const [courtTypeSearch, setCourtTypeSearch] = useState('');
 
   const [districtLoading, setDistrictLoading] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
   const [lastLookupKey, setLastLookupKey] = useState('');
+  const [lastNoMatchKey, setLastNoMatchKey] = useState('');
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -104,6 +106,10 @@ export const CourtAdminRegisterScreen: React.FC<{ navigation: any }> = ({ naviga
     ? locations.filter((item) => item.name.toLowerCase().includes(locationSearch.toLowerCase()))
     : locations;
 
+  const filteredCourtTypes = courtTypeSearch
+    ? COURT_TYPE_OPTIONS.filter((item) => item.label.toLowerCase().includes(courtTypeSearch.toLowerCase()))
+    : COURT_TYPE_OPTIONS;
+
   const loadDistricts = async (state: string) => {
     setDistrictLoading(true);
     try {
@@ -124,6 +130,7 @@ export const CourtAdminRegisterScreen: React.FC<{ navigation: any }> = ({ naviga
     setPincode('');
     setLocationName('');
     setLocations([]);
+    setLastNoMatchKey('');
     setShowStateModal(false);
     setStateSearch('');
     await loadDistricts(state);
@@ -135,12 +142,14 @@ export const CourtAdminRegisterScreen: React.FC<{ navigation: any }> = ({ naviga
     setLocationName('');
     setLocations([]);
     setLastLookupKey('');
+    setLastNoMatchKey('');
     setShowDistrictModal(false);
     setDistrictSearch('');
   };
 
-  const lookupLocationsByPincode = async (pinFromArgs?: string) => {
+  const lookupLocationsByPincode = async (pinFromArgs?: string, manualTrigger = false) => {
     const pin = (pinFromArgs ?? pincode).trim();
+    const lookupKey = `${stateName}::${district}::${pin}`;
     if (!/^\d{6}$/.test(pin)) {
       Alert.alert('Error', 'Please enter a valid 6-digit pincode.');
       return;
@@ -163,21 +172,28 @@ export const CourtAdminRegisterScreen: React.FC<{ navigation: any }> = ({ naviga
       if (!matches.length) {
         setLocations([]);
         setLocationName('');
-        Alert.alert('No Locations Found', 'No matching location found for selected state, district, and pincode.');
+        // Mark this key as handled so auto-lookup doesn't keep alerting in a loop.
+        setLastLookupKey(lookupKey);
+        if (manualTrigger || lastNoMatchKey !== lookupKey) {
+          Alert.alert('No Locations Found', 'No matching location found for selected state, district, and pincode.');
+          setLastNoMatchKey(lookupKey);
+        }
         return;
       }
 
       setLocations(matches);
+      setLastNoMatchKey('');
       if (matches.length === 1) {
         setLocationName(matches[0].name);
       } else {
         setLocationName('');
         setShowLocationModal(true);
       }
-      setLastLookupKey(`${stateName}::${district}::${pin}`);
+      setLastLookupKey(lookupKey);
     } catch {
       setLocations([]);
       setLocationName('');
+      setLastLookupKey(lookupKey);
       Alert.alert('Error', 'Failed to fetch locations from pincode.');
     } finally {
       setLocationLoading(false);
@@ -399,9 +415,11 @@ export const CourtAdminRegisterScreen: React.FC<{ navigation: any }> = ({ naviga
                   onChangeText={(value) => {
                     setPincode(value);
                     setLocationName('');
+                    // Re-enable warning when user edits pincode and force a fresh lookup cycle.
+                    setLastLookupKey('');
+                    setLastNoMatchKey('');
                     if (value.trim().length < 6) {
                       setLocations([]);
-                      setLastLookupKey('');
                     }
                   }}
                   keyboardType="number-pad"
@@ -410,7 +428,7 @@ export const CourtAdminRegisterScreen: React.FC<{ navigation: any }> = ({ naviga
               </View>
               <TouchableOpacity
                 style={[styles.pincodeSearchBtn, locationLoading && styles.pincodeSearchBtnDisabled]}
-                onPress={() => void lookupLocationsByPincode()}
+                onPress={() => void lookupLocationsByPincode(undefined, true)}
                 disabled={locationLoading}
               >
                 {locationLoading ? (
@@ -490,22 +508,38 @@ export const CourtAdminRegisterScreen: React.FC<{ navigation: any }> = ({ naviga
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Select Court Type</Text>
-                <TouchableOpacity onPress={() => setShowCourtTypeModal(false)}>
+                <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowCourtTypeModal(false)}>
                   <Ionicons name="close" size={22} color={COLORS.text} />
                 </TouchableOpacity>
               </View>
+              <View style={styles.searchBox}>
+                <Ionicons name="search" size={18} color={COLORS.textMuted} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search court type"
+                  placeholderTextColor={COLORS.textMuted}
+                  value={courtTypeSearch}
+                  onChangeText={setCourtTypeSearch}
+                />
+              </View>
               <FlatList
-                data={COURT_TYPE_OPTIONS}
+                data={filteredCourtTypes}
                 keyExtractor={(item) => item.value}
+                style={styles.modalList}
+                contentContainerStyle={styles.modalListContent}
+                keyboardShouldPersistTaps="handled"
+                ListEmptyComponent={<Text style={styles.emptyText}>No court types found</Text>}
                 renderItem={({ item }) => (
                   <TouchableOpacity
                     style={[styles.listItem, item.value === courtType && styles.listItemActive]}
                     onPress={() => {
                       setCourtType(item.value);
                       setShowCourtTypeModal(false);
+                      setCourtTypeSearch('');
                     }}
                   >
                     <Text style={[styles.listItemText, item.value === courtType && styles.listItemTextActive]}>{item.label}</Text>
+                    {item.value === courtType ? <Ionicons name="checkmark" size={18} color={COLORS.primary} /> : null}
                   </TouchableOpacity>
                 )}
               />
@@ -518,7 +552,7 @@ export const CourtAdminRegisterScreen: React.FC<{ navigation: any }> = ({ naviga
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Select State</Text>
-                <TouchableOpacity onPress={() => setShowStateModal(false)}>
+                <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowStateModal(false)}>
                   <Ionicons name="close" size={22} color={COLORS.text} />
                 </TouchableOpacity>
               </View>
@@ -536,11 +570,13 @@ export const CourtAdminRegisterScreen: React.FC<{ navigation: any }> = ({ naviga
                 data={filteredStates}
                 keyExtractor={(item) => item}
                 style={styles.modalList}
+                contentContainerStyle={styles.modalListContent}
                 keyboardShouldPersistTaps="handled"
                 ListEmptyComponent={<Text style={styles.emptyText}>No states found</Text>}
                 renderItem={({ item }) => (
                   <TouchableOpacity style={[styles.listItem, item === stateName && styles.listItemActive]} onPress={() => void selectState(item)}>
                     <Text style={[styles.listItemText, item === stateName && styles.listItemTextActive]}>{item}</Text>
+                    {item === stateName ? <Ionicons name="checkmark" size={18} color={COLORS.primary} /> : null}
                   </TouchableOpacity>
                 )}
               />
@@ -553,7 +589,7 @@ export const CourtAdminRegisterScreen: React.FC<{ navigation: any }> = ({ naviga
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Select District</Text>
-                <TouchableOpacity onPress={() => setShowDistrictModal(false)}>
+                <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowDistrictModal(false)}>
                   <Ionicons name="close" size={22} color={COLORS.text} />
                 </TouchableOpacity>
               </View>
@@ -571,11 +607,13 @@ export const CourtAdminRegisterScreen: React.FC<{ navigation: any }> = ({ naviga
                 data={filteredDistricts}
                 keyExtractor={(item) => item}
                 style={styles.modalList}
+                contentContainerStyle={styles.modalListContent}
                 keyboardShouldPersistTaps="handled"
                 ListEmptyComponent={<Text style={styles.emptyText}>No districts found</Text>}
                 renderItem={({ item }) => (
                   <TouchableOpacity style={[styles.listItem, item === district && styles.listItemActive]} onPress={() => selectDistrict(item)}>
                     <Text style={[styles.listItemText, item === district && styles.listItemTextActive]}>{item}</Text>
+                    {item === district ? <Ionicons name="checkmark" size={18} color={COLORS.primary} /> : null}
                   </TouchableOpacity>
                 )}
               />
@@ -588,7 +626,7 @@ export const CourtAdminRegisterScreen: React.FC<{ navigation: any }> = ({ naviga
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Choose Location</Text>
-                <TouchableOpacity onPress={() => setShowLocationModal(false)}>
+                <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowLocationModal(false)}>
                   <Ionicons name="close" size={22} color={COLORS.text} />
                 </TouchableOpacity>
               </View>
@@ -606,6 +644,7 @@ export const CourtAdminRegisterScreen: React.FC<{ navigation: any }> = ({ naviga
                 data={filteredLocations}
                 keyExtractor={(item) => `${item.name}-${item.district}-${item.state}`}
                 style={styles.modalList}
+                contentContainerStyle={styles.modalListContent}
                 keyboardShouldPersistTaps="handled"
                 ListEmptyComponent={<Text style={styles.emptyText}>No locations found</Text>}
                 renderItem={({ item }) => (
@@ -618,6 +657,7 @@ export const CourtAdminRegisterScreen: React.FC<{ navigation: any }> = ({ naviga
                     }}
                   >
                     <Text style={[styles.listItemText, item.name === locationName && styles.listItemTextActive]}>{item.name}</Text>
+                    {item.name === locationName ? <Ionicons name="checkmark" size={18} color={COLORS.primary} /> : null}
                   </TouchableOpacity>
                 )}
               />
@@ -677,9 +717,9 @@ const getStyles = (COLORS: any) =>
       borderWidth: 1,
       borderColor: COLORS.border,
       backgroundColor: COLORS.surfaceAlt,
-      borderRadius: BORDER_RADIUS.lg,
-      minHeight: 52,
-      paddingHorizontal: SPACING.lg,
+      borderRadius: BORDER_RADIUS.xl,
+      minHeight: 56,
+      paddingHorizontal: SPACING.md,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
@@ -732,62 +772,84 @@ const getStyles = (COLORS: any) =>
     },
     modalOverlay: {
       flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.35)',
+      backgroundColor: 'rgba(0,0,0,0.45)',
       justifyContent: 'flex-end',
     },
     modalContent: {
-      backgroundColor: COLORS.background,
+      backgroundColor: COLORS.white,
       borderTopLeftRadius: BORDER_RADIUS.xxl,
       borderTopRightRadius: BORDER_RADIUS.xxl,
-      maxHeight: '75%',
-      padding: SPACING.lg,
+      borderBottomLeftRadius: BORDER_RADIUS.xxl,
+      borderBottomRightRadius: BORDER_RADIUS.xxl,
+      maxHeight: '68%',
+      minHeight: '44%',
+      paddingTop: SPACING.lg,
+      paddingBottom: SPACING.md,
+      overflow: 'hidden',
+      marginHorizontal: SPACING.xs,
+      marginBottom: SPACING.xs,
     },
     modalHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
       marginBottom: SPACING.md,
+      paddingHorizontal: SPACING.lg,
     },
-    modalTitle: { fontSize: FONT_SIZE.lg, fontWeight: '800', color: COLORS.text },
+    modalTitle: { fontSize: FONT_SIZE.xl, fontWeight: '800', color: COLORS.text },
+    modalCloseBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     searchBox: {
       borderWidth: 1,
-      borderColor: COLORS.border,
-      borderRadius: BORDER_RADIUS.lg,
+      borderColor: COLORS.borderLight,
+      borderRadius: BORDER_RADIUS.xl,
       flexDirection: 'row',
       alignItems: 'center',
       paddingHorizontal: SPACING.md,
       marginBottom: SPACING.md,
       backgroundColor: COLORS.surfaceAlt,
+      marginHorizontal: SPACING.lg,
     },
     searchInput: {
       flex: 1,
-      minHeight: 44,
+      minHeight: 54,
       color: COLORS.text,
       marginLeft: SPACING.sm,
+      fontSize: FONT_SIZE.md,
     },
     modalList: {
       minHeight: 220,
+      paddingHorizontal: SPACING.lg,
+    },
+    modalListContent: {
+      paddingBottom: SPACING.xl,
+      flexGrow: 1,
     },
     emptyText: {
       textAlign: 'center',
       color: COLORS.textMuted,
-      marginTop: SPACING.md,
-      marginBottom: SPACING.md,
+      marginTop: SPACING.lg,
+      marginBottom: SPACING.lg,
     },
     listItem: {
-      borderWidth: 1,
-      borderColor: COLORS.border,
-      borderRadius: BORDER_RADIUS.md,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
       paddingVertical: SPACING.md,
-      paddingHorizontal: SPACING.md,
-      marginBottom: SPACING.sm,
+      paddingHorizontal: SPACING.sm,
+      borderBottomWidth: 1,
+      borderBottomColor: COLORS.borderLight,
       backgroundColor: COLORS.white,
     },
     listItemActive: {
-      borderColor: COLORS.primary,
-      backgroundColor: `${COLORS.primary}12`,
+      backgroundColor: COLORS.primaryLight + '16',
     },
-    listItemText: { color: COLORS.text, fontSize: FONT_SIZE.md, fontWeight: '600' },
+    listItemText: { color: COLORS.text, fontSize: FONT_SIZE.lg, fontWeight: '500' },
     listItemTextActive: { color: COLORS.primary },
     loginCta: { marginTop: SPACING.md, alignItems: 'center' },
     loginCtaText: { color: COLORS.primary, fontWeight: '700', fontSize: FONT_SIZE.sm },
