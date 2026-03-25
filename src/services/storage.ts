@@ -4,6 +4,7 @@ const KEYS = {
   TOKEN: 'lawsuit_auth_token',
   REFRESH_TOKEN: 'lawsuit_refresh_token',
   USER: 'lawsuit_user_data',
+  API_BASE_URL: 'lawsuit_api_base_url',
 };
 
 export const storage = {
@@ -26,6 +27,12 @@ export const storage = {
   },
   setUser: async (user: Record<string, unknown>): Promise<void> => {
     await SecureStore.setItemAsync(KEYS.USER, JSON.stringify(user));
+  },
+  getApiBaseUrl: async (): Promise<string | null> => {
+    return SecureStore.getItemAsync(KEYS.API_BASE_URL);
+  },
+  setApiBaseUrl: async (url: string): Promise<void> => {
+    await SecureStore.setItemAsync(KEYS.API_BASE_URL, url);
   },
   clear: async (): Promise<void> => {
     await SecureStore.deleteItemAsync(KEYS.TOKEN);

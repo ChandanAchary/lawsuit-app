@@ -8,9 +8,9 @@
     "userInterfaceStyle": "light",
     "scheme": "nyayax",
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/splash-icon1.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0B4D64"
+      "backgroundColor": "#F3F4F6"
     },
     "ios": {
       "supportsTablet": true,

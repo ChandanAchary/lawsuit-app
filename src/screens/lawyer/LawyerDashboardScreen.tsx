@@ -6,10 +6,11 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { API_BASE_URL, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { useAuthStore } from '../../stores/authStore';
 import { useWalletStore } from '../../stores/walletStore';
 import { dashboardApi, referralApi, subscriptionApi, usersApi } from '../../services/api';
+import { getRuntimeApiBaseUrl } from '../../services/runtimeApiConfig';
 import { Appointment } from '../../types';
 import { format } from 'date-fns';
 
@@ -143,10 +144,11 @@ export const LawyerDashboardScreen: React.FC<{ navigation: any }> = ({ navigatio
 
     if (!raw || typeof raw !== 'string') return null;
     const trimmed = raw.trim();
+    const apiBaseUrl = getRuntimeApiBaseUrl();
     if (!trimmed) return null;
     if (/^https?:\/\//i.test(trimmed)) return trimmed;
-    if (trimmed.startsWith('/')) return `${API_BASE_URL}${trimmed}`;
-    return `${API_BASE_URL}/${trimmed}`;
+    if (trimmed.startsWith('/')) return `${apiBaseUrl}${trimmed}`;
+    return `${apiBaseUrl}/${trimmed}`;
   };
 
   if (loading) {

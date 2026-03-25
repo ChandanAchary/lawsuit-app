@@ -1,6 +1,6 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
-import { API_URL } from '../constants';
 import { storage } from './storage';
+import { getRuntimeApiUrl, maybeRefreshRuntimeApiConfig } from './runtimeApiConfig';
 
 let isRefreshing = false;
 let failedQueue: { resolve: (token: string) => void; reject: (err: unknown) => void }[] = [];
@@ -23,12 +23,14 @@ const processQueue = (error: unknown, token: string | null = null) => {
 };
 
 const api: AxiosInstance = axios.create({
-  baseURL: API_URL,
+  baseURL: getRuntimeApiUrl(),
   timeout: 30000,
   headers: { 'Content-Type': 'application/json' },
 });
 
 api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
+  await maybeRefreshRuntimeApiConfig();
+  config.baseURL = getRuntimeApiUrl();
   const token = await storage.getToken();
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -59,7 +61,7 @@ api.interceptors.response.use(
       try {
         const refreshToken = await storage.getRefreshToken();
         if (!refreshToken) throw new Error('No refresh token');
-        const { data } = await axios.post(`${API_URL}/auth/refresh`, { refreshToken });
+        const { data } = await axios.post(`${getRuntimeApiUrl()}/auth/refresh`, { refreshToken });
         const newToken = data.accessToken || data.token;
         await storage.setToken(newToken);
         if (data.refreshToken) await storage.setRefreshToken(data.refreshToken);

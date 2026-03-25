@@ -1,7 +1,7 @@
 import { io, Socket } from 'socket.io-client';
-import { API_BASE_URL } from '../constants';
 import { authApi } from './api';
 import { storage } from './storage';
+import { getRuntimeApiBaseUrl, maybeRefreshRuntimeApiConfig } from './runtimeApiConfig';
 
 class SocketService {
   private socket: Socket | null = null;
@@ -35,6 +35,8 @@ class SocketService {
   }
 
   async connect(): Promise<void> {
+    await maybeRefreshRuntimeApiConfig();
+
     if (this.socket) {
       // Reuse existing client instance; Socket.IO will reconnect when needed.
       if (!this.socket.connected) {
@@ -49,7 +51,7 @@ class SocketService {
     const auth = await this.getSocketAuth();
     if (!auth) return;
 
-    this.socket = io(API_BASE_URL, {
+    this.socket = io(getRuntimeApiBaseUrl(), {
       auth,
       // Allow polling fallback when websocket handshake is slow/blocked on mobile networks.
       transports: ['websocket', 'polling'],

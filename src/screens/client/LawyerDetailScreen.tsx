@@ -8,10 +8,10 @@ import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { formatErrorMessage } from '../../utils/formatError';
 import { Lawyer, AvailabilitySlot } from '../../types';
 import { lawyersApi, appointmentsApi } from '../../services/api';
-import { API_URL } from '../../constants';
 import { useWalletStore } from '../../stores/walletStore';
 import { useAuthStore } from '../../stores/authStore';
 import { useThemeStore, useColors } from '../../stores/themeStore';
+import { getRuntimeApiUrl } from '../../services/runtimeApiConfig';
 import { format, addDays } from 'date-fns';
 import { Button } from '../../components/Button';
 import { BottomSheet } from '../../components/Modals';
@@ -62,9 +62,10 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
       // normalize avatar fields and ensure full URL
       const avatarRaw = raw.avatar || raw.avatarUrl || raw.user?.avatar || raw.user?.avatarUrl;
       let avatar = avatarRaw;
+      const apiUrl = getRuntimeApiUrl();
       if (avatar && typeof avatar === 'string') {
-        if (avatar.startsWith('/')) avatar = `${API_URL}${avatar}`;
-        else if (!avatar.startsWith('http')) avatar = `${API_URL}/${avatar}`;
+        if (avatar.startsWith('/')) avatar = `${apiUrl}${avatar}`;
+        else if (!avatar.startsWith('http')) avatar = `${apiUrl}/${avatar}`;
       }
       // normalize common fields so UI shows fee, specialization, location consistently
       const normalizedLawyer: any = {

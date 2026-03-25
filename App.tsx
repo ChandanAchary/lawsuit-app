@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { View, ActivityIndicator, StyleSheet, LogBox, Modal, Text, TouchableOpacity } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, LogBox, Modal, Text, TouchableOpacity, Image } from 'react-native';
 import { NavigationContainer, LinkingOptions, DefaultTheme, DarkTheme, Theme, createNavigationContainerRef } from '@react-navigation/native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,6 +11,7 @@ import { useNotificationStore } from './src/stores/notificationStore';
 import { AuthStack, MainStack } from './src/navigation';
 import { requestAllPermissions } from './src/utils/permissions';
 import { socketService } from './src/services/socket';
+import { initRuntimeApiConfig } from './src/services/runtimeApiConfig';
 import {
   addNotificationResponseListener,
   configureLocalNotificationChannel,
@@ -92,7 +93,8 @@ export default function App() {
   useEffect(() => {
     const init = async () => {
       try {
-        await Promise.all([initTheme(), restoreSession()]);
+        await Promise.all([initTheme(), initRuntimeApiConfig()]);
+        await restoreSession();
         // Request all runtime permissions on first launch
         await requestAllPermissions().catch(() => {});
         await configureLocalNotificationChannel().catch(() => {});
@@ -190,12 +192,11 @@ export default function App() {
   };
 
   if (!isReady) {
-    const splashBg = isDark ? DARK_COLORS.background : COLORS.background;
-    const spinnerColor = isDark ? DARK_COLORS.primary : COLORS.primary;
-    
     return (
-      <View style={[styles.splash, { backgroundColor: splashBg }]}>
-        <ActivityIndicator size="large" color={spinnerColor} />
+      <View style={styles.splashScreen}> 
+        <Image source={require('./assets/splash-icon1.png')} style={styles.splashLogo} resizeMode="contain" />
+        <Text style={styles.splashBrand}>NyayaX</Text>
+        <ActivityIndicator size="small" color={COLORS.textSecondary} style={styles.splashLoader} />
       </View>
     );
   }
@@ -234,11 +235,25 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  splash: {
+  splashScreen: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  splashLogo: {
+    width: 220,
+    height: 220,
+  },
+  splashBrand: {
+    marginTop: 18,
+    fontSize: 42,
+    fontWeight: '500',
+    color: '#111111',
+    letterSpacing: 0.5,
+  },
+  splashLoader: {
+    marginTop: 20,
   },
   callOverlay: {
     flex: 1,

@@ -1,4 +1,3 @@
-import { INDIA_STATES_LIST } from '../constants/indiaStates';
 import { addressApi } from '../services/api';
 
 const normalizeStringList = (list: unknown): string[] => {
@@ -12,9 +11,9 @@ export const loadStateOptions = async (): Promise<string[]> => {
   try {
     const { data } = await addressApi.getStates();
     const list = normalizeStringList(data?.states || data?.data?.states || []);
-    return list.length ? list : INDIA_STATES_LIST;
+    return list;
   } catch {
-    return INDIA_STATES_LIST;
+    return [];
   }
 };
 

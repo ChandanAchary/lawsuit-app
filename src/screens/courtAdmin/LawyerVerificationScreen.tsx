@@ -4,8 +4,9 @@ import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Alert, TextInput, Modal, ScrollView, Linking, Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { API_BASE_URL, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { courtAdminApi, lawyersApi } from '../../services/api';
+import { getRuntimeApiBaseUrl } from '../../services/runtimeApiConfig';
 import { TabBar } from '../../components/TabBar';
 import { Loading, EmptyState } from '../../components/Common';
 import { Button } from '../../components/Button';
@@ -100,9 +101,10 @@ export const LawyerVerificationScreen: React.FC<{ navigation: any; route?: any }
   const toAbsoluteUrl = (value?: string) => {
     if (!value) return '';
     const url = String(value).trim();
+    const apiBaseUrl = getRuntimeApiBaseUrl();
     if (!url) return '';
     if (/^https?:\/\//i.test(url)) return url;
-    if (url.startsWith('/')) return `${API_BASE_URL}${url}`;
+    if (url.startsWith('/')) return `${apiBaseUrl}${url}`;
     return url;
   };
 
