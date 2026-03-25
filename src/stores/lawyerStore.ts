@@ -28,9 +28,13 @@ export const useLawyerStore = create<LawyerState>((set) => ({
     try {
       // Map filter keys to backend query params
       const params: Record<string, unknown> = { page, limit };
+      const hasGeoInputs =
+        typeof filters?.latitude === 'number' ||
+        typeof filters?.longitude === 'number' ||
+        !!filters?.clientPincode;
       if (filters?.search) params.q = filters.search;
       if (filters?.specialization) params.specialization = filters.specialization;
-      if (filters?.location) params.city = filters.location;
+      if (filters?.location && !hasGeoInputs) params.city = filters.location;
       if (filters?.maxFee) params.maxFee = filters.maxFee;
       if (filters?.language) params.languages = filters.language;
       if (typeof filters?.latitude === 'number') params.latitude = filters.latitude;
@@ -56,6 +60,9 @@ export const useLawyerStore = create<LawyerState>((set) => ({
         avatar: l.avatar || l.avatarUrl || (l.user && (l.user.avatar || l.user.avatarUrl)) || undefined,
         specialization: l.specializations || l.specialization || [],
         experienceYears: Number(l.experienceYears ?? l.experience ?? 0),
+        distance: Number.isFinite(Number(l.distance ?? l.distanceKm ?? l.distance_km))
+          ? Number(l.distance ?? l.distanceKm ?? l.distance_km)
+          : undefined,
         location: [l.city, l.state].filter(Boolean).join(', ') || l.location || l.address || '',
         // feePerConsultation is stored in paise — convert to rupees
         fee: l.feePerConsultation != null ? Number(l.feePerConsultation) / 100 : (Number(l.fee) || 0),
@@ -77,6 +84,13 @@ export const useLawyerStore = create<LawyerState>((set) => ({
         mappedLawyers.sort((a: any, b: any) => sortOrder === 'asc' ? a.rating - b.rating : b.rating - a.rating);
       } else if (sortBy === 'fee') {
         mappedLawyers.sort((a: any, b: any) => sortOrder === 'asc' ? a.fee - b.fee : b.fee - a.fee);
+      } else if (sortBy === 'distance') {
+        // Keep near-me ordering stable even when backend ordering is inconsistent.
+        mappedLawyers.sort((a: any, b: any) => {
+          const aDistance = typeof a.distance === 'number' ? a.distance : Number.POSITIVE_INFINITY;
+          const bDistance = typeof b.distance === 'number' ? b.distance : Number.POSITIVE_INFINITY;
+          return sortOrder === 'desc' ? bDistance - aDistance : aDistance - bDistance;
+        });
       }
 
       set({

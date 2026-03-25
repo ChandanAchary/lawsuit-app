@@ -71,7 +71,9 @@ export const LawyerCard: React.FC<LawyerCardProps> = ({ lawyer, onPress, style, 
               <Text style={[styles.locationText, nearMe && styles.locationTextNear]} numberOfLines={1}>{lawyer.location || 'N/A'}</Text>
               {nearMe && (
                 <View style={styles.nearBadge}>
-                  <Text style={styles.nearBadgeText}>Near you</Text>
+                  <Text style={styles.nearBadgeText}>
+                    {typeof lawyer.distance === 'number' ? `${lawyer.distance.toFixed(1)} km` : 'Near you'}
+                  </Text>
                 </View>
               )}
             </View>

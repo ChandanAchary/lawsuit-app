@@ -13,6 +13,8 @@ import { ChipGroup } from '../../components/TabBar';
 import { getCurrentLocation, UserLocation } from '../../utils/permissions';
 import { usersApi } from '../../services/api';
 
+const DISTANCE_SEARCH_RADIUS_KM = 50000;
+
 export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
   const COLORS = useColors();
@@ -29,38 +31,43 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const [locationLoading, setLocationLoading] = useState(false);
   const locationFetched = useRef(false);
 
+  const buildDistanceFilters = useCallback((base: LawyerFilterOptions): LawyerFilterOptions => {
+    const distanceFilters: LawyerFilterOptions = { ...base };
+    delete distanceFilters.location;
+    distanceFilters.sortBy = 'distance';
+    distanceFilters.sortOrder = 'asc';
+    distanceFilters.radius = DISTANCE_SEARCH_RADIUS_KM;
+    return distanceFilters;
+  }, []);
+
   useEffect(() => {
     fetchLawyers({ ...filters, search, sortBy, sortOrder: 'desc' });
   }, []);
 
   const handleSearch = useCallback(() => {
     if (sortBy === 'nearme' && userLocation) {
+      const distanceFilters = buildDistanceFilters(filters);
       fetchLawyers({
-        ...filters,
+        ...distanceFilters,
         search,
         latitude: userLocation.latitude,
         longitude: userLocation.longitude,
-        radius: 50,
-        sortBy: 'distance',
-        sortOrder: 'asc',
       });
       return;
     }
 
     if (sortBy === 'nearme' && profilePincode) {
+      const distanceFilters = buildDistanceFilters(filters);
       fetchLawyers({
-        ...filters,
+        ...distanceFilters,
         search,
         clientPincode: profilePincode,
-        radius: 50,
-        sortBy: 'distance',
-        sortOrder: 'asc',
       });
       return;
     }
 
     fetchLawyers({ ...filters, search, sortBy, sortOrder: 'desc' });
-  }, [search, filters, sortBy, userLocation, profilePincode, fetchLawyers]);
+  }, [search, filters, sortBy, userLocation, profilePincode, fetchLawyers, buildDistanceFilters]);
 
   const searchWithSavedProfileLocation = useCallback(async (): Promise<boolean> => {
     try {
@@ -79,18 +86,16 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         latitude: undefined,
         longitude: undefined,
         clientPincode: pin,
-        radius: 50,
-        sortBy: 'distance',
-        sortOrder: 'asc',
       };
 
-      setFilters(profileFilters);
-      await fetchLawyers({ ...profileFilters, search });
+      const distanceFilters = buildDistanceFilters(profileFilters);
+      setFilters(distanceFilters);
+      await fetchLawyers({ ...distanceFilters, search });
       return true;
     } catch {
       return false;
     }
-  }, [filters, search, fetchLawyers]);
+  }, [filters, search, fetchLawyers, buildDistanceFilters]);
 
   const handleUseMyLocation = useCallback(async () => {
     setLocationLoading(true);
@@ -120,14 +125,12 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       clientPincode: undefined,
       latitude: loc.latitude,
       longitude: loc.longitude,
-      radius: 50,
-      sortBy: 'distance',
-      sortOrder: 'asc',
     };
 
-    setFilters(locationFilters);
-    fetchLawyers({ ...locationFilters, search });
-  }, [filters, search, fetchLawyers, searchWithSavedProfileLocation]);
+    const distanceFilters = buildDistanceFilters(locationFilters);
+    setFilters(distanceFilters);
+    fetchLawyers({ ...distanceFilters, search });
+  }, [filters, search, fetchLawyers, searchWithSavedProfileLocation, buildDistanceFilters]);
 
   const handleSortChange = async (s: string) => {
     setSortBy(s);
@@ -139,12 +142,10 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           clientPincode: undefined,
           latitude: userLocation.latitude,
           longitude: userLocation.longitude,
-          radius: 50,
-          sortBy: 'distance',
-          sortOrder: 'asc',
         };
-        setFilters(locationFilters);
-        fetchLawyers({ ...locationFilters, search });
+        const distanceFilters = buildDistanceFilters(locationFilters);
+        setFilters(distanceFilters);
+        fetchLawyers({ ...distanceFilters, search });
       } else if (locationFetched.current && profilePincode) {
         const profileFilters: LawyerFilterOptions = {
           ...filters,
@@ -152,13 +153,11 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           latitude: undefined,
           longitude: undefined,
           clientPincode: profilePincode,
-          radius: 50,
-          sortBy: 'distance',
-          sortOrder: 'asc',
         };
         setNearMeSource('profile');
-        setFilters(profileFilters);
-        fetchLawyers({ ...profileFilters, search });
+        const distanceFilters = buildDistanceFilters(profileFilters);
+        setFilters(distanceFilters);
+        fetchLawyers({ ...distanceFilters, search });
       } else {
         await handleUseMyLocation();
       }
@@ -181,26 +180,22 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const handleLoadMore = () => {
     if (lawyers.length < total) {
       if (sortBy === 'nearme' && userLocation) {
+        const distanceFilters = buildDistanceFilters(filters);
         fetchLawyers({
-          ...filters,
+          ...distanceFilters,
           search,
           latitude: userLocation.latitude,
           longitude: userLocation.longitude,
-          radius: 50,
-          sortBy: 'distance',
-          sortOrder: 'asc',
         }, page + 1);
         return;
       }
 
       if (sortBy === 'nearme' && profilePincode) {
+        const distanceFilters = buildDistanceFilters(filters);
         fetchLawyers({
-          ...filters,
+          ...distanceFilters,
           search,
           clientPincode: profilePincode,
-          radius: 50,
-          sortBy: 'distance',
-          sortOrder: 'asc',
         }, page + 1);
         return;
       }
@@ -247,7 +242,7 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         <View style={styles.locationBanner}>
           <Ionicons name="location" size={14} color={COLORS.primary} />
           <Text style={styles.locationBannerText}>
-            Showing lawyers within 50 km of{' '}
+            Showing nearest lawyers in ascending distance from{' '}
             <Text style={{ fontWeight: '700' }}>{userLocation.city}</Text>
           </Text>
         </View>
@@ -256,7 +251,7 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         <View style={styles.locationBanner}>
           <Ionicons name="location" size={14} color={COLORS.primary} />
           <Text style={styles.locationBannerText}>
-            Showing lawyers within 50 km of your current location
+            Showing nearest lawyers in ascending distance from your current location
           </Text>
         </View>
       )}
@@ -264,7 +259,7 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         <View style={styles.locationBanner}>
           <Ionicons name="home" size={14} color={COLORS.primary} />
           <Text style={styles.locationBannerText}>
-            Location permission denied. Showing lawyers within 50 km of your saved address ({profilePincode}).
+            Location permission denied. Showing nearest lawyers from your saved address ({profilePincode}) in ascending distance.
           </Text>
         </View>
       )}
@@ -306,26 +301,22 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 onPress={() => {
                   setSearch('');
                   if (sortBy === 'nearme' && userLocation) {
+                    const distanceFilters = buildDistanceFilters(filters);
                     fetchLawyers({
-                      ...filters,
+                      ...distanceFilters,
                       search: '',
                       latitude: userLocation.latitude,
                       longitude: userLocation.longitude,
-                      radius: 50,
-                      sortBy: 'distance',
-                      sortOrder: 'asc',
                     });
                     return;
                   }
 
                   if (sortBy === 'nearme' && profilePincode) {
+                    const distanceFilters = buildDistanceFilters(filters);
                     fetchLawyers({
-                      ...filters,
+                      ...distanceFilters,
                       search: '',
                       clientPincode: profilePincode,
-                      radius: 50,
-                      sortBy: 'distance',
-                      sortOrder: 'asc',
                     });
                     return;
                   }

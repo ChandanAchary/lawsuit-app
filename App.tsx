@@ -194,7 +194,7 @@ export default function App() {
   if (!isReady) {
     return (
       <View style={styles.splashScreen}> 
-        <Image source={require('./assets/splash-icon1.png')} style={styles.splashLogo} resizeMode="contain" />
+        <Image source={require('./assets/splash-icon.png')} style={styles.splashLogo} resizeMode="contain" />
         <Text style={styles.splashBrand}>NyayaX</Text>
         <ActivityIndicator size="small" color={COLORS.textSecondary} style={styles.splashLoader} />
       </View>
