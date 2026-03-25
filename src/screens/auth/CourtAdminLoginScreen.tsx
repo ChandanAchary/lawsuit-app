@@ -10,6 +10,7 @@ import { courtAdminApi } from '../../services/api';
 import { Button } from '../../components/Button';
 import { storage } from '../../services/storage';
 import { useAuthStore } from '../../stores/authStore';
+import { safeGoBack } from '../../utils/navigation';
 
 export const CourtAdminLoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
@@ -52,7 +53,7 @@ export const CourtAdminLoginScreen: React.FC<{ navigation: any }> = ({ navigatio
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <LinearGradient colors={[COLORS.primaryDark, COLORS.primary]} style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => safeGoBack(navigation, 'Landing')}>
           <Ionicons name="arrow-back" size={22} color={COLORS.white} />
         </TouchableOpacity>
         <View style={styles.iconWrap}>

@@ -11,6 +11,7 @@ import { StatusBadge, Loading, EmptyState } from '../../components/Common';
 import { ChatTab } from '../../components/ChatTab';
 import { Button } from '../../components/Button';
 import { BottomSheet } from '../../components/Modals';
+import { safeGoBack } from '../../utils/navigation';
 
 interface CaseTask {
   id: string;
@@ -75,7 +76,7 @@ export const LawyerCaseDetailScreen: React.FC<{ navigation: any; route: any }> =
 
   const fetchCase = async () => {
     try { const { data } = await casesApi.getById(caseId); setCaseData(data.case || data); }
-    catch { Alert.alert('Error', 'Failed to load case'); navigation.goBack(); }
+    catch { Alert.alert('Error', 'Failed to load case'); safeGoBack(navigation, 'MainTabs'); }
     finally { setLoading(false); }
   };
   const fetchTimeline = async () => { try { const { data } = await casesApi.getTimeline(caseId); setTimeline(data.items || data.timeline || []); } catch {} };
@@ -152,7 +153,7 @@ export const LawyerCaseDetailScreen: React.FC<{ navigation: any; route: any }> =
   return (
     <View style={styles.container}>
       <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => safeGoBack(navigation, 'MainTabs')} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={COLORS.text} />
         </TouchableOpacity>
         <Text style={styles.topTitle} numberOfLines={1}>{caseData.title}</Text>

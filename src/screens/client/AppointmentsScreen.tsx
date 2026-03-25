@@ -15,6 +15,7 @@ import { Button } from '../../components/Button';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { format } from 'date-fns';
 import { formatErrorMessage } from '../../utils/formatError';
+import { useWalletStore } from '../../stores/walletStore';
 
 
 const TABS = [
@@ -45,6 +46,7 @@ export const AppointmentsScreen: React.FC<{ navigation: any }> = ({ navigation }
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [rescheduling, setRescheduling] = useState(false);
+  const { fetchBalance, fetchTransactions } = useWalletStore();
 
   // Fetch all appointments once
   const fetchAppointments = useCallback(async (showLoader = true) => {
@@ -108,6 +110,7 @@ export const AppointmentsScreen: React.FC<{ navigation: any }> = ({ navigation }
         onPress: async () => {
           try {
             await appointmentsApi.cancel(id);
+            await Promise.allSettled([fetchBalance(), fetchTransactions(1)]);
             fetchAppointments(false);
           } catch {
             Alert.alert('Error', 'Failed to cancel appointment');

@@ -12,11 +12,12 @@ import { useWalletStore } from '../../stores/walletStore';
 import { useAuthStore } from '../../stores/authStore';
 import { useThemeStore, useColors } from '../../stores/themeStore';
 import { getRuntimeApiUrl } from '../../services/runtimeApiConfig';
-import { format, addDays } from 'date-fns';
+import { format, addDays, parse } from 'date-fns';
 import { Button } from '../../components/Button';
 import { BottomSheet } from '../../components/Modals';
 import { RazorpayCheckout } from '../../components/RazorpayCheckout';
 import { RazorpayOrderOptions, RazorpayPaymentResult } from '../../utils/razorpay';
+import { safeGoBack } from '../../utils/navigation';
 
 const { width } = Dimensions.get('window');
 
@@ -55,6 +56,39 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
     if (lawyer) fetchSlots();
   }, [selectedDate, lawyer]);
 
+  const normalizeScheduledAt = (slot: string, date: Date): string | null => {
+    try {
+      const trimmed = String(slot || '').trim();
+      if (!trimmed) return null;
+
+      if (trimmed.includes('T') && !Number.isNaN(Date.parse(trimmed))) {
+        return new Date(trimmed).toISOString();
+      }
+
+      if (/^\d{2}:\d{2}(:\d{2})?$/.test(trimmed)) {
+        return new Date(`${format(date, 'yyyy-MM-dd')}T${trimmed}`).toISOString();
+      }
+
+      if (/^\d{1,2}:\d{2}\s?(AM|PM)$/i.test(trimmed)) {
+        return parse(trimmed.toUpperCase(), 'hh:mm a', date).toISOString();
+      }
+
+      if (!Number.isNaN(Date.parse(trimmed))) {
+        return new Date(trimmed).toISOString();
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
+  const isSlotAlreadyBookedError = (err: any): boolean => {
+    const raw = String(
+      err?.response?.data?.error || err?.response?.data?.message || err?.message || '',
+    ).toLowerCase();
+    return raw.includes('unique constraint failed') && raw.includes('lawyerid') && raw.includes('scheduledat');
+  };
+
   const fetchLawyer = async () => {
     try {
       const { data } = await lawyersApi.getById(lawyerId);
@@ -89,7 +123,7 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
       setLawyer(normalizedLawyer as Lawyer);
     } catch (err: any) {
       Alert.alert('Error', formatErrorMessage(err?.response?.data || err) || 'Failed to load lawyer details');
-      navigation.goBack();
+      safeGoBack(navigation, 'MainTabs');
     } finally {
       setLoading(false);
     }
@@ -176,11 +210,10 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
     if (!selectedSlot || !lawyer) return;
     setBooking(true);
     try {
-      let scheduledAt = '';
-      if (selectedSlot.includes('T') && !/^\d{2}:\d{2}$/.test(selectedSlot)) {
-        try { scheduledAt = new Date(selectedSlot).toISOString(); } catch { scheduledAt = selectedSlot; }
-      } else {
-        scheduledAt = new Date(`${format(selectedDate, 'yyyy-MM-dd')}T${selectedSlot}`).toISOString();
+      const scheduledAt = normalizeScheduledAt(selectedSlot, selectedDate);
+      if (!scheduledAt) {
+        Alert.alert('Invalid Slot', 'Please select a valid time slot.');
+        return;
       }
       const { data } = await appointmentsApi.book({ lawyerId: lawyer.id, scheduledAt, paymentMethod });
       const appointment = data.appointment || data.data || data;
@@ -189,7 +222,7 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
       if (paymentMethod === 'wallet') {
         Alert.alert('Success', 'Appointment booked successfully!');
         setShowBooking(false);
-        navigation.goBack();
+        safeGoBack(navigation, 'MainTabs');
       } else {
         // Razorpay payment flow
         const payment = data?.payment || appointment?.payment || {};
@@ -236,6 +269,12 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
         setShowRazorpay(true);
       }
     } catch (err: any) {
+      if (isSlotAlreadyBookedError(err)) {
+        setSelectedSlot(null);
+        await fetchSlots();
+        Alert.alert('Slot Unavailable', 'This time slot was just booked by another user. Please select another slot.');
+        return;
+      }
       Alert.alert('Booking Failed', formatErrorMessage(err.response?.data || err) || 'Please try again');
     } finally {
       setBooking(false);
@@ -260,7 +299,7 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
 
       setPendingPaymentReference(null);
       Alert.alert('Success', 'Payment confirmed! Appointment booked.');
-      navigation.goBack();
+      safeGoBack(navigation, 'MainTabs');
     } catch {
       Alert.alert('Error', 'Payment received but verification failed. Contact support.');
     }
@@ -284,7 +323,7 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
           colors={[COLORS.primary, COLORS.midnight]}
           style={styles.header}
         >
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => safeGoBack(navigation, 'MainTabs')}>
             <Ionicons name="arrow-back" size={24} color={COLORS.white} />
           </TouchableOpacity>
 

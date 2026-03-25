@@ -29,11 +29,31 @@ export const Input: React.FC<InputProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const isPassword = secureTextEntry !== undefined;
   const showInternalEye = isPassword && !rightIcon;
+
+  const sanitizeInlineNode = (node: React.ReactNode): React.ReactNode => {
+    if (node == null || typeof node === 'boolean') return null;
+    if (typeof node === 'string') {
+      if (!node.trim()) return null;
+      return <Text style={styles.label}>{node}</Text>;
+    }
+    if (typeof node === 'number') {
+      return <Text style={styles.label}>{String(node)}</Text>;
+    }
+    if (Array.isArray(node)) {
+      return node.map((child, idx) => (
+        <React.Fragment key={idx}>{sanitizeInlineNode(child)}</React.Fragment>
+      ));
+    }
+    return node;
+  };
+
+  const safeIcon = sanitizeInlineNode(icon);
+  const safeRightIcon = sanitizeInlineNode(rightIcon);
   return (
     <View style={[styles.container, containerStyle]}>
       {label && <Text style={styles.label}>{label}</Text>}
       <View style={[styles.inputWrapper, error ? styles.inputError : undefined]}>
-        {icon && <View style={styles.icon}>{icon}</View>}
+        {safeIcon && <View style={styles.icon}>{safeIcon}</View>}
         <TextInput
           style={[styles.input, icon ? styles.inputWithIcon : undefined, style]}
           placeholderTextColor={COLORS.textMuted}
@@ -48,7 +68,7 @@ export const Input: React.FC<InputProps> = ({
             <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color={COLORS.textMuted} />
           </TouchableOpacity>
         )}
-        {!showInternalEye && rightIcon && <View style={styles.rightIcon}>{rightIcon}</View>}
+        {!showInternalEye && safeRightIcon && <View style={styles.rightIcon}>{safeRightIcon}</View>}
       </View>
       {error && <Text style={styles.error}>{error}</Text>}
     </View>

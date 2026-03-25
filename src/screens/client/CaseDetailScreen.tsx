@@ -10,6 +10,7 @@ import { formatDate, formatTime, formatDateTime } from '../../utils/date';
 import { StatusBadge, Loading, EmptyState } from '../../components/Common';
 import { ChatTab } from '../../components/ChatTab';
 import { Button } from '../../components/Button';
+import { safeGoBack } from '../../utils/navigation';
 
 interface CaseTask {
   id: string;
@@ -65,7 +66,7 @@ export const CaseDetailScreen: React.FC<{ navigation: any; route: any }> = ({ na
       setCaseData(data.case || data);
     } catch {
       Alert.alert('Error', 'Failed to load case');
-      navigation.goBack();
+      safeGoBack(navigation, 'MainTabs');
     } finally {
       setLoading(false);
     }
@@ -150,7 +151,7 @@ export const CaseDetailScreen: React.FC<{ navigation: any; route: any }> = ({ na
     <View style={styles.container}>
       {/* Top bar */}
       <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => safeGoBack(navigation, 'MainTabs')} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={COLORS.text} />
         </TouchableOpacity>
         <View style={styles.topBarTitle}>

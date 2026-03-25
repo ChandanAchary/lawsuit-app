@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, Modal, Dimensions,
-  ActivityIndicator, StatusBar, Linking,
+  ActivityIndicator, StatusBar, Linking, RefreshControl,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
@@ -29,6 +30,7 @@ export const ProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
   const [uploading, setUploading] = useState(false);
   const [showFullPhoto, setShowFullPhoto] = useState(false);
   const [stats, setStats] = useState({ cases: 0, appointments: 0, lawyers: 0 });
+  const [refreshing, setRefreshing] = useState(false);
 
   const [showAppearance, setShowAppearance] = useState(false);
 
@@ -48,15 +50,30 @@ export const ProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
 
   useEffect(() => { getUser(); fetchStats(); }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      getUser();
+      fetchStats();
+    }, []),
+  );
+
   const fetchStats = async () => {
     try {
       const { data } = await dashboardApi.clientDashboard();
+      const payload = data?.data ?? data;
+      const statsPayload = payload?.stats ?? payload;
       setStats({
-        cases: data?.stats?.totalCases ?? data?.totalCases ?? 0,
-        appointments: data?.stats?.totalAppointments ?? data?.totalAppointments ?? 0,
-        lawyers: data?.stats?.totalLawyers ?? data?.totalLawyers ?? 0,
+        cases: statsPayload?.totalCases ?? statsPayload?.cases?.total ?? payload?.totalCases ?? 0,
+        appointments: statsPayload?.totalAppointments ?? statsPayload?.appointments?.total ?? payload?.totalAppointments ?? 0,
+        lawyers: statsPayload?.totalLawyers ?? statsPayload?.lawyers?.total ?? payload?.totalLawyers ?? 0,
       });
     } catch {}
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.allSettled([getUser(), fetchStats()]);
+    setRefreshing(false);
   };
 
   const getAvatarUrl = (): string | undefined => {
@@ -109,7 +126,11 @@ export const ProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
   return (
     <>
       <StatusBar barStyle="light-content" />
-      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={{ paddingBottom: 100 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
+      >
         {/* ── Gradient Header with Avatar ── */}
         <LinearGradient colors={[COLORS.primaryDark, COLORS.primary, COLORS.primaryLight]} style={styles.headerGradient}>
           <View style={styles.avatarSection}>

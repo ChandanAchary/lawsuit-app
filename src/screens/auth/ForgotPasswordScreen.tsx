@@ -10,6 +10,7 @@ import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { useAuthStore } from '../../stores/authStore';
 import { authApi } from '../../services/api';
+import { safeGoBack } from '../../utils/navigation';
 
 type Step = 'email' | 'otp' | 'newPassword';
 
@@ -142,7 +143,7 @@ export const ForgotPasswordScreen: React.FC<{ navigation: any }> = ({ navigation
           onPress={() => {
             if (step === 'newPassword') setStep('otp');
             else if (step === 'otp') setStep('email');
-            else navigation.goBack();
+            else safeGoBack(navigation, 'Login');
           }}
         >
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />

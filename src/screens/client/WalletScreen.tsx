@@ -1,7 +1,7 @@
 import {  useThemeStore , useColors } from '../../stores/themeStore';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, FlatList, RefreshControl,
+  View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, FlatList, RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,6 +17,8 @@ import { EmptyState, Loading } from '../../components/Common';
 import { RazorpayCheckout } from '../../components/RazorpayCheckout';
 import { RazorpayOrderOptions, RazorpayPaymentResult } from '../../utils/razorpay';
 import { useAuthStore } from '../../stores/authStore';
+import { appointmentsApi, paymentsApi } from '../../services/api';
+import { useFocusEffect } from '@react-navigation/native';
 
 const QUICK_AMOUNTS = [500, 1000, 2000, 5000];
 
@@ -26,22 +28,42 @@ const TX_TABS = [
   { key: TransactionType.DEBIT, label: 'Debits' },
 ];
 
+const getTxType = (tx: WalletTransaction): string => String(tx.type || '').trim().toUpperCase();
+
+const CREDIT_TYPES = new Set([TransactionType.CREDIT, TransactionType.REFUND]);
+const DEBIT_TYPES = new Set([TransactionType.DEBIT, TransactionType.WITHDRAWAL, TransactionType.PAYMENT, TransactionType.TRANSFER]);
+
 const isCreditTransaction = (tx: WalletTransaction): boolean => {
-  if (tx.type === TransactionType.CREDIT || tx.type === TransactionType.REFUND) return true;
-  if (tx.type === TransactionType.TRANSFER) {
-    const description = String(tx.description || '').toLowerCase();
+  const type = getTxType(tx);
+  const description = String(tx.description || '').toLowerCase();
+  if (CREDIT_TYPES.has(type as TransactionType)) return true;
+  if (type === TransactionType.TRANSFER) {
     return description.includes('received') || description.includes('credited');
   }
+  if (description.includes('refund') || description.includes('reversal')) return true;
+  if (!type && Number(tx.amount) > 0) return true;
   return false;
 };
 
 const isDebitTransaction = (tx: WalletTransaction): boolean => {
-  if (tx.type === TransactionType.DEBIT || tx.type === TransactionType.WITHDRAWAL || tx.type === TransactionType.PAYMENT) return true;
-  if (tx.type === TransactionType.TRANSFER) {
-    const description = String(tx.description || '').toLowerCase();
+  const type = getTxType(tx);
+  const description = String(tx.description || '').toLowerCase();
+  if (DEBIT_TYPES.has(type as TransactionType)) return true;
+  if (type === TransactionType.TRANSFER) {
     return description.includes('sent') || description.includes('debited') || !description.includes('received');
   }
+  if (description.includes('book') || description.includes('paid') || description.includes('debit')) return true;
+  if (!type && Number(tx.amount) < 0) return true;
   return false;
+};
+
+const toSourceLabel = (provider?: string): string | null => {
+  const normalized = String(provider || '').trim().toLowerCase();
+  if (!normalized) return null;
+  if (normalized.includes('razorpay')) return 'Razorpay';
+  if (normalized.includes('wallet')) return 'Wallet';
+  if (normalized.includes('stripe')) return 'Stripe';
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 };
 
 export const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
@@ -64,6 +86,7 @@ export const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const [transferDesc, setTransferDesc] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [sourceByReference, setSourceByReference] = useState<Record<string, string>>({});
   // Razorpay state
   const [showRazorpay, setShowRazorpay] = useState(false);
   const [razorpayOrder, setRazorpayOrder] = useState<RazorpayOrderOptions | null>(null);
@@ -72,6 +95,62 @@ export const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     fetchBalance();
     fetchTransactions(1);
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchBalance();
+      fetchTransactions(1);
+
+      // Refund entries can arrive shortly after cancellation; retry once/twice.
+      const t1 = setTimeout(() => { fetchBalance(); fetchTransactions(1); }, 2500);
+      const t2 = setTimeout(() => { fetchBalance(); fetchTransactions(1); }, 7000);
+
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+      };
+    }, [fetchBalance, fetchTransactions]),
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    const referenceIds = Array.from(new Set(
+      transactions
+        .map((tx) => String(tx.referenceId || '').trim())
+        .filter((id) => !!id && !sourceByReference[id]),
+    ));
+    if (!referenceIds.length) return;
+
+    (async () => {
+      const updates: Record<string, string> = {};
+      await Promise.all(referenceIds.map(async (paymentId) => {
+        try {
+          const { data } = await paymentsApi.getById(paymentId);
+          const payment = data?.payment || data?.data || data;
+          const source = toSourceLabel(payment?.provider);
+          if (source) updates[paymentId] = source;
+        } catch {
+          try {
+            // Some wallet txs reference appointmentId; resolve provider through appointment payment.
+            const { data } = await appointmentsApi.getById(paymentId);
+            const appointment = data?.appointment || data?.data || data;
+            const source = toSourceLabel(appointment?.payment?.provider);
+            if (source) updates[paymentId] = source;
+          } catch {
+            // Ignore references that are neither payment nor appointment IDs.
+          }
+        }
+      }));
+
+      if (!cancelled && Object.keys(updates).length) {
+        setSourceByReference((prev) => ({ ...prev, ...updates }));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [transactions, sourceByReference]);
 
   const filteredTransactions = React.useMemo(() => {
     if (txTab === 'all') return transactions;
@@ -178,8 +257,28 @@ export const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     }
   };
 
+  const getTransactionSource = (tx: WalletTransaction): string | null => {
+    const ref = String(tx.referenceId || '').trim();
+    if (ref && sourceByReference[ref]) return sourceByReference[ref];
+
+    const description = String(tx.description || '').toLowerCase();
+    if (description.includes('razorpay')) return 'Razorpay';
+    if (description.includes('wallet')) return 'Wallet';
+
+    const type = getTxType(tx);
+    if (tx.type === TransactionType.WITHDRAWAL) return 'Wallet';
+    if (CREDIT_TYPES.has(type as TransactionType) || DEBIT_TYPES.has(type as TransactionType)) {
+      return 'Wallet';
+    }
+    return null;
+  };
+
   const renderTransaction = ({ item }: { item: WalletTransaction }) => {
-    const isCredit = item.type === TransactionType.CREDIT;
+    const inferredCredit = isCreditTransaction(item);
+    const inferredDebit = isDebitTransaction(item);
+    const isCredit = inferredCredit || (!inferredDebit && Number(item.amount) >= 0);
+    const absoluteAmount = Math.abs(Number(item.amount) || 0);
+    const source = getTransactionSource(item);
     return (
       <View style={styles.txRow}>
         <View style={[styles.txIcon, { backgroundColor: isCredit ? '#e6f9f0' : '#fef1f1' }]}>
@@ -192,9 +291,10 @@ export const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         <View style={styles.txInfo}>
           <Text style={styles.txDesc} numberOfLines={1}>{item.description || (isCredit ? 'Credit' : 'Debit')}</Text>
           <Text style={styles.txDate}>{formatDate(item.createdAt)} · {formatTime(item.createdAt)}</Text>
+          {source && <Text style={styles.txSource}>Via {source}</Text>}
         </View>
         <Text style={[styles.txAmount, { color: isCredit ? COLORS.success : COLORS.error }]}>
-          {isCredit ? '+' : '-'}₹{Number(item.amount).toLocaleString('en-IN')}
+          {isCredit ? '+' : '-'}₹{absoluteAmount.toLocaleString('en-IN')}
         </Text>
       </View>
     );
@@ -366,6 +466,7 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   txInfo: { flex: 1, marginLeft: SPACING.md },
   txDesc: { fontSize: FONT_SIZE.md, fontWeight: '600', color: COLORS.text },
   txDate: { fontSize: FONT_SIZE.xs, color: COLORS.textMuted, marginTop: 2 },
+  txSource: { fontSize: FONT_SIZE.xs, color: COLORS.textMuted, marginTop: 2 },
   txAmount: { fontSize: FONT_SIZE.md, fontWeight: '700' },
   modalContent: { paddingBottom: SPACING.xl },
   amountInput: {

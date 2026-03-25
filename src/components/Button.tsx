@@ -40,6 +40,24 @@ export const Button: React.FC<ButtonProps> = ({
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
 
   const isDisabled = disabled || loading;
+  const sanitizeIconNode = (node: React.ReactNode): React.ReactNode => {
+    if (node == null || typeof node === 'boolean') return null;
+    if (typeof node === 'string') {
+      if (!node.trim()) return null;
+      return <Text style={[styles.text, styles[`text_${variant}`], styles[`text_${size}`]]}>{node}</Text>;
+    }
+    if (typeof node === 'number') {
+      return <Text style={[styles.text, styles[`text_${variant}`], styles[`text_${size}`]]}>{String(node)}</Text>;
+    }
+    if (Array.isArray(node)) {
+      return node.map((child, idx) => (
+        <React.Fragment key={idx}>{sanitizeIconNode(child)}</React.Fragment>
+      ));
+    }
+    return node;
+  };
+
+  const safeIcon = sanitizeIconNode(icon);
 
   return (
     <TouchableOpacity
@@ -62,13 +80,13 @@ export const Button: React.FC<ButtonProps> = ({
         />
       ) : (
         <>
-          {icon}
+          {safeIcon}
           <Text
             style={[
               styles.text,
               styles[`text_${variant}`],
               styles[`text_${size}`],
-              icon ? { marginLeft: SPACING.sm } : undefined,
+              safeIcon ? { marginLeft: SPACING.sm } : undefined,
               textStyle,
             ]}
           >

@@ -51,6 +51,10 @@ export const BankAccountsScreen: React.FC<{ navigation: any }> = ({ navigation }
   // IFSC lookup
   const [lookingUpIfsc, setLookingUpIfsc] = useState(false);
 
+  const normalizeUpiId = (value: string) => value.trim().toLowerCase().replace(/\s+/g, '');
+
+  const isValidUpiId = (value: string) => /^[a-z0-9._-]{2,256}@[a-z0-9.-]{2,64}$/i.test(value);
+
   useEffect(() => { fetchAccounts(); }, []);
 
   const fetchAccounts = async () => {
@@ -101,15 +105,36 @@ export const BankAccountsScreen: React.FC<{ navigation: any }> = ({ navigation }
   };
 
   const handleVerifyUpi = async () => {
-    if (!upiId.includes('@')) { Alert.alert('Invalid', 'Enter a valid UPI ID'); return; }
+    const normalizedUpi = normalizeUpiId(upiId);
+    setUpiId(normalizedUpi);
+
+    if (!isValidUpiId(normalizedUpi)) {
+      Alert.alert('Invalid UPI ID', 'Enter a valid UPI ID (example: name@okaxis).');
+      return;
+    }
+
     setVerifyingUpi(true);
     try {
-      const res = await bankAccountApi.verifyUpi(upiId);
+      const res = await bankAccountApi.verifyUpi(normalizedUpi);
       const result = res.data?.data || res.data;
-      const verified = result?.isValid ?? result?.success;
-      if (verified) { setUpiVerified(true); Alert.alert('Verified', result?.name ? `Verified: ${result.name}` : 'UPI ID verified successfully'); }
-      else { Alert.alert('Failed', 'Could not verify UPI ID'); }
-    } catch { Alert.alert('Error', 'UPI verification failed'); }
+      const verified =
+        result?.isValid ??
+        result?.verified ??
+        result?.success ??
+        result?.status === 'SUCCESS';
+
+      if (verified) {
+        setUpiVerified(true);
+        Alert.alert('Verified', result?.name ? `Verified: ${result.name}` : 'UPI ID verified successfully');
+      } else {
+        const backendMessage =
+          result?.message || result?.error || result?.reason || 'Could not verify UPI ID';
+        Alert.alert('Verification Failed', String(backendMessage));
+      }
+    } catch (err: any) {
+      const msg = formatErrorMessage(err?.response?.data?.error || err?.response?.data?.message || err?.response?.data || err);
+      Alert.alert('UPI Verification Failed', msg || 'Please check UPI handle and try again.');
+    }
     finally { setVerifyingUpi(false); }
   };
 
@@ -120,14 +145,24 @@ export const BankAccountsScreen: React.FC<{ navigation: any }> = ({ navigation }
         return;
       }
     } else {
-      if (!upiId) { Alert.alert('Missing Info', 'Please enter UPI ID'); return; }
+      const normalizedUpi = normalizeUpiId(upiId);
+      setUpiId(normalizedUpi);
+      if (!normalizedUpi) { Alert.alert('Missing Info', 'Please enter UPI ID'); return; }
+      if (!isValidUpiId(normalizedUpi)) {
+        Alert.alert('Invalid UPI ID', 'Enter a valid UPI ID (example: name@okaxis).');
+        return;
+      }
+      if (!upiVerified) {
+        Alert.alert('Verify UPI', 'Please verify your UPI ID before saving.');
+        return;
+      }
     }
 
     setSaving(true);
     try {
       const payload: Record<string, unknown> = activeTab === 'BANK'
         ? { type: 'BANK', accountHolderName: holderName, accountNumber, ifscCode: ifsc, bankName, label, isDefault }
-        : { type: 'UPI', upiId, label, isDefault };
+        : { type: 'UPI', upiId: normalizeUpiId(upiId), label, isDefault };
       if (editingAccount) {
         await bankAccountApi.update(editingAccount.id, payload);
       } else {
@@ -277,7 +312,14 @@ export const BankAccountsScreen: React.FC<{ navigation: any }> = ({ navigation }
                 </>
               ) : (
                 <>
-                  <FieldInput COLORS={COLORS} label="UPI ID" value={upiId} onChangeText={(t: string) => { setUpiId(t); setUpiVerified(false); }} placeholder="name@upi" />
+                  <FieldInput
+                    COLORS={COLORS}
+                    label="UPI ID"
+                    value={upiId}
+                    onChangeText={(t: string) => { setUpiId(normalizeUpiId(t)); setUpiVerified(false); }}
+                    placeholder="name@okaxis"
+                    autoCapitalize="none"
+                  />
                   <TouchableOpacity
                     style={[styles.verifyBtn, upiVerified && styles.verifyBtnDone]}
                     onPress={handleVerifyUpi} disabled={verifyingUpi || upiVerified}

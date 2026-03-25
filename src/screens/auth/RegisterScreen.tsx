@@ -9,6 +9,7 @@ import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { useAuthStore } from '../../stores/authStore';
+import { safeGoBack } from '../../utils/navigation';
 
 type Step = 'info' | 'password';
 
@@ -141,7 +142,7 @@ export const RegisterScreen: React.FC<{ navigation: any; route: any }> = ({ navi
             <Ionicons name={isDark ? 'moon-outline' : 'sunny-outline'} size={20} color={COLORS.text} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => safeGoBack(navigation, 'Landing')}>
             <Ionicons name="arrow-back" size={24} color={COLORS.text} />
           </TouchableOpacity>
 

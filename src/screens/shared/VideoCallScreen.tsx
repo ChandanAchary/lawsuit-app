@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
 import { videoApi } from '../../services/api';
 import { socketService } from '../../services/socket';
+import { safeGoBack } from '../../utils/navigation';
 
 const normalizeErrorMessage = (value: unknown): string => {
   if (!value) return 'Call failed.';
@@ -132,7 +133,7 @@ export const VideoCallScreen: React.FC<{ navigation: any; route: any }> = ({ nav
     if (chatId) videoApi.endChatSession(chatId).catch(() => {});
     stopTimer();
     setCallState('ended');
-    setTimeout(() => navigation.goBack(), 900);
+    setTimeout(() => safeGoBack(navigation, 'MainTabs'), 900);
   }, [otherId, roomId, appointmentId, navigation, chatId, callSeconds]);
 
   const toggleMute = useCallback(() => {

@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../constants';
 import { Button } from '../../components/Button';
 import { useAuthStore } from '../../stores/authStore';
+import { safeGoBack } from '../../utils/navigation';
 
 export const OtpVerifyScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
@@ -76,7 +77,7 @@ export const OtpVerifyScreen: React.FC<{ navigation: any; route: any }> = ({ nav
     >
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <View style={styles.content}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => safeGoBack(navigation, 'Register')}>
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
 

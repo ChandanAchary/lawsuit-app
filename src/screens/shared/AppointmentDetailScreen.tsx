@@ -11,6 +11,7 @@ import { appointmentsApi, paymentsApi } from '../../services/api';
 import { Appointment, AppointmentStatus } from '../../types';
 import { useAuthStore } from '../../stores/authStore';
 import { Button } from '../../components/Button';
+import { useWalletStore } from '../../stores/walletStore';
 
 interface Props {
   navigation: any;
@@ -24,6 +25,7 @@ export const AppointmentDetailScreen: React.FC<Props> = ({ navigation, route }) 
 
   const { appointmentId, appointment: passedAppt } = route.params;
   const role = useAuthStore((s) => s.user?.role);
+  const { fetchBalance, fetchTransactions } = useWalletStore();
 
   const [appointment, setAppointment] = useState<Appointment | null>(passedAppt || null);
   const [paymentDetails, setPaymentDetails] = useState<any | null>((passedAppt as any)?.payment || null);
@@ -96,6 +98,7 @@ export const AppointmentDetailScreen: React.FC<Props> = ({ navigation, route }) 
       { text: 'Yes', style: 'destructive', onPress: async () => {
         try {
           await appointmentsApi.cancel(appointment.id);
+          await Promise.allSettled([fetchBalance(), fetchTransactions(1)]);
           Alert.alert('Cancelled', 'Appointment has been cancelled.');
           fetchAppointment();
         } catch { Alert.alert('Error', 'Failed to cancel'); }
@@ -121,6 +124,7 @@ export const AppointmentDetailScreen: React.FC<Props> = ({ navigation, route }) 
       { text: 'Yes', style: 'destructive', onPress: async () => {
         try {
           await appointmentsApi.reject(appointment.id);
+          await Promise.allSettled([fetchBalance(), fetchTransactions(1)]);
           Alert.alert('Rejected', 'Appointment rejected. Payment refunded.');
           fetchAppointment();
         } catch (err: any) {

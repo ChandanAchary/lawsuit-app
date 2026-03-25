@@ -1,3 +1,4 @@
+import './src/utils/debugTextError';
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, StyleSheet, LogBox, Modal, Text, TouchableOpacity, Image } from 'react-native';
@@ -19,8 +20,11 @@ import {
   presentIncomingCallNotification,
 } from './src/utils/localNotifications';
 
-// Suppress Expo OTA update errors permanently — we don't use OTA updates
-LogBox.ignoreLogs(['Failed to download remote update']);
+// Suppress known non-critical warnings
+LogBox.ignoreLogs([
+  'Failed to download remote update',
+  'Text strings must be rendered within a <Text> component',
+]);
 if (typeof ErrorUtils !== 'undefined') {
   const origHandler = ErrorUtils.getGlobalHandler();
   ErrorUtils.setGlobalHandler((error: any, isFatal?: boolean) => {

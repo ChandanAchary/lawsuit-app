@@ -2,6 +2,16 @@ import { create } from 'zustand';
 import { walletApi } from '../services/api';
 import { WalletTransaction } from '../types';
 
+const normalizeTransaction = (tx: any): WalletTransaction => ({
+  ...tx,
+  amount: Number(tx?.amount ?? 0),
+  type: String(tx?.type || '').toUpperCase() as any,
+  status: String(tx?.status || '').toUpperCase() as any,
+  description: String(tx?.description || ''),
+  referenceId: tx?.referenceId ? String(tx.referenceId) : undefined,
+  createdAt: tx?.createdAt || new Date().toISOString(),
+});
+
 interface WalletState {
   balance: number;
   transactions: WalletTransaction[];
@@ -38,13 +48,16 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       const params: Record<string, unknown> = { page, limit };
       if (type) params.type = type;
       const { data } = await walletApi.getTransactions(params as any);
-      const incoming = data.items || data.transactions || [];
+      const payload = data?.data ?? data;
+      const incomingRaw = payload?.items || payload?.transactions || [];
+      const incoming = Array.isArray(incomingRaw) ? incomingRaw.map(normalizeTransaction) : [];
+      incoming.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       set({
         transactions: page > 1
           ? [...get().transactions, ...incoming.filter((next: WalletTransaction) => !get().transactions.some((prev) => prev.id === next.id))]
           : incoming,
-        totalTransactions: data.total || 0,
-        currentPage: page,
+        totalTransactions: payload?.total || incoming.length,
+        currentPage: payload?.page || page,
         loading: false,
       });
     } catch (err: any) {

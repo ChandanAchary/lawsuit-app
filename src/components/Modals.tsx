@@ -25,6 +25,23 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   const COLORS = useColors();
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
 
+  const sanitizeChildren = (node: React.ReactNode): React.ReactNode => {
+    if (node == null || typeof node === 'boolean') return null;
+    if (typeof node === 'string') {
+      if (!node.trim()) return null;
+      return <Text style={styles.inlineText}>{node}</Text>;
+    }
+    if (typeof node === 'number') return <Text style={styles.inlineText}>{String(node)}</Text>;
+    if (Array.isArray(node)) {
+      return node.map((child, idx) => (
+        <React.Fragment key={idx}>{sanitizeChildren(child)}</React.Fragment>
+      ));
+    }
+    return node;
+  };
+
+  const safeChildren = sanitizeChildren(children);
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose}>
@@ -40,7 +57,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
             </TouchableOpacity>
           </View>
         )}
-        <ScrollView showsVerticalScrollIndicator={false}>{children}</ScrollView>
+        <ScrollView showsVerticalScrollIndicator={false}>{safeChildren}</ScrollView>
       </View>
     </Modal>
   );
@@ -58,6 +75,23 @@ export const AppModal: React.FC<AppModalProps> = ({ visible, onClose, title, chi
   const COLORS = useColors();
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
 
+  const sanitizeChildren = (node: React.ReactNode): React.ReactNode => {
+    if (node == null || typeof node === 'boolean') return null;
+    if (typeof node === 'string') {
+      if (!node.trim()) return null;
+      return <Text style={styles.inlineText}>{node}</Text>;
+    }
+    if (typeof node === 'number') return <Text style={styles.inlineText}>{String(node)}</Text>;
+    if (Array.isArray(node)) {
+      return node.map((child, idx) => (
+        <React.Fragment key={idx}>{sanitizeChildren(child)}</React.Fragment>
+      ));
+    }
+    return node;
+  };
+
+  const safeChildren = sanitizeChildren(children);
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
@@ -70,7 +104,7 @@ export const AppModal: React.FC<AppModalProps> = ({ visible, onClose, title, chi
               </TouchableOpacity>
             </View>
           )}
-          <ScrollView showsVerticalScrollIndicator={false}>{children}</ScrollView>
+          <ScrollView showsVerticalScrollIndicator={false}>{safeChildren}</ScrollView>
         </View>
       </View>
     </Modal>
@@ -139,6 +173,10 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   modalTitle: {
     fontSize: FONT_SIZE.xl,
     fontWeight: '700',
+    color: COLORS.text,
+  },
+  inlineText: {
+    fontSize: FONT_SIZE.sm,
     color: COLORS.text,
   },
 });
