@@ -5,11 +5,12 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { useAuthStore } from '../../stores/authStore';
 import { useUserStore } from '../../stores/userStore';
-import { usersApi, storageApi, dashboardApi } from '../../services/api';
+import { usersApi, storageApi, dashboardApi, lawyersApi } from '../../services/api';
 import {  useThemeStore , useColors } from '../../stores/themeStore';
 import { Loading } from '../../components/Common';
 import { Button } from '../../components/Button';
@@ -46,7 +47,18 @@ export const LawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigation 
     ]);
   };
 
-  useEffect(() => { getUser(); fetchLawyerInfo(); fetchStats(); }, []);
+  const normalizeNumber = (value: any): number => {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  useEffect(() => { getUser(); fetchLawyerInfo(); }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchStats();
+    }, [authUser?.id, user?.id]),
+  );
 
   const fetchLawyerInfo = async () => {
     try {
@@ -57,11 +69,34 @@ export const LawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigation 
 
   const fetchStats = async () => {
     try {
-      const { data } = await dashboardApi.lawyerDashboard();
+      const lawyerId = (user as any)?.id || (authUser as any)?.id;
+      const [dashboardRes, profileRes] = await Promise.all([
+        dashboardApi.lawyerDashboard().catch(() => ({ data: null })),
+        lawyerId ? lawyersApi.getPublicProfile(lawyerId).catch(() => ({ data: null })) : Promise.resolve({ data: null }),
+      ]);
+
+      const dashboardData = dashboardRes?.data?.data ?? dashboardRes?.data ?? {};
+      const profileData = profileRes?.data?.lawyer ?? profileRes?.data?.data ?? profileRes?.data ?? {};
+      const profileStats = profileData?.stats ?? {};
+
       setStats({
-        casesWon: data?.stats?.casesWon ?? data?.casesWon ?? 0,
-        clients: data?.stats?.totalClients ?? data?.totalClients ?? 0,
-        rating: data?.stats?.rating ?? data?.rating ?? 0,
+        casesWon: normalizeNumber(
+          profileStats?.wonCases ??
+          dashboardData?.wonCases ??
+          dashboardData?.stats?.wonCases ??
+          dashboardData?.casesWon,
+        ),
+        clients: normalizeNumber(
+          profileData?.totalConsultations ??
+          profileStats?.completedConsultations ??
+          dashboardData?.totalClients ??
+          dashboardData?.stats?.totalClients,
+        ),
+        rating: normalizeNumber(
+          dashboardData?.rating ??
+          profileStats?.averageRating ??
+          profileData?.rating,
+        ),
       });
     } catch {}
   };
@@ -113,7 +148,7 @@ export const LawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigation 
   const displayUser = user || authUser;
   const avatarUrl = getAvatarUrl();
   const info = lawyerInfo;
-  const displayRating = info?.rating ? Number(info.rating).toFixed(1) : (stats.rating ? stats.rating.toFixed(1) : '—');
+  const displayRating = Number.isFinite(stats.rating) ? stats.rating.toFixed(1) : '0.0';
 
   return (
     <>

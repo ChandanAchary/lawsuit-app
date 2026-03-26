@@ -31,7 +31,7 @@ const TX_TABS = [
 const getTxType = (tx: WalletTransaction): string => String(tx.type || '').trim().toUpperCase();
 
 const CREDIT_TYPES = new Set([TransactionType.CREDIT, TransactionType.REFUND]);
-const DEBIT_TYPES = new Set([TransactionType.DEBIT, TransactionType.WITHDRAWAL, TransactionType.PAYMENT, TransactionType.TRANSFER]);
+const DEBIT_TYPES = new Set([TransactionType.DEBIT, TransactionType.WITHDRAWAL, TransactionType.PAYMENT]);
 
 const isCreditTransaction = (tx: WalletTransaction): boolean => {
   const type = getTxType(tx);
@@ -40,8 +40,6 @@ const isCreditTransaction = (tx: WalletTransaction): boolean => {
   if (type === TransactionType.TRANSFER) {
     return description.includes('received') || description.includes('credited');
   }
-  if (description.includes('refund') || description.includes('reversal')) return true;
-  if (!type && Number(tx.amount) > 0) return true;
   return false;
 };
 
@@ -50,10 +48,8 @@ const isDebitTransaction = (tx: WalletTransaction): boolean => {
   const description = String(tx.description || '').toLowerCase();
   if (DEBIT_TYPES.has(type as TransactionType)) return true;
   if (type === TransactionType.TRANSFER) {
-    return description.includes('sent') || description.includes('debited') || !description.includes('received');
+    return description.includes('sent') || description.includes('debited');
   }
-  if (description.includes('book') || description.includes('paid') || description.includes('debit')) return true;
-  if (!type && Number(tx.amount) < 0) return true;
   return false;
 };
 
@@ -276,7 +272,7 @@ export const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const renderTransaction = ({ item }: { item: WalletTransaction }) => {
     const inferredCredit = isCreditTransaction(item);
     const inferredDebit = isDebitTransaction(item);
-    const isCredit = inferredCredit || (!inferredDebit && Number(item.amount) >= 0);
+    const isCredit = inferredCredit && !inferredDebit;
     const absoluteAmount = Math.abs(Number(item.amount) || 0);
     const source = getTransactionSource(item);
     return (
