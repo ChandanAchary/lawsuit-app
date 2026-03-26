@@ -17,13 +17,23 @@ const TABS = [
   { key: 'history', label: 'My Verifications' },
 ];
 
+const STATUS_FILTERS = [
+  { key: 'ALL', label: 'All' },
+  { key: 'APPROVED', label: 'Approved' },
+  { key: 'REJECTED', label: 'Rejected' },
+];
+
 export const LawyerVerificationScreen: React.FC<{ navigation: any; route?: any }> = ({ navigation, route }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
   const COLORS = useColors();
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
 
   const initialTab = route?.params?.tab || 'pending';
+  const initialStatusFilter = String(route?.params?.statusFilter || 'ALL').toUpperCase();
   const [tab, setTab] = useState(initialTab);
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'APPROVED' | 'REJECTED'>(
+    initialStatusFilter === 'APPROVED' || initialStatusFilter === 'REJECTED' ? initialStatusFilter : 'ALL',
+  );
   const [pending, setPending] = useState<any[]>([]);
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,6 +81,24 @@ export const LawyerVerificationScreen: React.FC<{ navigation: any; route?: any }
   }, [tab]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  useEffect(() => {
+    const routeTab = route?.params?.tab;
+    const routeStatus = String(route?.params?.statusFilter || 'ALL').toUpperCase();
+
+    if (routeTab === 'pending' || routeTab === 'history') {
+      setTab(routeTab);
+    }
+
+    if (routeStatus === 'APPROVED' || routeStatus === 'REJECTED' || routeStatus === 'ALL') {
+      setStatusFilter(routeStatus);
+    }
+  }, [route?.params?.tab, route?.params?.statusFilter]);
+
+  const filteredHistory = React.useMemo(() => {
+    if (statusFilter === 'ALL') return history;
+    return history.filter((row: any) => String(row?.status || '').trim().toUpperCase() === statusFilter);
+  }, [history, statusFilter]);
 
   const handleVerify = async () => {
     if (!selectedLawyer || !actionType) return;
@@ -383,9 +411,25 @@ export const LawyerVerificationScreen: React.FC<{ navigation: any; route?: any }
         <Text style={styles.headerTitle}>Lawyer Verification</Text>
       </View>
       <TabBar tabs={TABS} active={tab} onSelect={setTab} />
+      {tab === 'history' && (
+        <View style={styles.filterRow}>
+          {STATUS_FILTERS.map((item) => {
+            const active = statusFilter === item.key;
+            return (
+              <TouchableOpacity
+                key={item.key}
+                style={[styles.filterChip, active && styles.filterChipActive]}
+                onPress={() => setStatusFilter(item.key as 'ALL' | 'APPROVED' | 'REJECTED')}
+              >
+                <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>{item.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
       {loading ? <Loading /> : (
         <FlatList
-          data={tab === 'pending' ? pending : history}
+          data={tab === 'pending' ? pending : filteredHistory}
           keyExtractor={(item) => item.id}
           renderItem={tab === 'pending' ? renderPending : renderHistory}
           contentContainerStyle={styles.list}
@@ -531,6 +575,32 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   },
   backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: FONT_SIZE.xxl, fontWeight: '900', color: COLORS.text },
+  filterRow: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    paddingHorizontal: SPACING.xl,
+    paddingTop: SPACING.sm,
+    paddingBottom: SPACING.xs,
+    backgroundColor: COLORS.surface,
+  },
+  filterChip: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.full,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+  },
+  filterChipActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  filterChipText: {
+    color: COLORS.textSecondary,
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '700',
+  },
+  filterChipTextActive: { color: COLORS.white },
   list: { padding: SPACING.xl, paddingBottom: 100 },
   card: {
     backgroundColor: COLORS.white, borderRadius: BORDER_RADIUS.xl, padding: SPACING.xl,

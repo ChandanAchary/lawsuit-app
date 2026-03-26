@@ -8,6 +8,7 @@ import { Notification, NotificationType } from '../types';
 import { useNotificationStore } from '../stores/notificationStore';
 import { formatTimeAgo } from '../utils/date';
 import { useThemeStore, useColors } from '../stores/themeStore';
+import { useAuthStore } from '../stores/authStore';
 
 const getNotificationIcons = (COLORS: any): Record<string, { icon: string; color: string }> => ({
   [NotificationType.APPOINTMENT_BOOKED]: { icon: 'calendar', color: COLORS.info },
@@ -32,6 +33,7 @@ export const NotificationsScreen: React.FC<{ navigation?: any }> = ({ navigation
   const insets = useSafeAreaInsets();
   const fallbackNav = useNavigation();
   const nav: any = navProp || fallbackNav;
+  const userRole = useAuthStore((s) => s.user?.role);
   const {
     notifications, isLoading, unreadCount, hasMore,
     fetchNotifications, fetchNextPage, markRead, markAllRead, deleteNotification,
@@ -41,9 +43,35 @@ export const NotificationsScreen: React.FC<{ navigation?: any }> = ({ navigation
 
   const getIcon = (type: string) => NOTIFICATION_ICONS[type] || { icon: 'notifications', color: COLORS.primary };
 
+  const parseNotificationData = (data: Notification['data'] | string | undefined): Record<string, any> => {
+    if (!data) return {};
+    if (typeof data === 'object') return data as Record<string, any>;
+    if (typeof data === 'string') {
+      try {
+        const parsed = JSON.parse(data);
+        return typeof parsed === 'object' && parsed ? parsed : {};
+      } catch {
+        return {};
+      }
+    }
+    return {};
+  };
+
+  const isVerificationNotification = (item: Notification, payload: Record<string, any>): boolean => {
+    const title = String(item.title || '').toLowerCase();
+    const body = String(item.body || '').toLowerCase();
+    return Boolean(
+      payload?.lawyerId ||
+      title.includes('verification') ||
+      body.includes('verification') ||
+      title.includes('verify') ||
+      body.includes('verify'),
+    );
+  };
+
   const handleNotificationPress = (item: Notification) => {
     if (!item.isRead) markRead(item.id);
-    const d = item.data;
+    const d = parseNotificationData(item.data as any);
     if (!d || !nav) return;
     switch (item.type) {
       case NotificationType.APPOINTMENT_BOOKED:
@@ -60,7 +88,17 @@ export const NotificationsScreen: React.FC<{ navigation?: any }> = ({ navigation
       case NotificationType.CASE_UPDATE:
       case NotificationType.DOCUMENT_UPLOADED:
       case NotificationType.TASK_ASSIGNED:
-        if (d.caseId) nav.navigate('CaseDetail', { caseId: d.caseId });
+        if (d.caseId) {
+          nav.navigate('CaseDetail', { caseId: d.caseId });
+          break;
+        }
+        if (isVerificationNotification(item, d)) {
+          if (userRole === 'COURT_ADMIN') {
+            nav.navigate('LawyerVerification', { tab: 'pending', statusFilter: 'ALL' });
+          } else if (userRole === 'LAWYER') {
+            nav.navigate('LawyerVerificationRequest');
+          }
+        }
         break;
       case NotificationType.VIDEO_CALL:
         if (d.appointmentId) nav.navigate('VideoCall', { appointmentId: d.appointmentId });

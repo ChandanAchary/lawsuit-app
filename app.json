@@ -84,13 +84,13 @@
       "expo-audio"
     ],
     "updates": {
-      "enabled": false,
-      "checkAutomatically": "NEVER",
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 0,
-      "url": ""
+      "url": "https://u.expo.dev/73a2f4bc-1a1a-40b6-a09a-65f0b94038b9"
     },
     "runtimeVersion": {
-      "policy": "sdkVersion"
+      "policy": "appVersion"
     },
     "owner": "expo-chandan",
     "extra": {

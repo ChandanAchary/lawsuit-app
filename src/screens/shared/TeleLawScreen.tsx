@@ -1,10 +1,11 @@
 import {  useThemeStore , useColors } from '../../stores/themeStore';
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Alert, Modal, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS, CASTE_OPTIONS, GENDER_OPTIONS } from '../../constants';
 import { teleLawApi } from '../../services/api';
+import { loadStateOptions } from '../../utils/addressOptions';
 
 export const TeleLawScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
@@ -21,9 +22,73 @@ export const TeleLawScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
   const [useProfile, setUseProfile] = useState(false);
   const [eligibilityResult, setEligibilityResult] = useState<any>(null);
   const [checking, setChecking] = useState(false);
+  const [stateOptions, setStateOptions] = useState<string[]>([]);
+  const [activePicker, setActivePicker] = useState<'caste' | 'gender' | 'state' | null>(null);
+  const [stateSearch, setStateSearch] = useState('');
+
+  const normalizeStringOptions = (input: unknown): string[] => {
+    if (!Array.isArray(input)) return [];
+    const normalized = input
+      .map((item: any) => (typeof item === 'string' ? item : item?.name || item?.label || ''))
+      .map((item: string) => item.trim())
+      .filter((item: string) => item.length > 0);
+    return [...new Set(normalized)];
+  };
+
+  const resolveCasteOptions = (): string[] => {
+    const infoOptions = normalizeStringOptions(
+      info?.casteOptions || info?.castes || info?.categories?.castes || info?.options?.castes,
+    );
+    if (infoOptions.length > 0) return infoOptions;
+    return [...CASTE_OPTIONS];
+  };
+
+  const resolveGenderOptions = (): string[] => {
+    const infoOptions = normalizeStringOptions(
+      info?.genderOptions || info?.genders || info?.categories?.genders || info?.options?.genders,
+    );
+    if (infoOptions.length > 0) return infoOptions;
+    return [...GENDER_OPTIONS].filter((option) => option !== 'PREFER NOT TO SAY');
+  };
+
+  const resolveStateOptions = (): string[] => {
+    const infoOptions = normalizeStringOptions(
+      info?.stateOptions || info?.states || info?.categories?.states || info?.options?.states,
+    );
+    if (infoOptions.length > 0) return infoOptions;
+    return stateOptions;
+  };
+
+  const casteOptions = resolveCasteOptions();
+  const genderOptions = resolveGenderOptions();
+  const availableStateOptions = resolveStateOptions();
+
+  const pickerTitle =
+    activePicker === 'caste' ? 'Select Caste Category' :
+    activePicker === 'gender' ? 'Select Gender' :
+    activePicker === 'state' ? 'Select State' : '';
+
+  const pickerOptions =
+    activePicker === 'caste' ? casteOptions :
+    activePicker === 'gender' ? genderOptions :
+    activePicker === 'state' ? availableStateOptions : [];
+
+  const filteredPickerOptions =
+    activePicker === 'state' && stateSearch.trim().length > 0
+      ? pickerOptions.filter((item) => item.toLowerCase().includes(stateSearch.trim().toLowerCase()))
+      : pickerOptions;
+
+  const selectedPickerValue =
+    activePicker === 'caste' ? caste :
+    activePicker === 'gender' ? gender :
+    activePicker === 'state' ? stateName : '';
 
   useEffect(() => {
     fetchInfo();
+  }, []);
+
+  useEffect(() => {
+    void loadStateOptions().then((resolved) => setStateOptions(resolved)).catch(() => setStateOptions([]));
   }, []);
 
   const fetchInfo = async () => {
@@ -55,6 +120,14 @@ export const TeleLawScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
     } finally {
       setChecking(false);
     }
+  };
+
+  const selectPickerOption = (value: string) => {
+    if (activePicker === 'caste') setCaste(value);
+    if (activePicker === 'gender') setGender(value);
+    if (activePicker === 'state') setStateName(value);
+    setStateSearch('');
+    setActivePicker(null);
   };
 
   if (loading && !info) {
@@ -119,30 +192,28 @@ export const TeleLawScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
               />
               
               <Text style={styles.inputLabel}>Caste Category</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. SC, ST, GENERAL"
-                value={caste}
-                autoCapitalize="characters"
-                onChangeText={setCaste}
-              />
+              <TouchableOpacity style={styles.dropdown} onPress={() => setActivePicker('caste')}>
+                <Text style={caste ? styles.dropdownText : styles.dropdownPlaceholder}>
+                  {caste || 'Select caste category'}
+                </Text>
+                <Ionicons name="chevron-down" size={18} color={COLORS.textMuted} />
+              </TouchableOpacity>
 
               <Text style={styles.inputLabel}>Gender</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. MALE, FEMALE, OTHER"
-                value={gender}
-                autoCapitalize="characters"
-                onChangeText={setGender}
-              />
+              <TouchableOpacity style={styles.dropdown} onPress={() => setActivePicker('gender')}>
+                <Text style={gender ? styles.dropdownText : styles.dropdownPlaceholder}>
+                  {gender || 'Select gender'}
+                </Text>
+                <Ionicons name="chevron-down" size={18} color={COLORS.textMuted} />
+              </TouchableOpacity>
 
               <Text style={styles.inputLabel}>State</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. Maharashtra"
-                value={stateName}
-                onChangeText={setStateName}
-              />
+              <TouchableOpacity style={styles.dropdown} onPress={() => setActivePicker('state')}>
+                <Text style={stateName ? styles.dropdownText : styles.dropdownPlaceholder}>
+                  {stateName || 'Select state'}
+                </Text>
+                <Ionicons name="chevron-down" size={18} color={COLORS.textMuted} />
+              </TouchableOpacity>
             </>
           )}
 
@@ -162,6 +233,48 @@ export const TeleLawScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
           )}
         </View>
       </ScrollView>
+
+      <Modal visible={activePicker !== null} transparent animationType="slide" onRequestClose={() => setActivePicker(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{pickerTitle}</Text>
+              <TouchableOpacity onPress={() => {
+                setStateSearch('');
+                setActivePicker(null);
+              }}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+            {activePicker === 'state' && (
+              <View style={styles.searchBox}>
+                <Ionicons name="search" size={18} color={COLORS.textMuted} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search state..."
+                  placeholderTextColor={COLORS.textMuted}
+                  value={stateSearch}
+                  onChangeText={setStateSearch}
+                />
+              </View>
+            )}
+            <FlatList
+              data={filteredPickerOptions}
+              keyExtractor={(item) => item}
+              ListEmptyComponent={<Text style={styles.emptyText}>No options available</Text>}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[styles.listItem, item === selectedPickerValue && styles.listItemActive]}
+                  onPress={() => selectPickerOption(item)}
+                >
+                  <Text style={[styles.listItemText, item === selectedPickerValue && styles.listItemTextActive]}>{item}</Text>
+                  {item === selectedPickerValue && <Ionicons name="checkmark" size={20} color={COLORS.primary} />}
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -200,6 +313,19 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     borderWidth: 1, borderColor: COLORS.borderLight, borderRadius: BORDER_RADIUS.md,
     padding: SPACING.md, fontSize: FONT_SIZE.md, marginBottom: SPACING.md, color: COLORS.text,
   },
+  dropdown: {
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+    borderRadius: BORDER_RADIUS.md,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    marginBottom: SPACING.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  dropdownText: { fontSize: FONT_SIZE.md, color: COLORS.text },
+  dropdownPlaceholder: { fontSize: FONT_SIZE.md, color: COLORS.textMuted },
   submitBtn: {
     backgroundColor: COLORS.primary, borderRadius: BORDER_RADIUS.lg, padding: SPACING.md,
     alignItems: 'center', marginTop: SPACING.sm,
@@ -208,4 +334,53 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   resultContainer: { marginTop: SPACING.lg, padding: SPACING.md, borderRadius: BORDER_RADIUS.md },
   resultText: { fontSize: FONT_SIZE.md, fontWeight: '700' },
   reasons: { fontSize: FONT_SIZE.sm, marginTop: SPACING.xs, color: COLORS.textSecondary },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: BORDER_RADIUS.xl,
+    borderTopRightRadius: BORDER_RADIUS.xl,
+    maxHeight: '70%',
+    paddingHorizontal: SPACING.md,
+    paddingBottom: SPACING.xl,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: SPACING.md,
+  },
+  modalTitle: { fontSize: FONT_SIZE.lg, fontWeight: '700', color: COLORS.text },
+  searchBox: {
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+    borderRadius: BORDER_RADIUS.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.md,
+    marginBottom: SPACING.sm,
+  },
+  searchInput: {
+    flex: 1,
+    color: COLORS.text,
+    fontSize: FONT_SIZE.md,
+    paddingVertical: SPACING.sm,
+    marginLeft: SPACING.sm,
+  },
+  listItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.borderLight,
+  },
+  listItemActive: { backgroundColor: COLORS.surfaceAlt },
+  listItemText: { fontSize: FONT_SIZE.md, color: COLORS.text },
+  listItemTextActive: { color: COLORS.primary, fontWeight: '700' },
+  emptyText: { textAlign: 'center', color: COLORS.textSecondary, paddingVertical: SPACING.lg },
 });

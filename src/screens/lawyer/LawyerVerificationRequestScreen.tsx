@@ -330,7 +330,7 @@ export const LawyerVerificationRequestScreen: React.FC<{ navigation: any }> = ({
     return (
       <TouchableOpacity
         style={[styles.card, selected && styles.cardSelected]}
-        onPress={() => setSelectedId(item.id)}
+        onPress={() => setSelectedId((prev) => (prev === item.id ? '' : item.id))}
         activeOpacity={0.8}
       >
         <View style={styles.row}> 

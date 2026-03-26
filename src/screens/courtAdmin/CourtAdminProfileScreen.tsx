@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Image,
+  Modal,
   RefreshControl,
   ScrollView,
   StatusBar,
@@ -52,6 +53,7 @@ export const CourtAdminProfileScreen: React.FC<{ navigation: any }> = ({ navigat
   const { user, logout } = useAuthStore();
   const [profile, setProfile] = useState<CourtAdminProfile | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showAvatarPreview, setShowAvatarPreview] = useState(false);
 
   const fetchProfile = async () => {
     setLoading(true);
@@ -96,13 +98,19 @@ export const CourtAdminProfileScreen: React.FC<{ navigation: any }> = ({ navigat
       <StatusBar barStyle="light-content" />
 
       <LinearGradient colors={[COLORS.primaryDark, COLORS.primary, COLORS.primaryLight]} style={styles.headerGradient}>
-        <View style={styles.avatarWrap}>
+        <TouchableOpacity
+          style={styles.avatarWrap}
+          activeOpacity={0.85}
+          onPress={() => {
+            if (avatarUrl) setShowAvatarPreview(true);
+          }}
+        >
           {avatarUrl ? (
             <Image key={avatarUrl} source={{ uri: avatarUrl }} style={styles.avatarImage} />
           ) : (
             <Ionicons name="shield-checkmark" size={40} color={COLORS.white} />
           )}
-        </View>
+        </TouchableOpacity>
         <Text style={styles.profileName}>{display?.name || 'Court Admin'}</Text>
         <Text style={styles.profileEmail}>{display?.email || ''}</Text>
         <View style={styles.roleBadge}>
@@ -156,17 +164,33 @@ export const CourtAdminProfileScreen: React.FC<{ navigation: any }> = ({ navigat
         <View style={{ width: 28 }} />
       </View>
       <View style={styles.card}>
-        <MenuItem icon="time-outline" label="Pending Verifications" onPress={() => navigation.navigate('LawyerVerification', { tab: 'pending' })} styles={styles} COLORS={COLORS} />
         <MenuItem icon="notifications-outline" label="Notifications" onPress={() => navigation.navigate('Notifications')} styles={styles} COLORS={COLORS} />
         <MenuItem icon="shield-checkmark-outline" label="Security & Account" onPress={() => navigation.navigate('Security')} styles={styles} COLORS={COLORS} />
         <MenuItem icon="help-circle-outline" label="Help Center" onPress={() => navigation.navigate('HelpCenter')} styles={styles} COLORS={COLORS} />
         <MenuItem icon="information-circle-outline" label="About" onPress={() => navigation.navigate('About')} styles={styles} COLORS={COLORS} />
+        <MenuItem icon="document-text-outline" label="Privacy Policy & Terms" onPress={() => navigation.navigate('PrivacyTerms')} styles={styles} COLORS={COLORS} />
       </View>
 
       <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
         <Ionicons name="log-out-outline" size={20} color={COLORS.error} />
         <Text style={styles.logoutText}>Logout</Text>
       </TouchableOpacity>
+
+      <Modal
+        visible={showAvatarPreview}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowAvatarPreview(false)}
+      >
+        <TouchableOpacity style={styles.avatarPreviewOverlay} activeOpacity={1} onPress={() => setShowAvatarPreview(false)}>
+          <View style={styles.avatarPreviewCard}>
+            {!!avatarUrl && <Image source={{ uri: avatarUrl }} style={styles.avatarPreviewImage} />}
+            <TouchableOpacity style={styles.avatarPreviewClose} onPress={() => setShowAvatarPreview(false)}>
+              <Ionicons name="close" size={22} color={COLORS.white} />
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </ScrollView>
   );
 };
@@ -227,6 +251,36 @@ const getStyles = (COLORS: any) =>
     avatarImage: {
       width: '100%',
       height: '100%',
+    },
+    avatarPreviewOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.75)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: SPACING.xl,
+    },
+    avatarPreviewCard: {
+      width: '100%',
+      maxWidth: 380,
+      borderRadius: BORDER_RADIUS.xl,
+      overflow: 'hidden',
+      backgroundColor: COLORS.black,
+    },
+    avatarPreviewImage: {
+      width: '100%',
+      aspectRatio: 1,
+      resizeMode: 'cover',
+    },
+    avatarPreviewClose: {
+      position: 'absolute',
+      top: SPACING.sm,
+      right: SPACING.sm,
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      backgroundColor: 'rgba(0,0,0,0.45)',
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     profileName: { fontSize: FONT_SIZE.xxl, fontWeight: '900', color: COLORS.white },
     profileEmail: { fontSize: FONT_SIZE.sm, color: 'rgba(255,255,255,0.8)', marginTop: 2 },

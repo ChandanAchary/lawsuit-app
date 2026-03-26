@@ -147,6 +147,13 @@ export const EditLawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigat
       Alert.alert('Error', 'Please set a valid consultation fee (minimum ₹10)');
       return;
     }
+
+    const trimmedPincode = (locationData.pincode || '').trim();
+    if (!/^\d{6}$/.test(trimmedPincode)) {
+      Alert.alert('Invalid Pincode', 'Please enter a valid 6-digit pincode before saving your profile.');
+      return;
+    }
+
     setSaving(true);
     try {
       await updateUser({ name: form.name, phone: form.phone });
@@ -161,7 +168,7 @@ export const EditLawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigat
         licenseProofUrl: docUrls.licenseProofUrl || undefined,
         barCouncilProofUrl: docUrls.barCouncilProofUrl || undefined,
         country: locationData.country, state: locationData.state,
-        pincode: locationData.pincode, district: locationData.district,
+        pincode: trimmedPincode, district: locationData.district,
         city: locationData.city, postOfficeName: locationData.postOfficeName,
         houseNameOrNumber: locationData.houseNameOrNumber, streetName: locationData.streetName,
         specializations: selectedSpecs, languages: selectedLangs,
@@ -243,16 +250,16 @@ export const EditLawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigat
         {/* Basic Information */}
         <View style={styles.card}>
           <Text style={styles.sTitle}>Basic Information</Text>
-          <Input label="Full Name *" value={form.name} onChangeText={(v) => setForm({ ...form, name: v })} icon={<Ionicons name="person-outline" size={20} color={COLORS.textMuted} />} />
+          <Input label="Full Name *" value={form.name} onChangeText={(v) => setForm({ ...form, name: v })} placeholder="e.g. Rahul Sharma" icon={<Ionicons name="person-outline" size={20} color={COLORS.textMuted} />} />
           <Input label="Email" value={displayUser?.email || ''} editable={false} icon={<Ionicons name="mail-outline" size={20} color={COLORS.textMuted} />} />
-          <Input label="Phone" value={form.phone} onChangeText={(v) => setForm({ ...form, phone: v })} icon={<Ionicons name="call-outline" size={20} color={COLORS.textMuted} />} keyboardType="phone-pad" />
+          <Input label="Phone" value={form.phone} onChangeText={(v) => setForm({ ...form, phone: v })} placeholder="e.g. 9876543210" icon={<Ionicons name="call-outline" size={20} color={COLORS.textMuted} />} keyboardType="phone-pad" />
         </View>
 
         {/* Professional Details */}
         <View style={styles.card}>
           <Text style={styles.sTitle}>Professional Details</Text>
-          <Input label="Bio" value={form.bio} onChangeText={(v) => setForm({ ...form, bio: v })} multiline icon={<Ionicons name="document-text-outline" size={20} color={COLORS.textMuted} />} />
-          <Input label="Bar Council ID" value={form.barCouncilId} onChangeText={(v) => setForm({ ...form, barCouncilId: v })} icon={<Ionicons name="id-card-outline" size={20} color={COLORS.textMuted} />} />
+          <Input label="Bio" value={form.bio} onChangeText={(v) => setForm({ ...form, bio: v })} placeholder="Write a short professional introduction" multiline icon={<Ionicons name="document-text-outline" size={20} color={COLORS.textMuted} />} />
+          <Input label="Bar Council ID" value={form.barCouncilId} onChangeText={(v) => setForm({ ...form, barCouncilId: v })} placeholder="e.g. BCI-12345" icon={<Ionicons name="id-card-outline" size={20} color={COLORS.textMuted} />} />
           <View style={styles.inlineDocRow}>
             <Text style={styles.inlineDocLabel}>Bar Council Certificate Proof</Text>
             <View style={styles.inlineDocBtns}>
@@ -280,7 +287,7 @@ export const EditLawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigat
               </TouchableOpacity>
             </View>
           </View>
-          <Input label="License Number" value={form.licenseNumber} onChangeText={(v) => setForm({ ...form, licenseNumber: v })} icon={<Ionicons name="document-outline" size={20} color={COLORS.textMuted} />} />
+          <Input label="License Number" value={form.licenseNumber} onChangeText={(v) => setForm({ ...form, licenseNumber: v })} placeholder="e.g. LIC-2026-001" icon={<Ionicons name="document-outline" size={20} color={COLORS.textMuted} />} />
           <View style={styles.inlineDocRow}>
             <Text style={styles.inlineDocLabel}>License / Registration Proof</Text>
             <View style={styles.inlineDocBtns}>
@@ -309,14 +316,14 @@ export const EditLawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigat
               {/* Styles for removeDocBtn are now in StyleSheet below */}
             </View>
           </View>
-          <Input label="Bar Council" value={form.barCouncil} onChangeText={(v) => setForm({ ...form, barCouncil: v })} icon={<Ionicons name="ribbon-outline" size={20} color={COLORS.textMuted} />} />
-          <Input label="Organisation" value={form.organisation} onChangeText={(v) => setForm({ ...form, organisation: v })} icon={<Ionicons name="business-outline" size={20} color={COLORS.textMuted} />} />
+          <Input label="Bar Council" value={form.barCouncil} onChangeText={(v) => setForm({ ...form, barCouncil: v })} placeholder="e.g. Bar Council of Odisha" icon={<Ionicons name="ribbon-outline" size={20} color={COLORS.textMuted} />} />
+          <Input label="Organisation" value={form.organisation} onChangeText={(v) => setForm({ ...form, organisation: v })} placeholder="e.g. Sharma & Associates" icon={<Ionicons name="business-outline" size={20} color={COLORS.textMuted} />} />
           <View style={styles.twoCol}>
             <View style={{ flex: 1 }}>
-              <Input label="Experience (years)" value={form.experienceYears} onChangeText={(v) => setForm({ ...form, experienceYears: v })} keyboardType="number-pad" />
+              <Input label="Experience (years)" value={form.experienceYears} onChangeText={(v) => setForm({ ...form, experienceYears: v })} placeholder="e.g. 5" keyboardType="number-pad" />
             </View>
             <View style={{ flex: 1 }}>
-              <Input label="Fee (₹)" value={form.feePerConsultation} onChangeText={(v) => setForm({ ...form, feePerConsultation: v })} keyboardType="number-pad" />
+              <Input label="Fee (₹)" value={form.feePerConsultation} onChangeText={(v) => setForm({ ...form, feePerConsultation: v })} placeholder="e.g. 500" keyboardType="number-pad" />
             </View>
           </View>
         </View>

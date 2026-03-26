@@ -8,7 +8,13 @@
     "start:dev-client": "expo start --dev-client",
     "android": "expo start --go --android",
     "ios": "expo start --go --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "eas:build:android:staging": "eas build --platform android --profile preview",
+    "eas:build:ios:staging": "eas build --platform ios --profile preview",
+    "eas:build:android:production": "eas build --platform android --profile production",
+    "eas:build:ios:production": "eas build --platform ios --profile production",
+    "eas:update:staging": "eas update --channel staging --environment staging --message \"staging update\"",
+    "eas:update:production": "eas update --channel production --environment production --message \"production update\""
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

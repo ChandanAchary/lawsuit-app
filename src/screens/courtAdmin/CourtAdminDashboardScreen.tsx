@@ -16,25 +16,41 @@ export const CourtAdminDashboardScreen: React.FC<{ navigation: any }> = ({ navig
 
   const user = useAuthStore((s) => s.user);
   const [pendingCount, setPendingCount] = useState(0);
+  const [approvedCount, setApprovedCount] = useState(0);
+  const [rejectedCount, setRejectedCount] = useState(0);
   const [pendingItems, setPendingItems] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchPending = useCallback(async () => {
+  const fetchDashboardStats = useCallback(async () => {
     try {
-      const { data } = await courtAdminApi.getPendingVerifications();
-      const items = data.items || data.lawyers || data || [];
-      const arr = Array.isArray(items) ? items : [];
-      setPendingItems(arr);
-      setPendingCount(arr.length);
+      const [pendingRes, historyRes] = await Promise.all([
+        courtAdminApi.getPendingVerifications(),
+        courtAdminApi.getMyVerifications({ page: 1, limit: 500 }),
+      ]);
+
+      const pendingItemsRaw = pendingRes.data.items || pendingRes.data.lawyers || pendingRes.data || [];
+      const pendingArr = Array.isArray(pendingItemsRaw) ? pendingItemsRaw : [];
+      setPendingItems(pendingArr);
+      setPendingCount(pendingArr.length);
+
+      const historyRows = historyRes.data.verifications || historyRes.data.items || historyRes.data || [];
+      const historyArr = Array.isArray(historyRows) ? historyRows : [];
+      const approved = historyArr.filter((row: any) => String(row?.status || '').trim().toUpperCase() === 'APPROVED').length;
+      const rejected = historyArr.filter((row: any) => String(row?.status || '').trim().toUpperCase() === 'REJECTED').length;
+
+      setApprovedCount(approved);
+      setRejectedCount(rejected);
     } catch {
       setPendingItems([]);
       setPendingCount(0);
+      setApprovedCount(0);
+      setRejectedCount(0);
     }
   }, []);
 
-  useEffect(() => { fetchPending(); }, []);
+  useEffect(() => { fetchDashboardStats(); }, []);
 
-  const onRefresh = () => { setRefreshing(true); fetchPending().finally(() => setRefreshing(false)); };
+  const onRefresh = () => { setRefreshing(true); fetchDashboardStats().finally(() => setRefreshing(false)); };
 
   return (
     <ScrollView
@@ -54,26 +70,45 @@ export const CourtAdminDashboardScreen: React.FC<{ navigation: any }> = ({ navig
       </LinearGradient>
 
       <View style={styles.statsRow}>
-        <View style={styles.statCard}>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={styles.statCard}
+          onPress={() => navigation.navigate('LawyerVerification', { tab: 'pending', statusFilter: 'ALL' })}
+        >
           <View style={[styles.statIcon, { backgroundColor: '#FEF3C7' }]}>
             <Ionicons name="hourglass" size={24} color="#F59E0B" />
           </View>
           <Text style={styles.statValue}>{pendingCount}</Text>
-          <Text style={styles.statLabel}>Pending Verifications</Text>
-        </View>
+          <Text style={styles.statLabel}>Pending Requests</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={styles.statCard}
+          onPress={() => navigation.navigate('LawyerVerification', { tab: 'history', statusFilter: 'APPROVED' })}
+        >
+          <View style={[styles.statIcon, { backgroundColor: '#D1FAE5' }]}>
+            <Ionicons name="checkmark-circle" size={24} color="#10B981" />
+          </View>
+          <Text style={styles.statValue}>{approvedCount}</Text>
+          <Text style={styles.statLabel}>Approved</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={styles.statCard}
+          onPress={() => navigation.navigate('LawyerVerification', { tab: 'history', statusFilter: 'REJECTED' })}
+        >
+          <View style={[styles.statIcon, { backgroundColor: '#FEE2E2' }]}>
+            <Ionicons name="close-circle" size={24} color="#EF4444" />
+          </View>
+          <Text style={styles.statValue}>{rejectedCount}</Text>
+          <Text style={styles.statLabel}>Rejected</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>New Pending Requests</Text>
-        <MenuItem
-          icon="time-outline"
-          label="Pending Verifications"
-          desc="Review and verify lawyers"
-          badge={pendingCount > 0 ? String(pendingCount) : undefined}
-          onPress={() => navigation.navigate('LawyerVerification', { tab: 'pending' })}
-          COLORS={COLORS}
-          styles={styles}
-        />
 
         {pendingItems.slice(0, 5).map((item: any, index: number) => (
           <TouchableOpacity
@@ -149,11 +184,15 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   heroTitle: { fontSize: FONT_SIZE.hero, fontWeight: '900', color: COLORS.white },
   heroSub: { fontSize: FONT_SIZE.md, color: 'rgba(255,255,255,0.7)', marginTop: SPACING.xs },
   statsRow: {
-    flexDirection: 'row', justifyContent: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginHorizontal: SPACING.xl, marginTop: -SPACING.xxl,
+    gap: SPACING.sm,
   },
   statCard: {
-    width: '60%', alignItems: 'center', backgroundColor: COLORS.white,
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
     borderRadius: BORDER_RADIUS.xl, padding: SPACING.xl, ...SHADOWS.md,
   },
   statIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.sm },

@@ -49,6 +49,25 @@ export const Input: React.FC<InputProps> = ({
 
   const safeIcon = sanitizeInlineNode(icon);
   const safeRightIcon = sanitizeInlineNode(rightIcon);
+
+  const derivePlaceholderFromLabel = (rawLabel?: string): string => {
+    const cleaned = (rawLabel || '')
+      .replace(/\*/g, '')
+      .replace(/\(.*?\)/g, '')
+      .trim();
+
+    if (!cleaned) return '';
+    if (/bio/i.test(cleaned)) return 'Tell us about yourself';
+    if (/email/i.test(cleaned)) return 'Enter email address';
+    if (/phone/i.test(cleaned)) return 'Enter phone number';
+    return `Enter ${cleaned.toLowerCase()}`;
+  };
+
+  const resolvedPlaceholder =
+    typeof props.placeholder === 'string' && props.placeholder.trim().length > 0
+      ? props.placeholder
+      : derivePlaceholderFromLabel(typeof label === 'string' ? label : '');
+
   return (
     <View style={[styles.container, containerStyle]}>
       {label && <Text style={styles.label}>{label}</Text>}
@@ -56,12 +75,13 @@ export const Input: React.FC<InputProps> = ({
         {safeIcon && <View style={styles.icon}>{safeIcon}</View>}
         <TextInput
           style={[styles.input, icon ? styles.inputWithIcon : undefined, style]}
-          placeholderTextColor={COLORS.textMuted}
+          placeholderTextColor={COLORS.textSecondary}
           secureTextEntry={
             // If parent provided a rightIcon (likely controlling visibility externally), respect parent's secureTextEntry
             rightIcon ? (secureTextEntry as boolean | undefined) : (isPassword ? !showPassword : undefined)
           }
           {...props}
+          placeholder={resolvedPlaceholder}
         />
         {showInternalEye && (
           <TouchableOpacity style={styles.rightIcon} onPress={() => setShowPassword((v) => !v)}>

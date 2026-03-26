@@ -31,6 +31,7 @@ export const CourtAdminLoginScreen: React.FC<{ navigation: any }> = ({ navigatio
       const { data } = await courtAdminApi.login(email.trim(), password);
       if (data.accessToken) {
         await storage.setToken(data.accessToken);
+        if (data.refreshToken) await storage.setRefreshToken(data.refreshToken);
         // Store court admin session via zustand setState (same pattern as authStore.login)
         const courtAdmin = data.courtAdmin || {};
         const courtAdminUser = {
