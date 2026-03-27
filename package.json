@@ -13,8 +13,8 @@
     "eas:build:ios:staging": "eas build --platform ios --profile preview",
     "eas:build:android:production": "eas build --platform android --profile production",
     "eas:build:ios:production": "eas build --platform ios --profile production",
-    "eas:update:staging": "eas update --channel staging --environment staging --message \"staging update\"",
-    "eas:update:production": "eas update --channel production --environment production --message \"production update\""
+    "eas:update:staging": "eas update --channel staging --message \"staging update\"",
+    "eas:update:production": "eas update --channel production --message \"production update\""
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
