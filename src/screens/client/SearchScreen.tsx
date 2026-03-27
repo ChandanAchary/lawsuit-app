@@ -30,6 +30,7 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const [nearMeSource, setNearMeSource] = useState<'device' | 'profile' | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const locationFetched = useRef(false);
+  const hasMountedSearchEffect = useRef(false);
 
   const buildDistanceFilters = useCallback((base: LawyerFilterOptions): LawyerFilterOptions => {
     const distanceFilters: LawyerFilterOptions = { ...base };
@@ -43,6 +44,19 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   useEffect(() => {
     fetchLawyers({ ...filters, search, sortBy, sortOrder: 'desc' });
   }, []);
+
+  useEffect(() => {
+    if (!hasMountedSearchEffect.current) {
+      hasMountedSearchEffect.current = true;
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      handleSearch();
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const handleSearch = useCallback(() => {
     if (sortBy === 'nearme' && userLocation) {
@@ -178,6 +192,8 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   };
 
   const handleLoadMore = () => {
+    if (loading) return;
+
     if (lawyers.length < total) {
       if (sortBy === 'nearme' && userLocation) {
         const distanceFilters = buildDistanceFilters(filters);
@@ -300,28 +316,6 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               <TouchableOpacity
                 onPress={() => {
                   setSearch('');
-                  if (sortBy === 'nearme' && userLocation) {
-                    const distanceFilters = buildDistanceFilters(filters);
-                    fetchLawyers({
-                      ...distanceFilters,
-                      search: '',
-                      latitude: userLocation.latitude,
-                      longitude: userLocation.longitude,
-                    });
-                    return;
-                  }
-
-                  if (sortBy === 'nearme' && profilePincode) {
-                    const distanceFilters = buildDistanceFilters(filters);
-                    fetchLawyers({
-                      ...distanceFilters,
-                      search: '',
-                      clientPincode: profilePincode,
-                    });
-                    return;
-                  }
-
-                  fetchLawyers({ ...filters, search: '', sortBy, sortOrder: 'desc' });
                 }}
               >
                 <Ionicons name="close-circle" size={18} color={COLORS.textMuted} />

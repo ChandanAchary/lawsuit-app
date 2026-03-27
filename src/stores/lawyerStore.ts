@@ -93,17 +93,38 @@ export const useLawyerStore = create<LawyerState>((set) => ({
         });
       }
 
-      set({
-        lawyers: mappedLawyers,
-        total: data.total || items.length,
-        page,
-        limit,
-        loading: false,
-        filterOptions: {
-          specializations: Array.from(specs),
-          locations: Array.from(locs),
-          languages: Array.from(langs),
-        },
+      const nextFilterOptions = {
+        specializations: Array.from(specs),
+        locations: Array.from(locs),
+        languages: Array.from(langs),
+      };
+
+      set((state) => {
+        const mergedLawyers =
+          page > 1
+            ? [
+                ...state.lawyers,
+                ...mappedLawyers.filter((candidate: any) =>
+                  !state.lawyers.some((existing: any) => existing.id === candidate.id),
+                ),
+              ]
+            : mappedLawyers;
+
+        return {
+          lawyers: mergedLawyers,
+          total: data.total || items.length,
+          page,
+          limit,
+          loading: false,
+          filterOptions:
+            page > 1
+              ? {
+                  specializations: Array.from(new Set([...state.filterOptions.specializations, ...nextFilterOptions.specializations])),
+                  locations: Array.from(new Set([...state.filterOptions.locations, ...nextFilterOptions.locations])),
+                  languages: Array.from(new Set([...state.filterOptions.languages, ...nextFilterOptions.languages])),
+                }
+              : nextFilterOptions,
+        };
       });
     } catch (err: any) {
       set({ error: err.message, loading: false });

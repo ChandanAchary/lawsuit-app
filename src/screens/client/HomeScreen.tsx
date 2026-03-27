@@ -9,6 +9,7 @@ import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { useAuthStore } from '../../stores/authStore';
 import {  useThemeStore , useColors } from '../../stores/themeStore';
 import { useWalletStore } from '../../stores/walletStore';
+import { useUserStore } from '../../stores/userStore';
 
 const { width } = Dimensions.get('window');
 
@@ -22,16 +23,28 @@ const FEATURES = [
 
 export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const user = useAuthStore((s) => s.user);
+  const getUser = useUserStore((s) => s.getUser);
   const balance = useWalletStore((s) => s.balance);
   const fetchBalance = useWalletStore((s) => s.fetchBalance);
   const isDark = useThemeStore((s) => s.isDark);
   const COLORS = useColors();
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
 
+  const isProfileHydrated = Boolean(user?.name && (((user as any)?.avatarUrl || user?.avatar || '').trim().length > 0));
+
+  useEffect(() => {
+    if (!isProfileHydrated) {
+      void getUser();
+    }
+  }, [getUser, isProfileHydrated]);
+
   useFocusEffect(
     React.useCallback(() => {
       void fetchBalance();
-    }, [fetchBalance]),
+      if (!isProfileHydrated) {
+        void getUser();
+      }
+    }, [fetchBalance, getUser, isProfileHydrated]),
   );
 
   return (
