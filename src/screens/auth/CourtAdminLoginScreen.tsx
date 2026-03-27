@@ -14,6 +14,7 @@ import { safeGoBack } from '../../utils/navigation';
 
 export const CourtAdminLoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
+  const { setMode: setThemeMode } = useThemeStore();
   const COLORS = useColors();
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
 
@@ -21,6 +22,10 @@ export const CourtAdminLoginScreen: React.FC<{ navigation: any }> = ({ navigatio
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const handleThemeToggle = () => {
+    setThemeMode(isDark ? 'light' : 'dark');
+  };
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -56,6 +61,9 @@ export const CourtAdminLoginScreen: React.FC<{ navigation: any }> = ({ navigatio
       <LinearGradient colors={[COLORS.primaryDark, COLORS.primary]} style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => safeGoBack(navigation, 'Landing')}>
           <Ionicons name="arrow-back" size={22} color={COLORS.white} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.themeBtn} onPress={handleThemeToggle}>
+          <Ionicons name={isDark ? 'moon-outline' : 'sunny-outline'} size={20} color={COLORS.white} />
         </TouchableOpacity>
         <View style={styles.iconWrap}>
           <Ionicons name="shield-checkmark" size={48} color={COLORS.accent} />
@@ -115,6 +123,11 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   },
   backBtn: {
     position: 'absolute', top: SPACING.huge, left: SPACING.xl,
+    width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  themeBtn: {
+    position: 'absolute', top: SPACING.huge, right: SPACING.xl,
     width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center', justifyContent: 'center',
   },

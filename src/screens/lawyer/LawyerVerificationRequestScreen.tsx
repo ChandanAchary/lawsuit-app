@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   FlatList,
+  Platform,
   RefreshControl,
   StyleSheet,
   Text,
@@ -11,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system/legacy';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { useColors, useThemeStore } from '../../stores/themeStore';
 import { courtAdminApi, usersApi } from '../../services/api';
@@ -58,6 +60,59 @@ export const LawyerVerificationRequestScreen: React.FC<{ navigation: any }> = ({
   const [downloading, setDownloading] = useState(false);
   const [statusByAdminId, setStatusByAdminId] = useState<Record<string, VerificationStatus>>({});
   const [requestMetaByAdminId, setRequestMetaByAdminId] = useState<Record<string, VerificationRequestMeta>>({});
+  const [lawyerProfile, setLawyerProfile] = useState<any>(null);
+
+  const hasValue = (value: unknown): boolean => {
+    if (typeof value === 'string') return value.trim().length > 0;
+    if (typeof value === 'number') return Number.isFinite(value) && value > 0;
+    if (Array.isArray(value)) return value.length > 0;
+    return Boolean(value);
+  };
+
+  const getMissingProfileFields = (lawyer: any): string[] => {
+    if (!lawyer || typeof lawyer !== 'object') {
+      return ['Lawyer profile details'];
+    }
+
+    const missing: string[] = [];
+
+    if (!hasValue(lawyer.name)) missing.push('Full Name');
+    if (!hasValue(lawyer.phone)) missing.push('Phone Number');
+    if (!hasValue(lawyer.bio)) missing.push('Bio');
+    if (!hasValue(lawyer.barCouncilId)) missing.push('Bar Council ID');
+    if (!hasValue(lawyer.licenseNumber)) missing.push('License Number');
+    if (!hasValue(lawyer.barCouncil)) missing.push('Bar Council Name');
+    if (!hasValue(lawyer.experienceYears)) missing.push('Experience (years)');
+    if (!hasValue(lawyer.feePerConsultation)) missing.push('Consultation Fee');
+    if (!hasValue(lawyer.specializations)) missing.push('At least 1 Specialization');
+    if (!hasValue(lawyer.languages)) missing.push('At least 1 Language');
+    if (!hasValue(lawyer.state)) missing.push('State');
+    if (!hasValue(lawyer.district)) missing.push('District');
+    if (!hasValue(lawyer.city)) missing.push('City');
+
+    const pin = String(lawyer.pincode || '').trim();
+    if (!/^\d{6}$/.test(pin)) missing.push('Valid 6-digit Pincode');
+
+    if (!hasValue(lawyer.licenseProofUrl)) missing.push('License / Registration Proof Document');
+    if (!hasValue(lawyer.barCouncilProofUrl)) missing.push('Bar Council Certificate Proof Document');
+
+    return missing;
+  };
+
+  const ensureProfileIsReadyForVerification = (): boolean => {
+    const missingFields = getMissingProfileFields(lawyerProfile);
+    if (missingFields.length === 0) return true;
+
+    Alert.alert(
+      'Complete Your Profile',
+      `Before sending or resending verification request, complete:\n\n${missingFields.map((item) => `• ${item}`).join('\n')}`,
+      [
+        { text: 'Later', style: 'cancel' },
+        { text: 'Go to Edit Profile', onPress: () => navigation.navigate('EditLawyerProfile') },
+      ],
+    );
+    return false;
+  };
 
   const formatDate = (value?: string) => {
     if (!value) return '-';
@@ -107,6 +162,7 @@ export const LawyerVerificationRequestScreen: React.FC<{ navigation: any }> = ({
     try {
       const { data } = await usersApi.getLawyerInformation();
       const lawyer = data?.lawyer || {};
+      setLawyerProfile(lawyer);
       const pin = String(lawyer?.pincode || '').trim();
 
       if (!/^\d{6}$/.test(pin)) {
@@ -125,6 +181,7 @@ export const LawyerVerificationRequestScreen: React.FC<{ navigation: any }> = ({
 
       await fetchStatuses();
     } catch {
+      setLawyerProfile(null);
       setItems([]);
       setSelectedId('');
       setStatusByAdminId({});
@@ -142,6 +199,10 @@ export const LawyerVerificationRequestScreen: React.FC<{ navigation: any }> = ({
   const submitRequest = async () => {
     if (!selectedId) {
       Alert.alert('Select Court Admin', 'Please select a nearby court admin first.');
+      return;
+    }
+
+    if (!ensureProfileIsReadyForVerification()) {
       return;
     }
 
@@ -187,6 +248,53 @@ export const LawyerVerificationRequestScreen: React.FC<{ navigation: any }> = ({
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+
+  const buildCertificateFileName = (approvedDate: string): string => {
+    const safeDate = approvedDate.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-_]/g, '');
+    return `Verification-Certificate-${safeDate || 'NA'}-${Date.now()}.pdf`;
+  };
+
+  const saveCertificateFile = async (sourceUri: string, approvedDate: string): Promise<string> => {
+    const targetUri = `${FileSystem.documentDirectory}${buildCertificateFileName(approvedDate)}`;
+    await FileSystem.copyAsync({ from: sourceUri, to: targetUri });
+    return targetUri;
+  };
+
+  const saveCertificateToDownloads = async (sourceUri: string, approvedDate: string): Promise<string> => {
+    const fileName = buildCertificateFileName(approvedDate);
+
+    // Android: let user grant access to Downloads folder, then write the PDF there.
+    if (Platform.OS === 'android') {
+      const permission = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+      if (!permission.granted) {
+        throw new Error('Downloads folder access was not granted.');
+      }
+
+      const base64 = await FileSystem.readAsStringAsync(sourceUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      const targetUri = await FileSystem.StorageAccessFramework.createFileAsync(
+        permission.directoryUri,
+        fileName,
+        'application/pdf',
+      );
+      await FileSystem.writeAsStringAsync(targetUri, base64, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      return targetUri;
+    }
+
+    // iOS/Web fallback: save in app document directory.
+    return saveCertificateFile(sourceUri, approvedDate);
+  };
+
+  const shareCertificateFile = async (uri: string, approvedDate: string) => {
+    await Sharing.shareAsync(uri, {
+      mimeType: 'application/pdf',
+      UTI: 'com.adobe.pdf',
+      dialogTitle: `Verification-Certificate-${approvedDate.replace(/\s+/g, '-')}`,
+    });
+  };
 
   const downloadCertificate = async (item: CourtAdminItem, requestMeta: VerificationRequestMeta) => {
     if (requestMeta.status !== 'APPROVED') {
@@ -237,17 +345,38 @@ export const LawyerVerificationRequestScreen: React.FC<{ navigation: any }> = ({
 
       const { uri } = await Print.printToFileAsync({ html });
       const canShare = await Sharing.isAvailableAsync();
-      if (!canShare) {
-        Alert.alert('Saved', `Certificate created at: ${uri}`);
-        return;
-      }
 
-      const filenameDate = approvedDate.replace(/\s+/g, '-');
-      await Sharing.shareAsync(uri, {
-        mimeType: 'application/pdf',
-        UTI: 'com.adobe.pdf',
-        dialogTitle: `Verification-Certificate-${filenameDate}`,
-      });
+      Alert.alert('Certificate Ready', 'Choose what you want to do:', [
+        {
+          text: 'Download',
+          onPress: () => {
+            void saveCertificateToDownloads(uri, approvedDate)
+              .then((savedUri) => {
+                Alert.alert('Downloaded', `Certificate saved successfully at:\n${savedUri}`);
+              })
+              .catch((error) => {
+                Alert.alert('Download Failed', error?.message || 'Unable to save certificate to Downloads.');
+              });
+          },
+        },
+        {
+          text: 'Share',
+          onPress: () => {
+            if (!canShare) {
+              Alert.alert('Share Not Available', 'Sharing is not available on this device.');
+              return;
+            }
+
+            void shareCertificateFile(uri, approvedDate).catch(() => {
+              Alert.alert('Share Failed', 'Unable to open share dialog right now.');
+            });
+          },
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+      ]);
     } catch {
       Alert.alert('Download Failed', 'Unable to generate certificate right now. Please try again.');
     } finally {
@@ -277,11 +406,11 @@ export const LawyerVerificationRequestScreen: React.FC<{ navigation: any }> = ({
 
     if (status === 'REJECTED') {
       Alert.alert(
-        'Apply for Re-Verification',
-        'After fixing the issues mentioned in remarks, you can apply again. Continue? ',
+        'Resend Verification Request',
+        'After fixing the issues mentioned in remarks, you can resend your request. Continue?',
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Apply Again', onPress: () => submitRequest() },
+          { text: 'Resend', onPress: () => submitRequest() },
         ],
       );
       return;
@@ -294,7 +423,7 @@ export const LawyerVerificationRequestScreen: React.FC<{ navigation: any }> = ({
     const status = getSelectedStatus();
     if (status === 'PENDING') return 'Request Pending';
     if (status === 'APPROVED') return 'Download Approved Certificate';
-    if (status === 'REJECTED') return 'Apply for Re-Verification';
+    if (status === 'REJECTED') return 'Resend Verification Request';
     return 'Send Verification Request';
   };
 
@@ -322,6 +451,7 @@ export const LawyerVerificationRequestScreen: React.FC<{ navigation: any }> = ({
     const selected = selectedId === item.id;
     const locationText = [item.court?.district, item.court?.state].filter(Boolean).join(', ');
     const status = statusByAdminId[item.id];
+    const isPending = status === 'PENDING';
     const statusMeta = getStatusMeta(status);
     const requestMeta = requestMetaByAdminId[item.id];
     const showApprovedCertificate = requestMeta?.status === 'APPROVED';
@@ -331,6 +461,7 @@ export const LawyerVerificationRequestScreen: React.FC<{ navigation: any }> = ({
       <TouchableOpacity
         style={[styles.card, selected && styles.cardSelected]}
         onPress={() => setSelectedId((prev) => (prev === item.id ? '' : item.id))}
+        disabled={isPending}
         activeOpacity={0.8}
       >
         <View style={styles.row}> 
@@ -403,7 +534,7 @@ export const LawyerVerificationRequestScreen: React.FC<{ navigation: any }> = ({
               disabled={downloading}
             >
               <Ionicons name="download-outline" size={16} color="#14532D" />
-              <Text style={styles.downloadBtnText}>{downloading ? 'Preparing...' : 'Download Certificate'}</Text>
+              <Text style={styles.downloadBtnText}>{downloading ? 'Preparing...' : 'Download / Share Certificate'}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -415,7 +546,7 @@ export const LawyerVerificationRequestScreen: React.FC<{ navigation: any }> = ({
               <Text style={styles.rejectedTitle}>Verification Rejected</Text>
             </View>
             <Text style={styles.rejectedMessage}>
-              Please fix the issues mentioned by court admin and apply for re-verification.
+              Please fix the issues mentioned by court admin and resend your verification request.
             </Text>
             {!!requestMeta?.remarks && (
               <Text style={styles.rejectedRemarks}>Remarks: {requestMeta.remarks}</Text>

@@ -223,7 +223,7 @@ export const LawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigation 
         <View style={styles.menuCard}>
           <MenuItem icon="person-outline" label="Edit Profile" subtitle="Name, specializations, experience"
             onPress={() => navigation.navigate('EditLawyerProfile')} />
-          <MenuItem icon="shield-checkmark-outline" label="Court Verification Request" subtitle="Send request to nearest court admin"
+          <MenuItem icon="shield-checkmark-outline" label="Court Verification Request" subtitle="Send or resend request to nearest court admin"
             onPress={() => navigation.navigate('LawyerVerificationRequest')} />
           <MenuItem icon="wallet-outline" label="Wallet" subtitle="Balance & transactions"
             onPress={() => navigation.navigate('Wallet')} />
