@@ -41,7 +41,7 @@ export const useLawyerStore = create<LawyerState>((set) => ({
       if (typeof filters?.longitude === 'number') params.longitude = filters.longitude;
       if (typeof filters?.radius === 'number') params.radiusKm = filters.radius;
       if (filters?.clientPincode) params.clientPincode = filters.clientPincode;
-      if (filters?.sortBy) params.sortBy = filters.sortBy;
+      if (filters?.sortBy && filters.sortBy !== 'availability') params.sortBy = filters.sortBy;
       if (filters?.sortOrder) params.order = filters.sortOrder;
       const { data } = await lawyersApi.getAll(params);
       const items = data.items || data.lawyers || [];
@@ -68,6 +68,7 @@ export const useLawyerStore = create<LawyerState>((set) => ({
         fee: l.feePerConsultation != null ? Number(l.feePerConsultation) / 100 : (Number(l.fee) || 0),
         reviewsCount: l.totalReviews || l.reviewsCount || 0,
         rating: Number(l.rating ?? l.avgRating ?? 0),
+        isAvailable: Boolean(l.isAvailable),
         bio: l.bio || null,
         organisation: l.organisation || null,
         barCouncil: l.barCouncil || null,
@@ -84,6 +85,11 @@ export const useLawyerStore = create<LawyerState>((set) => ({
         mappedLawyers.sort((a: any, b: any) => sortOrder === 'asc' ? a.rating - b.rating : b.rating - a.rating);
       } else if (sortBy === 'fee') {
         mappedLawyers.sort((a: any, b: any) => sortOrder === 'asc' ? a.fee - b.fee : b.fee - a.fee);
+      } else if (sortBy === 'availability') {
+        mappedLawyers.sort((a: any, b: any) => {
+          if (a.isAvailable === b.isAvailable) return b.rating - a.rating;
+          return a.isAvailable ? -1 : 1;
+        });
       } else if (sortBy === 'distance') {
         // Keep near-me ordering stable even when backend ordering is inconsistent.
         mappedLawyers.sort((a: any, b: any) => {

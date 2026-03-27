@@ -14,6 +14,7 @@ import { getCurrentLocation, UserLocation } from '../../utils/permissions';
 import { usersApi } from '../../services/api';
 
 const DISTANCE_SEARCH_RADIUS_KM = 50000;
+type QuickFilterKey = 'verifiedTop' | 'nearme' | 'fee' | 'experience' | 'rating' | 'availability';
 
 export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
@@ -24,7 +25,14 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState<LawyerFilterOptions>({});
   const [showFilters, setShowFilters] = useState(false);
-  const [sortBy, setSortBy] = useState('rating');
+  const [quickFilters, setQuickFilters] = useState<Record<QuickFilterKey, boolean>>({
+    verifiedTop: false,
+    nearme: false,
+    fee: false,
+    experience: false,
+    rating: false,
+    availability: false,
+  });
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [profilePincode, setProfilePincode] = useState<string | null>(null);
   const [nearMeSource, setNearMeSource] = useState<'device' | 'profile' | null>(null);
@@ -42,7 +50,7 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   }, []);
 
   useEffect(() => {
-    fetchLawyers({ ...filters, search, sortBy, sortOrder: 'desc' });
+    fetchLawyers({ ...filters, search });
   }, []);
 
   useEffect(() => {
@@ -59,7 +67,7 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   }, [search]);
 
   const handleSearch = useCallback(() => {
-    if (sortBy === 'nearme' && userLocation) {
+    if (quickFilters.nearme && userLocation) {
       const distanceFilters = buildDistanceFilters(filters);
       fetchLawyers({
         ...distanceFilters,
@@ -70,7 +78,7 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       return;
     }
 
-    if (sortBy === 'nearme' && profilePincode) {
+    if (quickFilters.nearme && profilePincode) {
       const distanceFilters = buildDistanceFilters(filters);
       fetchLawyers({
         ...distanceFilters,
@@ -80,8 +88,8 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       return;
     }
 
-    fetchLawyers({ ...filters, search, sortBy, sortOrder: 'desc' });
-  }, [search, filters, sortBy, userLocation, profilePincode, fetchLawyers, buildDistanceFilters]);
+    fetchLawyers({ ...filters, search });
+  }, [search, filters, userLocation, profilePincode, quickFilters.nearme, fetchLawyers, buildDistanceFilters]);
 
   const searchWithSavedProfileLocation = useCallback(async (): Promise<boolean> => {
     try {
@@ -92,7 +100,7 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       setUserLocation(null);
       setProfilePincode(pin);
       setNearMeSource('profile');
-      setSortBy('nearme');
+      setQuickFilters((prev) => ({ ...prev, nearme: true }));
 
       const profileFilters: LawyerFilterOptions = {
         ...filters,
@@ -131,7 +139,7 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     setUserLocation(loc);
     setProfilePincode(null);
     setNearMeSource('device');
-    setSortBy('nearme');
+    setQuickFilters((prev) => ({ ...prev, nearme: true }));
 
     const locationFilters: LawyerFilterOptions = {
       ...filters,
@@ -146,9 +154,25 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     fetchLawyers({ ...distanceFilters, search });
   }, [filters, search, fetchLawyers, searchWithSavedProfileLocation, buildDistanceFilters]);
 
-  const handleSortChange = async (s: string) => {
-    setSortBy(s);
-    if (s === 'nearme') {
+  const toggleQuickFilter = async (key: QuickFilterKey) => {
+    const isActive = quickFilters[key];
+
+    if (key === 'nearme') {
+      if (isActive) {
+        const nextFilters = { ...filters };
+        delete nextFilters.latitude;
+        delete nextFilters.longitude;
+        delete nextFilters.radius;
+        delete nextFilters.clientPincode;
+        setNearMeSource(null);
+        setProfilePincode(null);
+        setUserLocation(null);
+        setQuickFilters((prev) => ({ ...prev, nearme: false }));
+        setFilters(nextFilters);
+        fetchLawyers({ ...nextFilters, search });
+        return;
+      }
+
       if (locationFetched.current && userLocation) {
         const locationFilters: LawyerFilterOptions = {
           ...filters,
@@ -159,6 +183,7 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         };
         const distanceFilters = buildDistanceFilters(locationFilters);
         setFilters(distanceFilters);
+        setQuickFilters((prev) => ({ ...prev, nearme: true }));
         fetchLawyers({ ...distanceFilters, search });
       } else if (locationFetched.current && profilePincode) {
         const profileFilters: LawyerFilterOptions = {
@@ -171,20 +196,83 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         setNearMeSource('profile');
         const distanceFilters = buildDistanceFilters(profileFilters);
         setFilters(distanceFilters);
+        setQuickFilters((prev) => ({ ...prev, nearme: true }));
         fetchLawyers({ ...distanceFilters, search });
       } else {
         await handleUseMyLocation();
       }
     } else {
-      const nextFilters = { ...filters };
-      delete nextFilters.latitude;
-      delete nextFilters.longitude;
-      delete nextFilters.radius;
-      delete nextFilters.clientPincode;
-      setNearMeSource(null);
-      setFilters(nextFilters);
-      fetchLawyers({ ...nextFilters, search, sortBy: s, sortOrder: 'desc' });
+      setQuickFilters((prev) => ({ ...prev, [key]: !prev[key] }));
     }
+  };
+
+  const displayedLawyers = React.useMemo(() => {
+    const list = [...lawyers];
+    list.sort((a: any, b: any) => {
+      if (quickFilters.verifiedTop && Boolean(a.isVerified) !== Boolean(b.isVerified)) {
+        return a.isVerified ? -1 : 1;
+      }
+
+      if (quickFilters.nearme) {
+        const ad = typeof a.distance === 'number' ? a.distance : Number.POSITIVE_INFINITY;
+        const bd = typeof b.distance === 'number' ? b.distance : Number.POSITIVE_INFINITY;
+        if (ad !== bd) return ad - bd;
+      }
+
+      if (quickFilters.fee) {
+        const af = Number(a.fee ?? Number.POSITIVE_INFINITY);
+        const bf = Number(b.fee ?? Number.POSITIVE_INFINITY);
+        if (af !== bf) return af - bf;
+      }
+
+      if (quickFilters.experience) {
+        const ae = Number(a.experienceYears ?? 0);
+        const be = Number(b.experienceYears ?? 0);
+        if (ae !== be) return be - ae;
+      }
+
+      if (quickFilters.rating) {
+        const ar = Number(a.rating ?? 0);
+        const br = Number(b.rating ?? 0);
+        if (ar !== br) return br - ar;
+      }
+
+      if (quickFilters.availability) {
+        const aa = Boolean(a.isAvailable);
+        const ba = Boolean(b.isAvailable);
+        if (aa !== ba) return aa ? -1 : 1;
+      }
+
+      return String(a.name || '').localeCompare(String(b.name || ''));
+    });
+    return list;
+  }, [lawyers, quickFilters]);
+
+  const hasActiveQuickFilters = React.useMemo(
+    () => Object.values(quickFilters).some(Boolean),
+    [quickFilters],
+  );
+
+  const clearQuickFilters = () => {
+    const nextFilters = { ...filters };
+    delete nextFilters.latitude;
+    delete nextFilters.longitude;
+    delete nextFilters.radius;
+    delete nextFilters.clientPincode;
+
+    setQuickFilters({
+      verifiedTop: false,
+      nearme: false,
+      fee: false,
+      experience: false,
+      rating: false,
+      availability: false,
+    });
+    setNearMeSource(null);
+    setProfilePincode(null);
+    setUserLocation(null);
+    setFilters(nextFilters);
+    fetchLawyers({ ...nextFilters, search });
   };
 
   const handleLawyerPress = (lawyer: Lawyer) => {
@@ -195,7 +283,7 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     if (loading) return;
 
     if (lawyers.length < total) {
-      if (sortBy === 'nearme' && userLocation) {
+      if (quickFilters.nearme && userLocation) {
         const distanceFilters = buildDistanceFilters(filters);
         fetchLawyers({
           ...distanceFilters,
@@ -206,7 +294,7 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         return;
       }
 
-      if (sortBy === 'nearme' && profilePincode) {
+      if (quickFilters.nearme && profilePincode) {
         const distanceFilters = buildDistanceFilters(filters);
         fetchLawyers({
           ...distanceFilters,
@@ -216,45 +304,61 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         return;
       }
 
-      fetchLawyers({ ...filters, search, sortBy, sortOrder: 'desc' }, page + 1);
+      fetchLawyers({ ...filters, search }, page + 1);
     }
   };
 
   const renderSubHeader = () => (
     <View style={styles.subHeader}>
       <View style={styles.sortRow}>
-        {(['rating', 'experience', 'fee', 'nearme'] as const).map((s) => (
+        {([
+          { key: 'nearme', label: 'Near Me' },
+          { key: 'verifiedTop', label: 'Verified Top' },
+          { key: 'fee', label: 'Fee' },
+          { key: 'experience', label: 'Experience' },
+          { key: 'rating', label: 'Rating' },
+          { key: 'availability', label: 'Availability' },
+        ] as const).map((item) => (
           <TouchableOpacity
-            key={s}
-            style={[styles.sortChip, sortBy === s && styles.sortChipActive]}
-            onPress={() => handleSortChange(s)}
+            key={item.key}
+            style={[styles.sortChip, quickFilters[item.key] && styles.sortChipActive]}
+            onPress={() => toggleQuickFilter(item.key)}
           >
-            {s === 'nearme' ? (
+            {item.key === 'nearme' ? (
               <View style={styles.nearMeChipInner}>
                 <Ionicons
                   name="location"
                   size={13}
-                  color={sortBy === s ? COLORS.white : COLORS.textSecondary}
+                  color={quickFilters[item.key] ? COLORS.white : COLORS.textSecondary}
                 />
-                <Text style={[styles.sortText, sortBy === s && styles.sortTextActive]}>
+                <Text style={[styles.sortText, quickFilters[item.key] && styles.sortTextActive]}>
                   {locationLoading ? 'Locating...' : 'Near Me'}
                 </Text>
               </View>
             ) : (
-              <Text style={[styles.sortText, sortBy === s && styles.sortTextActive]}>
-                {s.charAt(0).toUpperCase() + s.slice(1)}
+              <Text style={[styles.sortText, quickFilters[item.key] && styles.sortTextActive]}>
+                {item.label}
               </Text>
             )}
           </TouchableOpacity>
         ))}
+
+        {hasActiveQuickFilters && (
+          <TouchableOpacity style={styles.clearChip} onPress={clearQuickFilters}>
+            <Ionicons name="close" size={13} color={COLORS.error} />
+            <Text style={styles.clearChipText}>Clear</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
-      <TouchableOpacity style={styles.locationActionButton} onPress={handleUseMyLocation} disabled={locationLoading}>
-        <Ionicons name="navigate" size={14} color={COLORS.white} />
-        <Text style={styles.locationActionText}>{locationLoading ? 'Fetching location...' : 'Use my location'}</Text>
-      </TouchableOpacity>
+      {quickFilters.nearme && (
+        <TouchableOpacity style={styles.locationActionButton} onPress={handleUseMyLocation} disabled={locationLoading}>
+          <Ionicons name="navigate" size={14} color={COLORS.white} />
+          <Text style={styles.locationActionText}>{locationLoading ? 'Fetching location...' : 'Use my location'}</Text>
+        </TouchableOpacity>
+      )}
 
-      {sortBy === 'nearme' && userLocation?.city && (
+      {quickFilters.nearme && userLocation?.city && (
         <View style={styles.locationBanner}>
           <Ionicons name="location" size={14} color={COLORS.primary} />
           <Text style={styles.locationBannerText}>
@@ -263,7 +367,7 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           </Text>
         </View>
       )}
-      {sortBy === 'nearme' && !userLocation?.city && !!userLocation && (
+      {quickFilters.nearme && !userLocation?.city && !!userLocation && (
         <View style={styles.locationBanner}>
           <Ionicons name="location" size={14} color={COLORS.primary} />
           <Text style={styles.locationBannerText}>
@@ -271,7 +375,7 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           </Text>
         </View>
       )}
-      {sortBy === 'nearme' && nearMeSource === 'profile' && !!profilePincode && (
+      {quickFilters.nearme && nearMeSource === 'profile' && !!profilePincode && (
         <View style={styles.locationBanner}>
           <Ionicons name="home" size={14} color={COLORS.primary} />
           <Text style={styles.locationBannerText}>
@@ -279,7 +383,7 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           </Text>
         </View>
       )}
-      {sortBy === 'nearme' && !userLocation && !locationLoading && !profilePincode && (
+      {quickFilters.nearme && !userLocation && !locationLoading && !profilePincode && (
         <View style={styles.locationBanner}>
           <Ionicons name="location-outline" size={14} color={COLORS.textMuted} />
           <Text style={[styles.locationBannerText, { color: COLORS.textMuted }]}>
@@ -332,9 +436,9 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       </View>
 
       <FlatList
-        data={lawyers}
+        data={displayedLawyers}
         renderItem={({ item }) => {
-          const isNearMe = sortBy === 'nearme';
+          const isNearMe = quickFilters.nearme;
           return (
             <LawyerCard
               lawyer={item}
@@ -471,6 +575,22 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   sortChipActive: {
     backgroundColor: COLORS.primary,
     borderColor: COLORS.primary,
+  },
+  clearChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.full,
+    backgroundColor: COLORS.error + '12',
+    borderWidth: 1,
+    borderColor: COLORS.error + '55',
+  },
+  clearChipText: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '700',
+    color: COLORS.error,
   },
   nearMeChipInner: {
     flexDirection: 'row',
