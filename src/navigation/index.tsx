@@ -79,23 +79,24 @@ const Tab = createBottomTabNavigator();
 
 const getFloatingTabBarStyle = (isDark: boolean) => ({
   position: 'absolute' as const,
-  left: -6,
-  right: -6,
-  bottom: 8,
-  height: 66,
+  left: 14,
+  right: 14,
+  bottom: 10 ,
+  height: 72,
   borderTopWidth: 0,
-  borderWidth: 1,
-  borderColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(15,23,42,0.10)',
-  backgroundColor: isDark ? 'rgba(24,26,38,0.88)' : 'rgba(255,255,255,0.88)',
-  borderRadius: 36,
-  paddingHorizontal: 12,
-  paddingBottom: Platform.OS === 'ios' ? 8 : 7,
-  paddingTop: 6,
-  elevation: 0,
+  borderWidth: 0.8,
+  borderColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(15,23,42,0.08)',
+  backgroundColor: isDark ? 'rgba(23,25,32,0.92)' : 'rgba(255,255,255,0.92)',
+  borderRadius: 34,
+  paddingHorizontal: 8,
+  paddingBottom: 10 ,
+  paddingTop: 8,
+  elevation: 10,
   shadowColor: '#000',
-  shadowOpacity: isDark ? 0.35 : 0.18,
-  shadowRadius: 18,
-  shadowOffset: { width: 0, height: 8 },
+  shadowOpacity: isDark ? 0.22 : 0.12,
+  shadowRadius: 10,
+  shadowOffset: { width: 0, height: 5 },
+  overflow: 'hidden' as const,
 });
 
 // ─── Auth Stack ─────────────────────────────────────────
@@ -118,13 +119,15 @@ const ClientTabs = () => {
   const isDark = useThemeStore((s) => s.isDark);
   return (
     <Tab.Navigator
+      safeAreaInsets={{ bottom: 0 }}
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: C.primary,
-        tabBarInactiveTintColor: C.textMuted,
-        tabBarLabelStyle: { fontSize: FONT_SIZE.xs - 1, fontWeight: '600', marginTop: -1 },
-        tabBarIconStyle: { marginBottom: -2 },
-        tabBarItemStyle: { paddingHorizontal: 0 },
+        tabBarInactiveTintColor: isDark ? 'rgba(210,217,230,0.88)' : C.textMuted,
+        tabBarActiveBackgroundColor: 'transparent',
+        tabBarLabelStyle: { fontSize: FONT_SIZE.xs - 1, fontWeight: '700', marginTop: 0 },
+        tabBarIconStyle: { marginBottom: -1 },
+        tabBarItemStyle: { paddingHorizontal: 0, borderRadius: 22, marginHorizontal: 2 },
         tabBarStyle: getFloatingTabBarStyle(isDark),
         tabBarHideOnKeyboard: true,
         tabBarIcon: ({ focused, color }) => {
@@ -156,13 +159,15 @@ const LawyerTabs = () => {
   const isDark = useThemeStore((s) => s.isDark);
   return (
     <Tab.Navigator
+      safeAreaInsets={{ bottom: 0 }}
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: C.primary,
-        tabBarInactiveTintColor: C.textMuted,
-        tabBarLabelStyle: { fontSize: FONT_SIZE.xs - 1, fontWeight: '600', marginTop: -1 },
-        tabBarIconStyle: { marginBottom: -2 },
-        tabBarItemStyle: { paddingHorizontal: 0 },
+        tabBarInactiveTintColor: isDark ? 'rgba(210,217,230,0.88)' : C.textMuted,
+        tabBarActiveBackgroundColor: 'transparent',
+        tabBarLabelStyle: { fontSize: FONT_SIZE.xs - 1, fontWeight: '700', marginTop: 0 },
+        tabBarIconStyle: { marginBottom: -1 },
+        tabBarItemStyle: { paddingHorizontal: 0, borderRadius: 22, marginHorizontal: 2 },
         tabBarStyle: getFloatingTabBarStyle(isDark),
         tabBarHideOnKeyboard: true,
         tabBarIcon: ({ focused, color }) => {
@@ -192,13 +197,15 @@ const AdminTabs = () => {
   const isDark = useThemeStore((s) => s.isDark);
   return (
     <Tab.Navigator
+      safeAreaInsets={{ bottom: 0 }}
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: C.primary,
-        tabBarInactiveTintColor: C.textMuted,
-        tabBarLabelStyle: { fontSize: FONT_SIZE.xs - 1, fontWeight: '600', marginTop: -1 },
-        tabBarIconStyle: { marginBottom: -2 },
-        tabBarItemStyle: { paddingHorizontal: 0 },
+        tabBarInactiveTintColor: isDark ? 'rgba(210,217,230,0.88)' : C.textMuted,
+        tabBarActiveBackgroundColor: 'transparent',
+        tabBarLabelStyle: { fontSize: FONT_SIZE.xs - 1, fontWeight: '700', marginTop: 0 },
+        tabBarIconStyle: { marginBottom: -1 },
+        tabBarItemStyle: { paddingHorizontal: 0, borderRadius: 22, marginHorizontal: 2 },
         tabBarStyle: getFloatingTabBarStyle(isDark),
         tabBarHideOnKeyboard: true,
         tabBarIcon: ({ focused, color }) => {
@@ -222,13 +229,15 @@ const CourtAdminTabs = () => {
   const isDark = useThemeStore((s) => s.isDark);
   return (
     <Tab.Navigator
+      safeAreaInsets={{ bottom: 0 }}
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: C.primary,
-        tabBarInactiveTintColor: C.textMuted,
-        tabBarLabelStyle: { fontSize: FONT_SIZE.xs - 1, fontWeight: '600', marginTop: -1 },
-        tabBarIconStyle: { marginBottom: -2 },
-        tabBarItemStyle: { paddingHorizontal: 0 },
+        tabBarInactiveTintColor: isDark ? 'rgba(210,217,230,0.88)' : C.textMuted,
+        tabBarActiveBackgroundColor: 'transparent',
+        tabBarLabelStyle: { fontSize: FONT_SIZE.xs - 1, fontWeight: '700', marginTop: 0 },
+        tabBarIconStyle: { marginBottom: -1 },
+        tabBarItemStyle: { paddingHorizontal: 0, borderRadius: 22, marginHorizontal: 2 },
         tabBarStyle: getFloatingTabBarStyle(isDark),
         tabBarHideOnKeyboard: true,
         tabBarIcon: ({ focused, color }) => {

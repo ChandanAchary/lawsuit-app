@@ -1,7 +1,7 @@
 import {  useThemeStore , useColors } from '../../stores/themeStore';
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, TextInput,
+  View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, TextInput, ScrollView, StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
@@ -23,6 +23,8 @@ export const LawyerTemplatesScreen: React.FC<{ navigation: any }> = ({ navigatio
   const [content, setContent] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { fetchTemplates(); }, []);
@@ -61,6 +63,27 @@ export const LawyerTemplatesScreen: React.FC<{ navigation: any }> = ({ navigatio
     ]);
   };
 
+  const baseCategories = ['Retainer', 'NDA', 'Service Agreement', 'Employment', 'Partnership', 'Lease', 'Other'];
+  const dynamicCategories = Array.from(
+    new Set(
+      templates
+        .map((t) => String(t.category || '').trim())
+        .filter(Boolean),
+    ),
+  );
+  const categories = ['All', ...Array.from(new Set([...baseCategories, ...dynamicCategories]))];
+
+  const filteredTemplates = templates.filter((template) => {
+    const q = searchQuery.trim().toLowerCase();
+    const inCategory = selectedCategory === 'All' || String(template.category || '') === selectedCategory;
+    if (!inCategory) return false;
+    if (!q) return true;
+    return [template.title, template.description || '', template.content, template.category || '']
+      .join(' ')
+      .toLowerCase()
+      .includes(q);
+  });
+
   const renderItem = ({ item }: { item: AgreementTemplate }) => (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
@@ -86,20 +109,56 @@ export const LawyerTemplatesScreen: React.FC<{ navigation: any }> = ({ navigatio
 
   return (
     <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
       <View style={styles.headerBar}>
-        <Text style={styles.headerTitle}>Agreement Templates</Text>
-        <TouchableOpacity onPress={openCreate} style={styles.addBtn}>
-          <Ionicons name="add" size={22} color={COLORS.white} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.headerTitle}>Agreement Templates</Text>
+          <Text style={styles.headerSubtitle}>Create and manage reusable templates for client agreements</Text>
+        </View>
+        <TouchableOpacity onPress={openCreate} style={styles.newTemplateBtn}>
+          <Ionicons name="add" size={18} color={COLORS.white} />
+          <Text style={styles.newTemplateText}>New Template</Text>
         </TouchableOpacity>
       </View>
 
+      <View style={styles.searchWrap}>
+        <Ionicons name="search-outline" size={18} color={COLORS.textMuted} />
+        <TextInput
+          style={styles.searchInput}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Search templates..."
+          placeholderTextColor={COLORS.textMuted}
+        />
+      </View>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.categoryScroll}
+        contentContainerStyle={styles.categoryRow}
+      >
+        {categories.map((cat) => {
+          const active = selectedCategory === cat;
+          return (
+            <TouchableOpacity
+              key={cat}
+              onPress={() => setSelectedCategory(cat)}
+              style={[styles.categoryChip, active && styles.categoryChipActive]}
+            >
+              <Text style={[styles.categoryChipText, active && styles.categoryChipTextActive]}>{cat}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
       {loading ? <Loading /> : (
         <FlatList
-          data={templates}
+          data={filteredTemplates}
           keyExtractor={(t) => t.id}
           renderItem={renderItem}
           contentContainerStyle={styles.list}
-          ListEmptyComponent={<EmptyState icon="📝" title="No Templates" message="Create agreement templates for your clients" />}
+          ListEmptyComponent={<EmptyState icon="📝" title="No Templates" message="No templates found for this filter" />}
         />
       )}
 
@@ -126,14 +185,78 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   headerBar: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: SPACING.xl, paddingTop: SPACING.huge, paddingBottom: SPACING.md,
-    backgroundColor: COLORS.white, ...SHADOWS.sm,
+    backgroundColor: COLORS.primary,
   },
-  headerTitle: { fontSize: FONT_SIZE.xxl, fontWeight: '900', color: COLORS.text },
-  addBtn: {
-    width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.primary,
-    alignItems: 'center', justifyContent: 'center',
+  headerTitle: { fontSize: FONT_SIZE.xxl, fontWeight: '900', color: COLORS.white },
+  headerSubtitle: {
+    fontSize: FONT_SIZE.sm,
+    color: 'rgba(255,255,255,0.82)',
+    marginTop: 2,
   },
-  list: { padding: SPACING.xl, paddingBottom: 100 },
+  newTemplateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: COLORS.primary,
+    borderRadius: BORDER_RADIUS.lg,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+  },
+  newTemplateText: {
+    color: COLORS.white,
+    fontWeight: '700',
+    fontSize: FONT_SIZE.sm,
+  },
+  searchWrap: {
+    marginHorizontal: SPACING.xl,
+    marginTop: SPACING.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: BORDER_RADIUS.lg,
+    paddingHorizontal: SPACING.md,
+    height: 44,
+  },
+  searchInput: {
+    flex: 1,
+    color: COLORS.text,
+    fontSize: FONT_SIZE.md,
+  },
+  categoryScroll: {
+    maxHeight: 52,
+  },
+  categoryRow: {
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.md,
+    gap: SPACING.sm,
+    alignItems: 'center',
+  },
+  categoryChip: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: BORDER_RADIUS.full,
+    paddingHorizontal: SPACING.md,
+    height: 40,
+    justifyContent: 'center',
+    backgroundColor: COLORS.white,
+    alignSelf: 'center',
+  },
+  categoryChipActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  categoryChipText: {
+    color: COLORS.textSecondary,
+    fontWeight: '600',
+    fontSize: FONT_SIZE.sm,
+  },
+  categoryChipTextActive: {
+    color: COLORS.white,
+  },
+  list: { padding: SPACING.xl, paddingTop: SPACING.sm, paddingBottom: 100 },
   card: {
     backgroundColor: COLORS.white, borderRadius: BORDER_RADIUS.xl, padding: SPACING.xl,
     marginBottom: SPACING.md, ...SHADOWS.sm,

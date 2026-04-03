@@ -54,12 +54,18 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
 
   const person = role === 'CLIENT' ? appointment.lawyer : appointment.client;
   const personAvatar = person?.avatar || (person as any)?.avatarUrl;
-  const statusColor = APPOINTMENT_STATUS_COLORS[appointment.status] || APPOINTMENT_STATUS_COLORS.PENDING;
+  const scheduledAtMs = Date.parse(String(appointment.scheduledAt || ''));
+  const isPast = Number.isFinite(scheduledAtMs) && scheduledAtMs < Date.now();
+  const effectiveStatus =
+    (appointment.status === AppointmentStatus.PENDING || appointment.status === AppointmentStatus.CONFIRMED) && isPast
+      ? AppointmentStatus.MISSED
+      : appointment.status;
+  const statusColor = APPOINTMENT_STATUS_COLORS[effectiveStatus] || APPOINTMENT_STATUS_COLORS.PENDING;
   const isUpcoming =
-    appointment.status === AppointmentStatus.CONFIRMED ||
-    appointment.status === AppointmentStatus.PENDING;
-  const isAttended = appointment.status === AppointmentStatus.ATTENDED ||
-    appointment.status === AppointmentStatus.COMPLETED;
+    effectiveStatus === AppointmentStatus.CONFIRMED ||
+    effectiveStatus === AppointmentStatus.PENDING;
+  const isAttended = effectiveStatus === AppointmentStatus.ATTENDED ||
+    effectiveStatus === AppointmentStatus.COMPLETED;
 
   return (
     <TouchableOpacity
@@ -90,7 +96,7 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
         </View>
         <View style={[styles.statusBadge, { backgroundColor: statusColor.bg }]}>
           <Text style={[styles.statusText, { color: statusColor.text }]}>
-            {appointment.status}
+            {effectiveStatus}
           </Text>
         </View>
       </View>
@@ -110,9 +116,9 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
         </View>
       </View>
 
-      {(isUpcoming || isAttended || appointment.status === AppointmentStatus.PENDING || appointment.status === AppointmentStatus.MISSED) && (
+      {(isUpcoming || isAttended || effectiveStatus === AppointmentStatus.PENDING || effectiveStatus === AppointmentStatus.MISSED) && (
         <View style={styles.actions}>
-          {appointment.status === AppointmentStatus.PENDING && role === 'LAWYER' && (
+          {effectiveStatus === AppointmentStatus.PENDING && role === 'LAWYER' && (
             <>
               {onAccept && (
                 <TouchableOpacity style={[styles.actionBtn, styles.actionPrimary]} onPress={onAccept}>
@@ -168,7 +174,7 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
               <Text style={styles.actionTextWhite}>Create Case</Text>
             </TouchableOpacity>
           )}
-          {appointment.status === AppointmentStatus.ATTENDED && onComplete && role === 'LAWYER' && (
+          {effectiveStatus === AppointmentStatus.ATTENDED && onComplete && role === 'LAWYER' && (
             <TouchableOpacity style={[styles.actionBtn, styles.actionPrimary]} onPress={onComplete}>
               <Ionicons name="checkmark-done" size={14} color={COLORS.white} />
               <Text style={styles.actionTextWhite}>Complete</Text>
@@ -180,13 +186,13 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
               <Text style={styles.actionTextPrimary}>View Client</Text>
             </TouchableOpacity>
           )}
-          {appointment.status === AppointmentStatus.MISSED && onReschedule && (
+          {effectiveStatus === AppointmentStatus.MISSED && onReschedule && (
             <TouchableOpacity style={[styles.actionBtn, styles.actionPrimary]} onPress={onReschedule}>
               <Ionicons name="calendar" size={14} color={COLORS.white} />
               <Text style={styles.actionTextWhite}>Reschedule</Text>
             </TouchableOpacity>
           )}
-          {appointment.status === AppointmentStatus.MISSED && onCancel && (
+          {effectiveStatus === AppointmentStatus.MISSED && onCancel && (
             <TouchableOpacity style={[styles.actionBtn, styles.actionOutline]} onPress={onCancel}>
               <Text style={styles.actionTextPrimary}>Cancel</Text>
             </TouchableOpacity>

@@ -17,6 +17,22 @@ import { format } from 'date-fns';
 import { formatErrorMessage } from '../../utils/formatError';
 import { useWalletStore } from '../../stores/walletStore';
 
+const getEffectiveAppointmentStatus = (appointment: Appointment): AppointmentStatus => {
+  const raw = appointment.status;
+  const scheduledAtMs = Date.parse(String(appointment.scheduledAt || ''));
+  const isPast = Number.isFinite(scheduledAtMs) && scheduledAtMs < Date.now();
+  if ((raw === AppointmentStatus.PENDING || raw === AppointmentStatus.CONFIRMED) && isPast) {
+    return AppointmentStatus.MISSED;
+  }
+  return raw;
+};
+
+const isUpcomingAppointment = (appointment: Appointment): boolean => {
+  const status = getEffectiveAppointmentStatus(appointment);
+  const scheduledAtMs = Date.parse(String(appointment.scheduledAt || ''));
+  return status === AppointmentStatus.CONFIRMED && Number.isFinite(scheduledAtMs) && scheduledAtMs > Date.now();
+};
+
 
 const TABS = [
   { key: 'all', label: 'All' },
@@ -68,32 +84,28 @@ export const AppointmentsScreen: React.FC<{ navigation: any }> = ({ navigation }
   }, []);
 
   useEffect(() => {
-    const now = new Date();
     let filtered: Appointment[] = [];
     switch (tab) {
       case 'all':
         filtered = allAppointments;
         break;
       case 'pending':
-        filtered = allAppointments.filter(a => a.status === AppointmentStatus.PENDING);
+        filtered = allAppointments.filter((a) => getEffectiveAppointmentStatus(a) === AppointmentStatus.PENDING);
         break;
       case 'upcoming':
-        filtered = allAppointments.filter(a =>
-          a.status === AppointmentStatus.CONFIRMED &&
-          new Date(a.scheduledAt) > now
-        );
+        filtered = allAppointments.filter((a) => isUpcomingAppointment(a));
         break;
       case 'attended':
-        filtered = allAppointments.filter(a => a.status === AppointmentStatus.ATTENDED);
+        filtered = allAppointments.filter((a) => getEffectiveAppointmentStatus(a) === AppointmentStatus.ATTENDED);
         break;
       case 'completed':
-        filtered = allAppointments.filter(a => a.status === AppointmentStatus.COMPLETED);
+        filtered = allAppointments.filter((a) => getEffectiveAppointmentStatus(a) === AppointmentStatus.COMPLETED);
         break;
       case 'missed':
-        filtered = allAppointments.filter(a => a.status === AppointmentStatus.MISSED);
+        filtered = allAppointments.filter((a) => getEffectiveAppointmentStatus(a) === AppointmentStatus.MISSED);
         break;
       case 'cancelled':
-        filtered = allAppointments.filter(a => a.status === AppointmentStatus.CANCELLED);
+        filtered = allAppointments.filter((a) => getEffectiveAppointmentStatus(a) === AppointmentStatus.CANCELLED);
         break;
       default:
         filtered = allAppointments;
@@ -144,30 +156,71 @@ export const AppointmentsScreen: React.FC<{ navigation: any }> = ({ navigation }
     Linking.openURL(url).catch(() => Alert.alert('Error', 'Could not open agreement'));
   };
 
+  const tabsWithCounts = React.useMemo(() => {
+    return TABS.map((item) => {
+      let count = 0;
+      switch (item.key) {
+        case 'all':
+          count = allAppointments.length;
+          break;
+        case 'pending':
+          count = allAppointments.filter((a) => getEffectiveAppointmentStatus(a) === AppointmentStatus.PENDING).length;
+          break;
+        case 'upcoming':
+          count = allAppointments.filter((a) => isUpcomingAppointment(a)).length;
+          break;
+        case 'attended':
+          count = allAppointments.filter((a) => getEffectiveAppointmentStatus(a) === AppointmentStatus.ATTENDED).length;
+          break;
+        case 'completed':
+          count = allAppointments.filter((a) => getEffectiveAppointmentStatus(a) === AppointmentStatus.COMPLETED).length;
+          break;
+        case 'missed':
+          count = allAppointments.filter((a) => getEffectiveAppointmentStatus(a) === AppointmentStatus.MISSED).length;
+          break;
+        case 'cancelled':
+          count = allAppointments.filter((a) => getEffectiveAppointmentStatus(a) === AppointmentStatus.CANCELLED).length;
+          break;
+        default:
+          count = 0;
+      }
+
+      return {
+        ...item,
+        label: `${item.label} (${count})`,
+      };
+    });
+  }, [allAppointments]);
+
   const renderItem = ({ item }: { item: Appointment }) => (
+    (() => {
+      const status = getEffectiveAppointmentStatus(item);
+      return (
     <AppointmentCard
       appointment={item}
       role="CLIENT"
       onPress={() => navigation.navigate('AppointmentDetail', { appointmentId: item.id, appointment: item })}
       onCancel={
-        item.status === AppointmentStatus.PENDING || item.status === AppointmentStatus.CONFIRMED
+        status === AppointmentStatus.PENDING || status === AppointmentStatus.CONFIRMED || status === AppointmentStatus.MISSED
           ? () => handleCancel(item.id) : undefined
       }
       onChat={
-        item.status === AppointmentStatus.CONFIRMED || item.status === AppointmentStatus.ATTENDED || item.status === AppointmentStatus.COMPLETED
+        status === AppointmentStatus.CONFIRMED || status === AppointmentStatus.ATTENDED || status === AppointmentStatus.COMPLETED
           ? () => navigation.navigate('ChatScreen', { otherUserId: item.lawyerId, name: item.lawyer?.name })
           : undefined
       }
       onViewAgreement={item.agreementUrl ? () => handleViewAgreement(item.agreementUrl!) : undefined}
       onReschedule={
-        item.status === AppointmentStatus.CONFIRMED || item.status === AppointmentStatus.MISSED
+        status === AppointmentStatus.CONFIRMED || status === AppointmentStatus.MISSED
           ? () => openReschedule(item.id) : undefined
       }
       onJoinVideo={
-        item.status === AppointmentStatus.CONFIRMED
+        status === AppointmentStatus.CONFIRMED
           ? () => navigation.navigate('VideoCall', { appointmentId: item.id }) : undefined
       }
     />
+      );
+    })()
   );
 
   return (
@@ -175,7 +228,7 @@ export const AppointmentsScreen: React.FC<{ navigation: any }> = ({ navigation }
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
       <View style={styles.headerBar}>
         <Text style={styles.headerTitle}>Appointments</Text>
-        <TabBar tabs={TABS} active={tab} onSelect={setTab} variant="filter" onDarkBg />
+        <TabBar tabs={tabsWithCounts} active={tab} onSelect={setTab} variant="filter" onDarkBg />
       </View>
       {loading ? (
         <Loading />

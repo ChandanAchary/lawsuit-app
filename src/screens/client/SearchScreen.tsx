@@ -14,6 +14,7 @@ import { getCurrentLocation, UserLocation } from '../../utils/permissions';
 import { usersApi } from '../../services/api';
 
 const DISTANCE_SEARCH_RADIUS_KM = 50000;
+const MAX_FEE_OPTIONS = [500, 1000, 1500, 2500];
 type QuickFilterKey = 'verifiedTop' | 'nearme' | 'fee' | 'experience' | 'rating' | 'availability';
 
 export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
@@ -500,6 +501,53 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               />
             </>
           )}
+
+          <Text style={styles.filterLabel}>Maximum Fee</Text>
+          <View style={styles.pillWrap}>
+            {MAX_FEE_OPTIONS.map((fee) => {
+              const checked = Number(filters.maxFee) === fee;
+              return (
+                <TouchableOpacity
+                  key={fee}
+                  style={[styles.filterPill, checked && styles.filterPillActive]}
+                  onPress={() => {
+                    const next = { ...filters };
+                    if (checked) delete next.maxFee;
+                    else next.maxFee = fee;
+                    setFilters(next);
+                  }}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.filterPillText, checked && styles.filterPillTextActive]}>
+                    Up to ₹{fee.toLocaleString('en-IN')}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <Text style={styles.filterLabel}>Language</Text>
+          <View style={styles.pillWrap}>
+            {filterOptions.languages.map((lang) => {
+              const checked = filters.language === lang;
+              return (
+                <TouchableOpacity
+                  key={lang}
+                  style={[styles.filterPill, checked && styles.filterPillActive]}
+                  onPress={() => {
+                    const next = { ...filters };
+                    if (checked) delete next.language;
+                    else next.language = lang;
+                    setFilters(next);
+                  }}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.filterPillText, checked && styles.filterPillTextActive]}>{lang}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
           <TouchableOpacity
             style={styles.applyBtn}
             onPress={() => {
@@ -648,6 +696,32 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     marginTop: SPACING.xs,
   },
   filterSection: { paddingBottom: SPACING.xxl },
+  pillWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.sm,
+    marginBottom: SPACING.sm,
+  },
+  filterPill: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.full,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+  },
+  filterPillActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primary,
+  },
+  filterPillText: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+  },
+  filterPillTextActive: {
+    color: COLORS.white,
+  },
   filterLabel: {
     fontSize: FONT_SIZE.md,
     fontWeight: '700',

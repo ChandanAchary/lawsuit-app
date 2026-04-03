@@ -18,8 +18,148 @@ import { BottomSheet } from '../../components/Modals';
 import { RazorpayCheckout } from '../../components/RazorpayCheckout';
 import { RazorpayOrderOptions, RazorpayPaymentResult } from '../../utils/razorpay';
 import { safeGoBack } from '../../utils/navigation';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 const { width } = Dimensions.get('window');
+
+type SlotState = 'AVAILABLE' | 'BOOKED' | 'PASSED' | 'LAWYER_OFF';
+
+interface DisplaySlot extends AvailabilitySlot {
+  status: SlotState;
+  reason?: string;
+}
+
+interface AvailabilityConfig {
+  isAvailable: boolean;
+  startTime: string;
+  endTime: string;
+  workingDays: string[];
+  hasCustomWindow: boolean;
+}
+
+const DEFAULT_AVAILABILITY: AvailabilityConfig = {
+  isAvailable: true,
+  startTime: '06:00',
+  endTime: '19:00',
+  workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+  hasCustomWindow: false,
+};
+
+const normalizeWeekday = (weekday: string) => {
+  const raw = String(weekday || '').trim().toLowerCase();
+  const map: Record<string, string> = {
+    monday: 'Monday', mon: 'Monday',
+    tuesday: 'Tuesday', tue: 'Tuesday', tues: 'Tuesday',
+    wednesday: 'Wednesday', wed: 'Wednesday',
+    thursday: 'Thursday', thu: 'Thursday', thurs: 'Thursday',
+    friday: 'Friday', fri: 'Friday',
+    saturday: 'Saturday', sat: 'Saturday',
+    sunday: 'Sunday', sun: 'Sunday',
+  };
+  return map[raw] || weekday;
+};
+
+const extractAvailabilityConfig = (lawyer: any): AvailabilityConfig => {
+  const config: AvailabilityConfig = {
+    ...DEFAULT_AVAILABILITY,
+    isAvailable: lawyer?.isAvailable !== false,
+  };
+
+  const exp = lawyer?.experience;
+  if (Array.isArray(exp)) {
+    const availabilityEntry = exp.find((e: any) =>
+      e?.title === 'Availability' || String(e?.description || '').includes('workingDays'),
+    );
+    if (availabilityEntry) {
+      if (typeof availabilityEntry.from === 'string' && availabilityEntry.from.trim()) {
+        config.startTime = availabilityEntry.from.trim();
+        config.hasCustomWindow = true;
+      }
+      if (typeof availabilityEntry.to === 'string' && availabilityEntry.to.trim()) {
+        config.endTime = availabilityEntry.to.trim();
+        config.hasCustomWindow = true;
+      }
+      try {
+        const parsed = typeof availabilityEntry.description === 'string'
+          ? JSON.parse(availabilityEntry.description)
+          : availabilityEntry.description;
+        if (Array.isArray(parsed?.workingDays) && parsed.workingDays.length > 0) {
+          config.workingDays = parsed.workingDays.map(normalizeWeekday);
+        }
+      } catch {
+        // Ignore malformed legacy availability descriptions.
+      }
+    }
+  } else if (exp && typeof exp === 'object') {
+    if (typeof exp.startTime === 'string' && exp.startTime.trim()) {
+      config.startTime = exp.startTime.trim();
+      config.hasCustomWindow = true;
+    }
+    if (typeof exp.endTime === 'string' && exp.endTime.trim()) {
+      config.endTime = exp.endTime.trim();
+      config.hasCustomWindow = true;
+    }
+    if (Array.isArray(exp.workingDays) && exp.workingDays.length > 0) {
+      config.workingDays = exp.workingDays.map(normalizeWeekday);
+    }
+  }
+
+  return config;
+};
+
+const parseHHMM = (timeText: string): { h: number; m: number } | null => {
+  const match = String(timeText || '').trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+  const h = Number(match[1]);
+  const m = Number(match[2]);
+  if (!Number.isFinite(h) || !Number.isFinite(m) || h < 0 || h > 23 || m < 0 || m > 59) {
+    return null;
+  }
+  return { h, m };
+};
+
+const parseTimeToMinutes = (value: unknown): number | null => {
+  if (value == null) return null;
+
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.getHours() * 60 + value.getMinutes();
+  }
+
+  const text = String(value).trim();
+  if (!text) return null;
+
+  const hhmmss = text.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (hhmmss) {
+    const h = Number(hhmmss[1]);
+    const m = Number(hhmmss[2]);
+    if (h >= 0 && h <= 23 && m >= 0 && m <= 59) return h * 60 + m;
+  }
+
+  const ampm = text.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (ampm) {
+    let h = Number(ampm[1]);
+    const m = Number(ampm[2]);
+    const period = ampm[3].toUpperCase();
+    if (h >= 1 && h <= 12 && m >= 0 && m <= 59) {
+      if (period === 'PM' && h !== 12) h += 12;
+      if (period === 'AM' && h === 12) h = 0;
+      return h * 60 + m;
+    }
+  }
+
+  const parsed = new Date(text);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.getHours() * 60 + parsed.getMinutes();
+  }
+
+  return null;
+};
+
+const formatMinutesAsDisplay = (baseDate: Date, minutes: number): string => {
+  const d = new Date(baseDate);
+  d.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
+  return format(d, 'hh:mm a');
+};
 
 export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
   const { lawyerId } = route.params;
@@ -29,11 +169,14 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
   const [lawyer, setLawyer] = useState<Lawyer | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
+  const [slots, setSlots] = useState<DisplaySlot[]>([]);
+  const [slotNotice, setSlotNotice] = useState<string | null>(null);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [showBooking, setShowBooking] = useState(false);
   const [booking, setBooking] = useState(false);
+  const [availabilityWindow, setAvailabilityWindow] = useState<{ start: string; end: string } | null>(null);
+  const [showSlotDatePicker, setShowSlotDatePicker] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'razorpay'>('wallet');
   const [reviews, setReviews] = useState<any[]>([]);
   const [showReviewSheet, setShowReviewSheet] = useState(false);
@@ -59,6 +202,14 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
   useEffect(() => {
     if (lawyer) fetchSlots();
   }, [selectedDate, lawyer]);
+
+  useEffect(() => {
+    if (!selectedSlot) return;
+    const selected = slots.find((s) => s.time === selectedSlot || s.display === selectedSlot);
+    if (!selected || selected.status !== 'AVAILABLE') {
+      setSelectedSlot(null);
+    }
+  }, [slots, selectedSlot]);
 
   const normalizeScheduledAt = (slot: string, date: Date): string | null => {
     try {
@@ -137,6 +288,7 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
     if (!lawyer) return;
     setSlotsLoading(true);
     try {
+      const availabilityConfig = extractAvailabilityConfig(lawyer as any);
       const { data } = await appointmentsApi.availability({
         lawyerId: lawyer.id,
         date: format(selectedDate, 'yyyy-MM-dd'),
@@ -154,31 +306,123 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
         else if (Array.isArray(data.data)) slotsData = data.data;
       }
 
-      const normalized = (slotsData || []).map((s: any) => {
+      const normalizedAvailable = (slotsData || []).map((s: any) => {
         if (!s) return null;
         if (typeof s === 'string') {
-          try {
-            return { time: s, available: true, display: format(new Date(s), 'hh:mm a') } as any;
-          } catch {
-            return { time: s, available: true, display: s } as any;
+          const mins = parseTimeToMinutes(s);
+          if (mins != null) {
+            return { time: s, available: true, display: formatMinutesAsDisplay(selectedDate, mins) } as any;
           }
+          return { time: s, available: true, display: s } as any;
         }
         // try to get an ISO time if available
         const rawTime = s.time || s.slot || s.start || s.label || s.from || s.to || String(s);
         let iso = rawTime;
-        // if rawTime looks like HH:mm, keep as-is for display but build iso later
-        const looksLikeTime = /^\d{2}:\d{2}(:\d{2})?$/.test(rawTime);
-        if (!looksLikeTime && Date.parse(String(rawTime))) {
+        const parsedMins = parseTimeToMinutes(rawTime);
+        if (parsedMins == null && Date.parse(String(rawTime))) {
           try { iso = new Date(rawTime).toISOString(); } catch { iso = String(rawTime); }
         }
         const available = typeof s.available === 'boolean' ? s.available : s.isAvailable ?? true;
-        const display = looksLikeTime ? rawTime : (Date.parse(String(iso)) ? format(new Date(iso), 'hh:mm a') : String(rawTime));
+        const display = parsedMins != null
+          ? formatMinutesAsDisplay(selectedDate, parsedMins)
+          : (Date.parse(String(iso)) ? format(new Date(iso), 'hh:mm a') : String(rawTime));
         return { time: iso, available, display } as any;
       }).filter(Boolean) as AvailabilitySlot[];
 
-      setSlots(normalized.map((s: any) => ({ time: s.time, available: s.available, display: s.display })) as any);
+      const availableMinuteSet = new Set(
+        normalizedAvailable
+          .filter((s: any) => s.available !== false)
+          .map((s: any) => parseTimeToMinutes((s as any).display || (s as any).time))
+          .filter((m: any) => Number.isFinite(m)),
+      );
+
+      const parsedStart = parseHHMM(availabilityConfig.startTime) || parseHHMM(DEFAULT_AVAILABILITY.startTime)!;
+      const parsedEnd = parseHHMM(availabilityConfig.endTime) || parseHHMM(DEFAULT_AVAILABILITY.endTime)!;
+
+      if (!availabilityConfig.hasCustomWindow && normalizedAvailable.length > 0) {
+        const minuteValues = normalizedAvailable
+          .map((slot: any) => parseTimeToMinutes(String((slot as any).display || (slot as any).time || '')))
+          .filter((m): m is number => typeof m === 'number' && Number.isFinite(m))
+          .sort((a: number, b: number) => a - b);
+        if (minuteValues.length > 0) {
+          const first = minuteValues[0];
+          const last = minuteValues[minuteValues.length - 1];
+          parsedStart.h = Math.floor(first / 60);
+          parsedStart.m = first % 60;
+          // Include last slot as part of visible working range.
+          const lastEnd = last + 30;
+          parsedEnd.h = Math.floor(lastEnd / 60);
+          parsedEnd.m = lastEnd % 60;
+        }
+      }
+
+      const dayStart = new Date(selectedDate);
+      dayStart.setHours(parsedStart.h, parsedStart.m, 0, 0);
+      const dayEnd = new Date(selectedDate);
+      dayEnd.setHours(parsedEnd.h, parsedEnd.m, 0, 0);
+      setAvailabilityWindow({
+        start: format(dayStart, 'hh:mm a'),
+        end: format(dayEnd, 'hh:mm a'),
+      });
+
+      const weekdayName = normalizeWeekday(format(selectedDate, 'EEEE'));
+      const isWorkingDay = availabilityConfig.workingDays.includes(weekdayName);
+      if (!availabilityConfig.isAvailable) {
+        setSlotNotice('Lawyer is currently not available for consultations.');
+      } else if (!isWorkingDay) {
+        setSlotNotice(`Lawyer does not accept appointments on ${weekdayName}.`);
+      } else {
+        setSlotNotice(null);
+      }
+      const now = new Date();
+      const generatedSlots: DisplaySlot[] = [];
+
+      let cursor = new Date(dayStart);
+      while (cursor < dayEnd) {
+        const slotEnd = new Date(cursor);
+        slotEnd.setMinutes(slotEnd.getMinutes() + 30);
+        if (slotEnd > dayEnd) break;
+
+        const display = format(cursor, 'hh:mm a');
+        const isPast = format(selectedDate, 'yyyy-MM-dd') === format(now, 'yyyy-MM-dd') && slotEnd <= now;
+        const cursorMins = cursor.getHours() * 60 + cursor.getMinutes();
+        const isAvailable = availableMinuteSet.has(cursorMins);
+
+        let status: SlotState = 'BOOKED';
+        let reason: string | undefined;
+
+        if (!availabilityConfig.isAvailable) {
+          status = 'LAWYER_OFF';
+          reason = 'Lawyer not available';
+        } else if (!isWorkingDay) {
+          status = 'LAWYER_OFF';
+          reason = 'Lawyer not available on this day';
+        } else if (isPast) {
+          status = 'PASSED';
+          reason = 'Time passed';
+        } else if (isAvailable) {
+          status = 'AVAILABLE';
+        } else {
+          status = 'BOOKED';
+          reason = 'Already booked';
+        }
+
+        generatedSlots.push({
+          time: display,
+          display,
+          available: status === 'AVAILABLE',
+          status,
+          reason,
+        });
+
+        cursor.setMinutes(cursor.getMinutes() + 30);
+      }
+
+      setSlots(generatedSlots);
     } catch (err: any) {
       setSlots([]);
+      setSlotNotice(null);
+      setAvailabilityWindow(null);
     } finally {
       setSlotsLoading(false);
     }
@@ -334,7 +578,8 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
     }
   };
 
-  const dates = Array.from({ length: 30 }, (_, i) => addDays(new Date(), i));
+  const dates = Array.from({ length: 7 }, (_, i) => addDays(new Date(), i));
+  const selectedDateInWeek = dates.some((d) => format(d, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd'));
 
   if (loading || !lawyer) {
     return (
@@ -548,6 +793,11 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
           {/* Date picker */}
           <View style={styles.bookingSection}>
             <Text style={styles.bookingTitle}>Book Appointment</Text>
+            {!!availabilityWindow && (
+              <Text style={styles.bookingWindowText}>
+                Availability: {availabilityWindow.start} - {availabilityWindow.end}
+              </Text>
+            )}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dateScroll}>
               {dates.map((d, i) => {
                 const isSelected = format(d, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
@@ -569,33 +819,72 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
                   </TouchableOpacity>
                 );
               })}
+              <TouchableOpacity style={styles.datePickerCard} onPress={() => setShowSlotDatePicker(true)}>
+                <Ionicons name="calendar-outline" size={18} color={COLORS.primary} />
+                <Text style={styles.datePickerCardText}>Pick date</Text>
+              </TouchableOpacity>
             </ScrollView>
+            {!selectedDateInWeek && (
+              <Text style={styles.selectedCustomDateText}>Selected: {format(selectedDate, 'EEE, dd MMM yyyy')}</Text>
+            )}
+
+            {showSlotDatePicker && (
+              <DateTimePicker
+                value={selectedDate}
+                mode="date"
+                minimumDate={new Date()}
+                onChange={(_, date) => {
+                  setShowSlotDatePicker(false);
+                  if (date) {
+                    setSelectedDate(date);
+                    setSelectedSlot(null);
+                  }
+                }}
+              />
+            )}
 
             {/* Time slots */}
             {slotsLoading ? (
               <ActivityIndicator color={COLORS.primary} style={{ padding: SPACING.xl }} />
             ) : (
               <View style={styles.slotsGrid}>
+                {!!slotNotice && <Text style={styles.slotNotice}>{slotNotice}</Text>}
                 {slots.length > 0 ? slots.map((s, i) => (
                   <TouchableOpacity
                     key={i}
                     style={[
                       styles.slotChip,
-                      !s.available && styles.slotDisabled,
+                      s.status !== 'AVAILABLE' && styles.slotDisabled,
+                      s.status === 'PASSED' && styles.slotPassed,
+                      s.status === 'LAWYER_OFF' && styles.slotUnavailable,
                       selectedSlot === s.time && styles.slotSelected,
                     ]}
-                    onPress={() => s.available && setSelectedSlot(s.time)}
-                    disabled={!s.available}
+                    onPress={() => s.status === 'AVAILABLE' && setSelectedSlot(s.time)}
+                    disabled={s.status !== 'AVAILABLE'}
                   >
-                    <Text
-                      style={[
-                        styles.slotText,
-                        !s.available && styles.slotTextDisabled,
-                        selectedSlot === s.time && styles.slotTextSelected,
-                      ]}
-                    >
-                      {(s as any).display || s.time}
-                    </Text>
+                    <View style={styles.slotContent}>
+                      <Text
+                        style={[
+                          styles.slotText,
+                          s.status !== 'AVAILABLE' && styles.slotTextDisabled,
+                          s.status === 'PASSED' && styles.slotTextPassed,
+                          selectedSlot === s.time && styles.slotTextSelected,
+                        ]}
+                      >
+                        {(s as any).display || s.time}
+                      </Text>
+                      {s.status !== 'AVAILABLE' && (
+                        <Text
+                          style={[
+                            styles.slotBookedLabel,
+                            s.status === 'PASSED' && styles.slotPassedLabel,
+                            s.status === 'LAWYER_OFF' && styles.slotUnavailableLabel,
+                          ]}
+                        >
+                          {s.status === 'BOOKED' ? 'Booked' : s.status === 'PASSED' ? 'Passed' : 'Unavailable'}
+                        </Text>
+                      )}
+                    </View>
                   </TouchableOpacity>
                 )) : (
                   <Text style={styles.noSlots}>No slots available for this date</Text>
@@ -742,14 +1031,14 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     opacity: 0.5,
   },
   unverifiedTagText: {
+    color: '#FCD34D',
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '700',
+  },
   reviewEligibilityHint: {
     fontSize: FONT_SIZE.xs,
     color: COLORS.textSecondary,
     marginBottom: SPACING.sm,
-  },
-    color: '#FCD34D',
-    fontSize: FONT_SIZE.xs,
-    fontWeight: '700',
   },
   backBtn: {
     marginLeft: SPACING.xl,
@@ -844,6 +1133,12 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   },
   bookingSection: { marginTop: SPACING.md },
   bookingTitle: { fontSize: FONT_SIZE.xl, fontWeight: '800', color: COLORS.text, marginBottom: SPACING.lg },
+  bookingWindowText: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.sm,
+    fontWeight: '600',
+  },
   dateScroll: { marginBottom: SPACING.lg },
   dateCard: {
     width: 64,
@@ -862,6 +1157,30 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   dateNumSelected: { color: COLORS.white },
   dateMonth: { fontSize: FONT_SIZE.xs, fontWeight: '500', color: COLORS.textMuted },
   dateMonthSelected: { color: 'rgba(255,255,255,0.7)' },
+  datePickerCard: {
+    minWidth: 88,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    marginRight: SPACING.sm,
+    borderRadius: BORDER_RADIUS.lg,
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    gap: 6,
+  },
+  datePickerCardText: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '700',
+    color: COLORS.primary,
+  },
+  selectedCustomDateText: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textSecondary,
+    marginTop: -SPACING.sm,
+    marginBottom: SPACING.md,
+    fontWeight: '600',
+  },
   slotsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm, paddingBottom: 120 },
   slotChip: {
     paddingVertical: SPACING.sm + 2,
@@ -873,9 +1192,38 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   },
   slotSelected: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   slotDisabled: { opacity: 0.35 },
+  slotPassed: {
+    backgroundColor: COLORS.surfaceAlt,
+  },
+  slotUnavailable: {
+    backgroundColor: COLORS.surfaceAlt,
+  },
   slotText: { fontSize: FONT_SIZE.sm, fontWeight: '600', color: COLORS.text },
   slotTextSelected: { color: COLORS.white },
   slotTextDisabled: { color: COLORS.textMuted },
+  slotTextPassed: {
+    textDecorationLine: 'line-through',
+  },
+  slotContent: { alignItems: 'center' },
+  slotBookedLabel: {
+    marginTop: 2,
+    fontSize: FONT_SIZE.xs - 1,
+    fontWeight: '700',
+    color: COLORS.error,
+    textTransform: 'uppercase',
+  },
+  slotPassedLabel: {
+    color: COLORS.textMuted,
+  },
+  slotUnavailableLabel: {
+    color: COLORS.warning,
+  },
+  slotNotice: {
+    width: '100%',
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.warning,
+    marginBottom: SPACING.sm,
+  },
   noSlots: { fontSize: FONT_SIZE.md, color: COLORS.textMuted, textAlign: 'center', paddingVertical: SPACING.xl, width: '100%' },
   bottomBar: {
     position: 'absolute',

@@ -1,7 +1,18 @@
 import './src/utils/debugTextError';
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { View, ActivityIndicator, StyleSheet, LogBox, Modal, Text, TouchableOpacity, Image } from 'react-native';
+import {
+  View,
+  ActivityIndicator,
+  StyleSheet,
+  LogBox,
+  Modal,
+  Text,
+  TouchableOpacity,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import { NavigationContainer, LinkingOptions, DefaultTheme, DarkTheme, Theme, createNavigationContainerRef } from '@react-navigation/native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
@@ -207,10 +218,15 @@ export default function App() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <NavigationContainer ref={navigationRef} linking={linking} theme={navTheme}>
-        <StatusBar style={isDark ? 'light' : 'dark'} />
-        {isAuthenticated ? <MainStack /> : <AuthStack />}
-      </NavigationContainer>
+      <KeyboardAvoidingView
+        style={styles.appRoot}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <NavigationContainer ref={navigationRef} linking={linking} theme={navTheme}>
+          <StatusBar style={isDark ? 'light' : 'dark'} />
+          {isAuthenticated ? <MainStack /> : <AuthStack />}
+        </NavigationContainer>
+      </KeyboardAvoidingView>
 
       <Modal visible={!!incomingCall} transparent animationType="fade" onRequestClose={rejectIncomingCall}>
         <View style={styles.callOverlay}>
@@ -239,6 +255,9 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
+  appRoot: {
+    flex: 1,
+  },
   splashScreen: {
     flex: 1,
     backgroundColor: '#F3F4F6',
