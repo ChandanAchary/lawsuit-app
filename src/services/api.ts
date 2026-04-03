@@ -22,6 +22,22 @@ const processQueue = (error: unknown, token: string | null = null) => {
   failedQueue = [];
 };
 
+const shouldSkipRefreshForRequest = (url?: string): boolean => {
+  if (!url) return false;
+
+  // Ignore query string and support relative or absolute URLs.
+  const cleanUrl = url.split('?')[0] || '';
+
+  return (
+    cleanUrl.includes('/auth/login') ||
+    cleanUrl.includes('/auth/register') ||
+    cleanUrl.includes('/auth/verify-otp') ||
+    cleanUrl.includes('/auth/request-otp') ||
+    cleanUrl.includes('/auth/restore-password') ||
+    cleanUrl.includes('/auth/refresh')
+  );
+};
+
 const api: AxiosInstance = axios.create({
   baseURL: getRuntimeApiUrl(),
   timeout: 30000,
@@ -42,9 +58,8 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    // Skip token refresh for auth endpoints (login, register, etc.)
-    const isAuthEndpoint = originalRequest?.url?.includes('/auth');
-    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
+    const shouldSkipRefresh = shouldSkipRefreshForRequest(originalRequest?.url);
+    if (error.response?.status === 401 && !originalRequest?._retry && !shouldSkipRefresh) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({
@@ -120,6 +135,8 @@ export const lawyersApi = {
   apply: (data: Record<string, unknown>) => api.post('/lawyers/apply', data),
   getReviews: (id: string, params?: Record<string, unknown>) => api.get(`/lawyers/${encodeURIComponent(id)}/reviews`, { params }),
   postReview: (id: string, data: { rating: number; comment?: string }) => api.post(`/lawyers/${encodeURIComponent(id)}/reviews`, data),
+  getReviewEligibility: (id: string, params?: { appointmentId?: string }) =>
+    api.get(`/lawyers/${encodeURIComponent(id)}/review-eligibility`, { params }),
 };
 
 // ─── Appointments API ───────────────────────────────────────

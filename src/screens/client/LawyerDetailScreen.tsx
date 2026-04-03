@@ -40,6 +40,9 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
   const [rating, setRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewEligibilityLoading, setReviewEligibilityLoading] = useState(false);
+  const [canReview, setCanReview] = useState(false);
+  const [reviewEligibilityMessage, setReviewEligibilityMessage] = useState('Book and complete a consultation with this lawyer before reviewing');
   const balance = useWalletStore((s) => s.balance);
   const user = useAuthStore((s) => s.user);
   // Razorpay state
@@ -50,6 +53,7 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
   useEffect(() => {
     fetchLawyer();
     fetchReviews();
+    fetchReviewEligibility();
   }, [lawyerId]);
 
   useEffect(() => {
@@ -189,7 +193,31 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
     }
   };
 
+  const fetchReviewEligibility = async () => {
+    setReviewEligibilityLoading(true);
+    try {
+      const { data } = await lawyersApi.getReviewEligibility(lawyerId);
+      setCanReview(Boolean(data?.canReview));
+      if (typeof data?.message === 'string' && data.message.trim()) {
+        setReviewEligibilityMessage(data.message);
+      } else if (data?.canReview) {
+        setReviewEligibilityMessage('You can submit a review');
+      } else {
+        setReviewEligibilityMessage('Book and complete a consultation with this lawyer before reviewing');
+      }
+    } catch {
+      setCanReview(false);
+      setReviewEligibilityMessage('Book and complete a consultation with this lawyer before reviewing');
+    } finally {
+      setReviewEligibilityLoading(false);
+    }
+  };
+
   const submitReview = async () => {
+    if (!canReview) {
+      Alert.alert('Review Not Allowed', reviewEligibilityMessage);
+      return;
+    }
     if (rating < 1 || rating > 5) return;
     setSubmittingReview(true);
     try {
@@ -198,6 +226,7 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
       setRating(5);
       setReviewComment('');
       fetchReviews();
+      fetchReviewEligibility();
       Alert.alert('Success', 'Review submitted successfully');
     } catch (err: any) {
       Alert.alert('Review Failed', formatErrorMessage(err.response?.data || err) || 'Could not submit review');
@@ -431,11 +460,24 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
           <View style={styles.reviewSection}>
             <View style={styles.reviewHeader}>
               <Text style={styles.reviewTitle}>Client Reviews</Text>
-              <TouchableOpacity style={styles.addReviewBtn} onPress={() => setShowReviewSheet(true)}>
+              <TouchableOpacity
+                style={[styles.addReviewBtn, (!canReview || reviewEligibilityLoading) && styles.addReviewBtnDisabled]}
+                onPress={() => {
+                  if (!canReview) {
+                    Alert.alert('Review Not Allowed', reviewEligibilityMessage);
+                    return;
+                  }
+                  setShowReviewSheet(true);
+                }}
+                disabled={reviewEligibilityLoading}
+              >
                 <Ionicons name="star-outline" size={14} color={COLORS.primary} />
                 <Text style={styles.addReviewBtnText}>Write Review</Text>
               </TouchableOpacity>
             </View>
+            {!canReview && (
+              <Text style={styles.reviewEligibilityHint}>{reviewEligibilityMessage}</Text>
+            )}
             {reviews.length === 0 ? (
               <Text style={styles.noReviewText}>No reviews yet. Be the first to review.</Text>
             ) : (
@@ -696,7 +738,15 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     paddingHorizontal: SPACING.sm,
     paddingVertical: 4,
   },
+  addReviewBtnDisabled: {
+    opacity: 0.5,
+  },
   unverifiedTagText: {
+  reviewEligibilityHint: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.sm,
+  },
     color: '#FCD34D',
     fontSize: FONT_SIZE.xs,
     fontWeight: '700',

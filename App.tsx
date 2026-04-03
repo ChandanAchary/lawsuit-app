@@ -99,13 +99,13 @@ export default function App() {
       try {
         await Promise.all([initTheme(), initRuntimeApiConfig()]);
         await restoreSession();
-        // Request all runtime permissions on first launch
-        await requestAllPermissions().catch(() => {});
-        await configureLocalNotificationChannel().catch(() => {});
       } catch (error) {
         console.error('App initialization error:', error);
       } finally {
         setIsReady(true);
+        // Keep startup snappy: permissions and channel setup should not block first paint.
+        void requestAllPermissions().catch(() => {});
+        void configureLocalNotificationChannel().catch(() => {});
       }
     };
     init();

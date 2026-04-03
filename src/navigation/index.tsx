@@ -3,10 +3,11 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { ComponentType } from 'react';
+import { Platform } from 'react-native';
 import { FONT_SIZE } from '../constants';
 import { UserRole } from '../types';
 import { useAuthStore } from '../stores/authStore';
-import { useColors } from '../stores/themeStore';
+import { useColors, useThemeStore } from '../stores/themeStore';
 
 // Auth screens
 import { LandingScreen } from '../screens/auth/LandingScreen';
@@ -76,6 +77,27 @@ import { CourtAdminLoginScreen } from '../screens/auth/CourtAdminLoginScreen';
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
+const getFloatingTabBarStyle = (isDark: boolean) => ({
+  position: 'absolute' as const,
+  left: -6,
+  right: -6,
+  bottom: 8,
+  height: 66,
+  borderTopWidth: 0,
+  borderWidth: 1,
+  borderColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(15,23,42,0.10)',
+  backgroundColor: isDark ? 'rgba(24,26,38,0.88)' : 'rgba(255,255,255,0.88)',
+  borderRadius: 36,
+  paddingHorizontal: 12,
+  paddingBottom: Platform.OS === 'ios' ? 8 : 7,
+  paddingTop: 6,
+  elevation: 0,
+  shadowColor: '#000',
+  shadowOpacity: isDark ? 0.35 : 0.18,
+  shadowRadius: 18,
+  shadowOffset: { width: 0, height: 8 },
+});
+
 // ─── Auth Stack ─────────────────────────────────────────
 export const AuthStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
@@ -93,26 +115,18 @@ export const AuthStack = () => (
 // ─── Client Tab Navigator ───────────────────────────────
 const ClientTabs = () => {
   const C = useColors();
+  const isDark = useThemeStore((s) => s.isDark);
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: C.primary,
         tabBarInactiveTintColor: C.textMuted,
-        tabBarLabelStyle: { fontSize: FONT_SIZE.xs - 1, fontWeight: '600' },
-        tabBarStyle: {
-          backgroundColor: C.surface,
-          borderTopWidth: 1,
-          borderTopColor: C.border,
-          elevation: 12,
-          shadowColor: '#000',
-          shadowOpacity: 0.08,
-          shadowRadius: 12,
-          shadowOffset: { width: 0, height: -4 },
-          height: 64,
-          paddingBottom: 8,
-          paddingTop: 6,
-        },
+        tabBarLabelStyle: { fontSize: FONT_SIZE.xs - 1, fontWeight: '600', marginTop: -1 },
+        tabBarIconStyle: { marginBottom: -2 },
+        tabBarItemStyle: { paddingHorizontal: 0 },
+        tabBarStyle: getFloatingTabBarStyle(isDark),
+        tabBarHideOnKeyboard: true,
         tabBarIcon: ({ focused, color }) => {
           const icons: Record<string, string> = {
             Home: focused ? 'home' : 'home-outline',
@@ -139,26 +153,18 @@ const ClientTabs = () => {
 // ─── Lawyer Tab Navigator ───────────────────────────────
 const LawyerTabs = () => {
   const C = useColors();
+  const isDark = useThemeStore((s) => s.isDark);
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: C.primary,
         tabBarInactiveTintColor: C.textMuted,
-        tabBarLabelStyle: { fontSize: FONT_SIZE.xs - 1, fontWeight: '600' },
-        tabBarStyle: {
-          backgroundColor: C.surface,
-          borderTopWidth: 1,
-          borderTopColor: C.border,
-          elevation: 12,
-          shadowColor: '#000',
-          shadowOpacity: 0.08,
-          shadowRadius: 12,
-          shadowOffset: { width: 0, height: -4 },
-          height: 64,
-          paddingBottom: 8,
-          paddingTop: 6,
-        },
+        tabBarLabelStyle: { fontSize: FONT_SIZE.xs - 1, fontWeight: '600', marginTop: -1 },
+        tabBarIconStyle: { marginBottom: -2 },
+        tabBarItemStyle: { paddingHorizontal: 0 },
+        tabBarStyle: getFloatingTabBarStyle(isDark),
+        tabBarHideOnKeyboard: true,
         tabBarIcon: ({ focused, color }) => {
           const icons: Record<string, string> = {
             Dashboard: focused ? 'grid' : 'grid-outline',
@@ -183,26 +189,18 @@ const LawyerTabs = () => {
 // ─── Admin Tab Navigator ────────────────────────────────
 const AdminTabs = () => {
   const C = useColors();
+  const isDark = useThemeStore((s) => s.isDark);
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: C.primary,
         tabBarInactiveTintColor: C.textMuted,
-        tabBarLabelStyle: { fontSize: FONT_SIZE.xs - 1, fontWeight: '600' },
-        tabBarStyle: {
-          backgroundColor: C.surface,
-          borderTopWidth: 1,
-          borderTopColor: C.border,
-          elevation: 12,
-          shadowColor: '#000',
-          shadowOpacity: 0.08,
-          shadowRadius: 12,
-          shadowOffset: { width: 0, height: -4 },
-          height: 64,
-          paddingBottom: 8,
-          paddingTop: 6,
-        },
+        tabBarLabelStyle: { fontSize: FONT_SIZE.xs - 1, fontWeight: '600', marginTop: -1 },
+        tabBarIconStyle: { marginBottom: -2 },
+        tabBarItemStyle: { paddingHorizontal: 0 },
+        tabBarStyle: getFloatingTabBarStyle(isDark),
+        tabBarHideOnKeyboard: true,
         tabBarIcon: ({ focused, color }) => {
           const icons: Record<string, string> = {
             AdminDashboard: focused ? 'shield-checkmark' : 'shield-checkmark-outline',
@@ -221,26 +219,18 @@ const AdminTabs = () => {
 // ─── Court Admin Tab Navigator ──────────────────────────
 const CourtAdminTabs = () => {
   const C = useColors();
+  const isDark = useThemeStore((s) => s.isDark);
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: C.primary,
         tabBarInactiveTintColor: C.textMuted,
-        tabBarLabelStyle: { fontSize: FONT_SIZE.xs - 1, fontWeight: '600' },
-        tabBarStyle: {
-          backgroundColor: C.surface,
-          borderTopWidth: 1,
-          borderTopColor: C.border,
-          elevation: 12,
-          shadowColor: '#000',
-          shadowOpacity: 0.08,
-          shadowRadius: 12,
-          shadowOffset: { width: 0, height: -4 },
-          height: 64,
-          paddingBottom: 8,
-          paddingTop: 6,
-        },
+        tabBarLabelStyle: { fontSize: FONT_SIZE.xs - 1, fontWeight: '600', marginTop: -1 },
+        tabBarIconStyle: { marginBottom: -2 },
+        tabBarItemStyle: { paddingHorizontal: 0 },
+        tabBarStyle: getFloatingTabBarStyle(isDark),
+        tabBarHideOnKeyboard: true,
         tabBarIcon: ({ focused, color }) => {
           const icons: Record<string, string> = {
             CourtAdminDashboard: focused ? 'shield-checkmark' : 'shield-checkmark-outline',

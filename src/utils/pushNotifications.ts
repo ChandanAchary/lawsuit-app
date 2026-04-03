@@ -3,12 +3,12 @@
  *
  * Flow:
  *  1. Request permission via requestPermissionsAsync()
- *  2. Obtain the native device push token (FCM on Android, APNs on iOS)
+ *  2. Obtain a device push token (native FCM/APNs preferred, Expo token fallback)
  *  3. Register the token with the backend at POST /users/fcm-token
  *  4. On logout: remove the token via DELETE /users/fcm-token
  *
- * The backend's fcm.service.ts uses Firebase Cloud Messaging (FCM) directly,
- * so we register the *native device* token, not an Expo push token.
+ * The backend supports both native FCM/APNs delivery and Expo push delivery.
+ * This client prefers native device tokens and falls back to Expo tokens.
  */
 
 import { Platform } from 'react-native';
@@ -39,20 +39,37 @@ if (!isExpoGo) {
 async function resolvePushToken(): Promise<string | null> {
   if (!Notifications) return null;
 
-  if (isExpoGo) {
-    console.warn('[Push] Native push token is unavailable in Expo Go. Use a development build or release build.');
-    return null;
-  }
-
-  // Preferred path for this backend: native device token (FCM/APNs)
+  // Preferred path: native device token (FCM/APNs) when available.
+  // In Expo-managed setups without native Firebase wiring, this can fail,
+  // so we fall back to Expo push token below.
   try {
     const tokenData = await Notifications.getDevicePushTokenAsync();
     const token = tokenData?.data as string | undefined;
     if (token) return token;
   } catch (err) {
     console.warn('[Push] Native token unavailable:', err);
-    console.warn('[Push] Native push token is required for this backend (FCM/APNs).');
-    return null;
+  }
+
+  // Fallback path: Expo push token.
+  // Works with EAS project credentials and lets the backend route via Expo Push API.
+  try {
+    const projectId =
+      Constants.expoConfig?.extra?.eas?.projectId ||
+      Constants.easConfig?.projectId;
+
+    if (!projectId) {
+      console.warn('[Push] Expo projectId is missing; cannot resolve Expo push token.');
+      return null;
+    }
+
+    const expoToken = await Notifications.getExpoPushTokenAsync({ projectId });
+    const token = expoToken?.data as string | undefined;
+    if (token) return token;
+  } catch (err) {
+    if (isExpoGo) {
+      console.warn('[Push] Expo Go does not support remote push notifications in this setup. Use a development build or production build.');
+    }
+    console.warn('[Push] Expo push token unavailable:', err);
   }
 
   return null;

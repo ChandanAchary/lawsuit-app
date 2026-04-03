@@ -163,21 +163,34 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const token = await storage.getToken();
       const userData = await storage.getUser();
       if (token && userData) {
-        // Validate persisted access token (and trigger refresh via interceptor when expired)
-        // before marking session authenticated.
-        const { data } = await authApi.getMe();
-        const freshToken = await storage.getToken();
-        const user = (data?.user || data || userData) as User;
-
+        // Restore immediately so startup is not blocked by a slow network call.
         set({
-          user,
-          token: freshToken || token,
+          user: userData as unknown as User,
+          token,
           isAuthenticated: true,
           isLoading: false,
         });
-        await storage.setUser(user as unknown as Record<string, unknown>);
-        // Re-register push token in case it changed.
         void registerPushToken();
+
+        // Validate persisted session in background and reconcile user/token silently.
+        void (async () => {
+          try {
+            const { data } = await authApi.getMe();
+            const freshToken = await storage.getToken();
+            const user = (data?.user || data || userData) as User;
+
+            set({
+              user,
+              token: freshToken || token,
+              isAuthenticated: true,
+              isLoading: false,
+            });
+            await storage.setUser(user as unknown as Record<string, unknown>);
+          } catch {
+            await storage.clear();
+            set({ user: null, token: null, isAuthenticated: false, isLoading: false, error: null });
+          }
+        })();
       } else {
         set({ isLoading: false });
       }
