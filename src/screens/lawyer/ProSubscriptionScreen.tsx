@@ -51,6 +51,12 @@ export const ProSubscriptionScreen: React.FC<{ navigation: any }> = ({ navigatio
   };
 
   const isPro = subscription?.plan === 'PRO' && subscription?.status === 'ACTIVE';
+  const subscriptionExpiryRaw = subscription?.expiresAt || subscription?.endDate || null;
+  const subscriptionExpiryDate = subscriptionExpiryRaw ? new Date(subscriptionExpiryRaw) : null;
+  const subscriptionExpiryLabel =
+    subscriptionExpiryDate && !Number.isNaN(subscriptionExpiryDate.getTime())
+      ? format(subscriptionExpiryDate, 'dd MMMM yyyy')
+      : '—';
 
   const handleSubscribeWallet = async () => {
     Alert.alert(
@@ -175,7 +181,7 @@ export const ProSubscriptionScreen: React.FC<{ navigation: any }> = ({ navigatio
           <View style={{ marginLeft: 12, flex: 1 }}>
             <Text style={styles.activeTitle}>Active Subscription</Text>
             <Text style={styles.activeSub}>
-              Expires {subscription?.expiresAt ? format(new Date(subscription.expiresAt), 'dd MMMM yyyy') : '—'}
+              Expires {subscriptionExpiryLabel}
             </Text>
           </View>
         </View>

@@ -131,6 +131,12 @@ export const LawyerDashboardScreen: React.FC<{ navigation: any }> = ({ navigatio
     : 0;
 
   const isPro = subscription?.plan === 'PRO' && subscription?.status === 'ACTIVE';
+  const subscriptionExpiryRaw = subscription?.expiresAt || subscription?.endDate || null;
+  const subscriptionExpiryDate = subscriptionExpiryRaw ? new Date(subscriptionExpiryRaw) : null;
+  const subscriptionExpiryLabel =
+    subscriptionExpiryDate && !Number.isNaN(subscriptionExpiryDate.getTime())
+      ? format(subscriptionExpiryDate, 'dd MMM yyyy')
+      : '—';
 
   const getClientAvatarUri = (appt: Appointment): string | null => {
     const client: any = appt?.client || {};
@@ -259,14 +265,18 @@ export const LawyerDashboardScreen: React.FC<{ navigation: any }> = ({ navigatio
       )}
 
       {isPro && (
-        <View style={styles.proActiveCard}>
+        <TouchableOpacity
+          style={styles.proActiveCard}
+          activeOpacity={0.8}
+          onPress={() => navigation.navigate('ProSubscription')}
+        >
           <Ionicons name="diamond" size={20} color="#7C3AED" />
           <View style={{ marginLeft: 12, flex: 1 }}>
             <Text style={styles.proActiveTitle}>Pro Member</Text>
-            <Text style={styles.proActiveSub}>Expires {subscription?.expiresAt ? format(new Date(subscription.expiresAt), 'dd MMM yyyy') : '—'}</Text>
+            <Text style={styles.proActiveSub}>Expires {subscriptionExpiryLabel}</Text>
           </View>
           <View style={styles.proBadge}><Text style={styles.proBadgeText}>ACTIVE</Text></View>
-        </View>
+        </TouchableOpacity>
       )}
 
       {/* Upcoming Consultations */}
