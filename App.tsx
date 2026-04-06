@@ -10,8 +10,6 @@ import {
   Text,
   TouchableOpacity,
   Image,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { NavigationContainer, LinkingOptions, DefaultTheme, DarkTheme, Theme, createNavigationContainerRef } from '@react-navigation/native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -218,15 +216,12 @@ export default function App() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <KeyboardAvoidingView
-        style={styles.appRoot}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+      <View style={styles.appRoot}>
         <NavigationContainer ref={navigationRef} linking={linking} theme={navTheme}>
           <StatusBar style={isDark ? 'light' : 'dark'} />
           {isAuthenticated ? <MainStack /> : <AuthStack />}
         </NavigationContainer>
-      </KeyboardAvoidingView>
+      </View>
 
       <Modal visible={!!incomingCall} transparent animationType="fade" onRequestClose={rejectIncomingCall}>
         <View style={styles.callOverlay}>

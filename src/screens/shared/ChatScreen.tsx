@@ -1,6 +1,6 @@
 import { useThemeStore, useColors } from '../../stores/themeStore';
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, ActivityIndicator, Image, Alert, StatusBar } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Text, ActivityIndicator, Image, Alert, StatusBar, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { ChatTab } from '../../components/ChatTab';
@@ -194,21 +194,28 @@ export const ChatScreen: React.FC<{ navigation: any; route: any }> = ({ navigati
         </View>
       </View>
 
-      {loading ? (
-        <View style={styles.center}><ActivityIndicator size="large" color={COLORS.primary} /></View>
-      ) : error ? (
-        <View style={styles.center}><Text style={styles.errorText}>{error}</Text></View>
-      ) : chatId ? (
-        <ChatTab chatId={chatId} participants={participants} />
-      ) : (
-        <View style={styles.center}><Text style={styles.errorText}>Unable to start chat</Text></View>
-      )}
+      <KeyboardAvoidingView
+        style={styles.chatBody}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
+      >
+        {loading ? (
+          <View style={styles.center}><ActivityIndicator size="large" color={COLORS.primary} /></View>
+        ) : error ? (
+          <View style={styles.center}><Text style={styles.errorText}>{error}</Text></View>
+        ) : chatId ? (
+          <ChatTab chatId={chatId} participants={participants} />
+        ) : (
+          <View style={styles.center}><Text style={styles.errorText}>Unable to start chat</Text></View>
+        )}
+      </KeyboardAvoidingView>
     </View>
   );
 };
 
 const getStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
+  chatBody: { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING.md,
     paddingTop: SPACING.huge, paddingBottom: SPACING.md, paddingHorizontal: SPACING.xl,

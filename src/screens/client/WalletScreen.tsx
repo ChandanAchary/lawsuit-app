@@ -1,7 +1,7 @@
 import {  useThemeStore , useColors } from '../../stores/themeStore';
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, FlatList, RefreshControl,
+  View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, FlatList, RefreshControl, ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -19,6 +19,7 @@ import { RazorpayOrderOptions, RazorpayPaymentResult } from '../../utils/razorpa
 import { useAuthStore } from '../../stores/authStore';
 import { appointmentsApi, paymentsApi } from '../../services/api';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const QUICK_AMOUNTS = [500, 1000, 2000, 5000];
 
@@ -66,6 +67,7 @@ export const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
   const COLORS = useColors();
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+  const insets = useSafeAreaInsets();
 
   const {
     balance, transactions, totalTransactions, currentPage, loading,
@@ -302,7 +304,11 @@ export const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       <LinearGradient colors={[COLORS.primary, COLORS.midnight]} style={styles.balanceCard}>
         <Text style={styles.balanceLabel}>Available Balance</Text>
         <Text style={styles.balanceValue}>₹{balance.toLocaleString('en-IN')}</Text>
-        <View style={styles.actionRow}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.actionRow}
+        >
           <TouchableOpacity style={styles.actionBtn} onPress={() => { setAmount(''); setShowAdd(true); }}>
             <Ionicons name="add-circle" size={22} color={COLORS.white} />
             <Text style={styles.actionText}>Add Money</Text>
@@ -315,7 +321,7 @@ export const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             <Ionicons name="swap-horizontal" size={22} color={COLORS.white} />
             <Text style={styles.actionText}>Transfer</Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
       </LinearGradient>
 
       <View style={styles.txHeader}>
@@ -328,7 +334,7 @@ export const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           data={filteredTransactions}
           keyExtractor={(t) => t.id}
           renderItem={renderTransaction}
-          contentContainerStyle={styles.txList}
+          contentContainerStyle={[styles.txList, { paddingBottom: Math.max(120, insets.bottom + 90) }]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />}
           onEndReached={loadMore}
           onEndReachedThreshold={0.3}
@@ -439,16 +445,17 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   },
   balanceLabel: { fontSize: FONT_SIZE.sm, color: 'rgba(255,255,255,0.7)', letterSpacing: 1 },
   balanceValue: { fontSize: 36, fontWeight: '900', color: COLORS.white, marginTop: SPACING.sm },
-  actionRow: { flexDirection: 'row', gap: SPACING.xl, marginTop: SPACING.xl },
+  actionRow: { flexDirection: 'row', gap: SPACING.md, marginTop: SPACING.xl, paddingRight: SPACING.md },
   actionBtn: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
     backgroundColor: 'rgba(255,255,255,0.15)', paddingVertical: SPACING.sm, paddingHorizontal: SPACING.lg,
     borderRadius: BORDER_RADIUS.full,
+    minWidth: 140,
   },
   actionText: { color: COLORS.white, fontSize: FONT_SIZE.sm, fontWeight: '600' },
   txHeader: { paddingHorizontal: SPACING.xl, paddingTop: SPACING.xxl, paddingBottom: SPACING.md },
   txTitle: { fontSize: FONT_SIZE.xl, fontWeight: '800', color: COLORS.text },
-  txList: { padding: SPACING.xl, paddingBottom: 100 },
+  txList: { padding: SPACING.xl, paddingBottom: 120 },
   txRow: {
     flexDirection: 'row',
     alignItems: 'center',

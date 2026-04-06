@@ -12,6 +12,7 @@ import { BottomSheet } from '../../components/Modals';
 import { ChipGroup } from '../../components/TabBar';
 import { getCurrentLocation, UserLocation } from '../../utils/permissions';
 import { usersApi } from '../../services/api';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const DISTANCE_SEARCH_RADIUS_KM = 50000;
 const MAX_FEE_OPTIONS = [500, 1000, 1500, 2500];
@@ -21,6 +22,7 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
   const COLORS = useColors();
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+  const insets = useSafeAreaInsets();
 
   const { lawyers, loading, total, page, filterOptions, fetchLawyers } = useLawyerStore();
   const [search, setSearch] = useState('');
@@ -450,7 +452,7 @@ export const SearchScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         }}
         keyExtractor={(item) => item.id}
         ListHeaderComponent={renderSubHeader}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: Math.max(120, insets.bottom + 90) }]}
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.5}
         ListFooterComponent={
@@ -682,7 +684,7 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     color: COLORS.textMuted,
     marginBottom: SPACING.sm,
   },
-  list: { padding: SPACING.lg, paddingTop: SPACING.xs },
+  list: { padding: SPACING.lg, paddingTop: SPACING.xs, paddingBottom: 120 },
   empty: { alignItems: 'center', paddingVertical: SPACING.huge },
   emptyTitle: {
     fontSize: FONT_SIZE.xl,

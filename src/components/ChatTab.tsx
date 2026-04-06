@@ -1,7 +1,7 @@
 import {  useThemeStore , useColors } from '../stores/themeStore';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Image, Keyboard,
+  View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, Platform, ActivityIndicator, Image, Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../constants';
@@ -33,10 +33,10 @@ export const ChatTab: React.FC<ChatTabProps> = ({ chatId, participants = [] }) =
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentUser = useAuthStore((s: any) => s.user);
+  const inputBottomInset = Math.max(insets.bottom, SPACING.sm);
 
   const participantMap = React.useMemo(() => {
     const m = new Map<string, ChatParticipant>();
@@ -124,19 +124,13 @@ export const ChatTab: React.FC<ChatTabProps> = ({ chatId, participants = [] }) =
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
 
     const showSub = Keyboard.addListener(showEvent, () => {
-      setKeyboardVisible(true);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
-    });
-    const hideSub = Keyboard.addListener(hideEvent, () => {
-      setKeyboardVisible(false);
     });
 
     return () => {
       showSub.remove();
-      hideSub.remove();
     };
   }, []);
 
@@ -332,17 +326,14 @@ export const ChatTab: React.FC<ChatTabProps> = ({ chatId, participants = [] }) =
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-    >
+    <View style={styles.container}>
       {loadingMore && (
         <View style={styles.loadingMore}>
           <ActivityIndicator size="small" color={COLORS.primary} />
         </View>
       )}
       <FlatList
+        style={styles.messageListView}
         ref={flatListRef}
         data={messages}
         renderItem={renderMessage}
@@ -350,13 +341,13 @@ export const ChatTab: React.FC<ChatTabProps> = ({ chatId, participants = [] }) =
         contentContainerStyle={[
           styles.messageList,
           {
-            paddingBottom: SPACING.sm + (keyboardVisible ? SPACING.xs : insets.bottom),
+            paddingBottom: SPACING.sm,
           },
         ]}
         onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
         onEndReached={loadMore}
         onEndReachedThreshold={0.15}
-        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+        keyboardDismissMode="none"
         keyboardShouldPersistTaps="handled"
         ListEmptyComponent={
           <View style={styles.emptyChat}>
@@ -382,7 +373,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ chatId, participants = [] }) =
       <View
         style={[
           styles.inputRow,
-          { paddingBottom: keyboardVisible ? SPACING.sm : Math.max(insets.bottom, SPACING.sm) },
+          { paddingBottom: inputBottomInset },
         ]}
       >
         <TextInput
@@ -394,7 +385,6 @@ export const ChatTab: React.FC<ChatTabProps> = ({ chatId, participants = [] }) =
           multiline
           textAlignVertical="center"
           maxLength={2000}
-          onFocus={() => setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50)}
         />
         <TouchableOpacity
           style={[styles.sendBtn, (!text.trim() || sending) && styles.sendBtnDisabled]}
@@ -408,12 +398,13 @@ export const ChatTab: React.FC<ChatTabProps> = ({ chatId, participants = [] }) =
           )}
         </TouchableOpacity>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 };
 
 const getStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
+  messageListView: { flex: 1 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingMore: { alignItems: 'center', paddingVertical: SPACING.sm },
   dateDividerRow: { alignItems: 'center', marginVertical: SPACING.xs },

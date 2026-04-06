@@ -49,6 +49,10 @@
         "android.permission.MODIFY_AUDIO_SETTINGS"
       ]
     },
+    "androidNavigationBar": {
+      "backgroundColor": "#0F0F1A",
+      "barStyle": "light-content"
+    },
     "web": {
       "favicon": "./assets/favicon.png"
     },

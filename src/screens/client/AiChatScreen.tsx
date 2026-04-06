@@ -9,6 +9,7 @@ import { modelChatApi } from '../../services/api';
 import Markdown from 'react-native-markdown-display';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../../stores/authStore';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface Message {
   id: string;
@@ -33,6 +34,7 @@ export const AiChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
   const markdownStyles = React.useMemo(() => getMarkdownStyles(COLORS), [isDark]);
   const historyKey = `${AI_CHAT_HISTORY_KEY_PREFIX}:${userId}`;
+  const insets = useSafeAreaInsets();
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -135,11 +137,7 @@ export const AiChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
-    >
+    <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
@@ -156,65 +154,73 @@ export const AiChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         </View>
       </View>
 
-      {messages.length === 0 ? (
-        <View style={styles.emptyState}>
-          <View style={styles.emptyIcon}>
-            <Ionicons name="sparkles" size={48} color={COLORS.primary} />
+      <KeyboardAvoidingView
+        style={styles.chatBody}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
+      >
+        {messages.length === 0 ? (
+          <View style={styles.emptyState}>
+            <View style={styles.emptyIcon}>
+              <Ionicons name="sparkles" size={48} color={COLORS.primary} />
+            </View>
+            <Text style={styles.emptyTitle}>Ask Legal Eagle</Text>
+            <Text style={styles.emptyDesc}>Get instant answers to your legal questions powered by AI</Text>
+            <View style={styles.suggestions}>
+              {SUGGESTIONS.map((s, i) => (
+                <TouchableOpacity key={i} style={styles.suggestionChip} onPress={() => sendMessage(s)}>
+                  <Text style={styles.suggestionText}>{s}</Text>
+                  <Ionicons name="arrow-forward" size={14} color={COLORS.primary} />
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
-          <Text style={styles.emptyTitle}>Ask Legal Eagle</Text>
-          <Text style={styles.emptyDesc}>Get instant answers to your legal questions powered by AI</Text>
-          <View style={styles.suggestions}>
-            {SUGGESTIONS.map((s, i) => (
-              <TouchableOpacity key={i} style={styles.suggestionChip} onPress={() => sendMessage(s)}>
-                <Text style={styles.suggestionText}>{s}</Text>
-                <Ionicons name="arrow-forward" size={14} color={COLORS.primary} />
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      ) : (
-        <FlatList
-          ref={flatRef}
-          data={messages}
-          keyExtractor={(m) => m.id}
-          renderItem={renderMessage}
-          contentContainerStyle={styles.messageList}
-          onContentSizeChange={() => flatRef.current?.scrollToEnd()}
-          ListFooterComponent={
-            loading ? (
-              <View style={[styles.bubble, styles.aiBubble]}>
-                <View style={styles.aiAvatar}>
-                  <Ionicons name="sparkles" size={14} color={COLORS.white} />
+        ) : (
+          <FlatList
+            ref={flatRef}
+            data={messages}
+            keyExtractor={(m) => m.id}
+            renderItem={renderMessage}
+            contentContainerStyle={styles.messageList}
+            onContentSizeChange={() => flatRef.current?.scrollToEnd()}
+            keyboardDismissMode="none"
+            keyboardShouldPersistTaps="handled"
+            ListFooterComponent={
+              loading ? (
+                <View style={[styles.bubble, styles.aiBubble]}>
+                  <View style={styles.aiAvatar}>
+                    <Ionicons name="sparkles" size={14} color={COLORS.white} />
+                  </View>
+                  <View style={[styles.bubbleContent, styles.aiContent]}>
+                    <Text style={styles.aiTyping}>Thinking...</Text>
+                  </View>
                 </View>
-                <View style={[styles.bubbleContent, styles.aiContent]}>
-                  <Text style={styles.aiTyping}>Thinking...</Text>
-                </View>
-              </View>
-            ) : null
-          }
-        />
-      )}
+              ) : null
+            }
+          />
+        )}
 
-      {/* Input */}
-      <View style={styles.inputBar}>
-        <TextInput
-          style={styles.input}
-          value={input}
-          onChangeText={setInput}
-          placeholder="Ask a legal question..."
-          placeholderTextColor={COLORS.textMuted}
-          multiline
-          maxLength={2000}
-        />
-        <TouchableOpacity
-          style={[styles.sendBtn, (!input.trim() || loading) && styles.sendBtnDisabled]}
-          onPress={() => sendMessage(input)}
-          disabled={!input.trim() || loading}
-        >
-          <Ionicons name="send" size={20} color={COLORS.white} />
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+        {/* Input */}
+        <View style={[styles.inputBar, { paddingBottom: Math.max(SPACING.md, insets.bottom) }] }>
+          <TextInput
+            style={styles.input}
+            value={input}
+            onChangeText={setInput}
+            placeholder="Ask a legal question..."
+            placeholderTextColor={COLORS.textMuted}
+            multiline
+            maxLength={2000}
+          />
+          <TouchableOpacity
+            style={[styles.sendBtn, (!input.trim() || loading) && styles.sendBtnDisabled]}
+            onPress={() => sendMessage(input)}
+            disabled={!input.trim() || loading}
+          >
+            <Ionicons name="send" size={20} color={COLORS.white} />
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </View>
   );
 };
 
@@ -241,6 +247,7 @@ const getMarkdownStyles = (COLORS: any) => StyleSheet.create({
 
 const getStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
+  chatBody: { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING.md,
     paddingTop: SPACING.huge, paddingBottom: SPACING.md, paddingHorizontal: SPACING.xl,
@@ -262,7 +269,7 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     marginBottom: SPACING.sm, ...SHADOWS.sm,
   },
   suggestionText: { fontSize: FONT_SIZE.md, fontWeight: '500', color: COLORS.text, flex: 1 },
-  messageList: { padding: SPACING.lg, paddingBottom: SPACING.xl },
+  messageList: { padding: SPACING.lg, paddingBottom: SPACING.sm, flexGrow: 1 },
   bubble: { flexDirection: 'row', marginBottom: SPACING.md, maxWidth: '85%' },
   userBubble: { alignSelf: 'flex-end' },
   aiBubble: { alignSelf: 'flex-start' },
