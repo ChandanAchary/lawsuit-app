@@ -4,6 +4,22 @@ import { storage } from '../services/storage';
 import { User, UserRole } from '../types';
 import { registerPushToken, unregisterPushToken } from '../utils/pushNotifications';
 
+const isAuthFailure = (error: any): boolean => {
+  const status = error?.response?.status;
+  if (status === 401 || status === 403) return true;
+
+  const message = String(
+    error?.response?.data?.error || error?.response?.data?.message || error?.message || ''
+  ).toLowerCase();
+
+  // Some backends return 400 for invalid/expired refresh/session tokens.
+  if (status === 400 && /(token|refresh|jwt|session|expired|invalid)/.test(message)) {
+    return true;
+  }
+
+  return false;
+};
+
 interface AuthState {
   user: User | null;
   token: string | null;
@@ -160,8 +176,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   restoreSession: async () => {
     set({ isLoading: true });
     try {
-      const token = await storage.getToken();
-      const userData = await storage.getUser();
+      const [token, userData] = await Promise.all([
+        storage.getToken(),
+        storage.getUser(),
+      ]);
       if (token && userData) {
         // Restore immediately so startup is not blocked by a slow network call.
         set({
@@ -186,9 +204,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               isLoading: false,
             });
             await storage.setUser(user as unknown as Record<string, unknown>);
-          } catch {
-            await storage.clear();
-            set({ user: null, token: null, isAuthenticated: false, isLoading: false, error: null });
+          } catch (error: any) {
+            if (isAuthFailure(error)) {
+              await storage.clear();
+              set({ user: null, token: null, isAuthenticated: false, isLoading: false, error: null });
+              return;
+            }
+
+            // Keep restored session on transient failures (offline/timeout/5xx).
+            set((state) => ({
+              ...state,
+              isLoading: false,
+            }));
           }
         })();
       } else {

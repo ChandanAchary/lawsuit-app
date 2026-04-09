@@ -106,8 +106,7 @@ export default function App() {
   useEffect(() => {
     const init = async () => {
       try {
-        await Promise.all([initTheme(), initRuntimeApiConfig()]);
-        await restoreSession();
+        await Promise.allSettled([initTheme(), initRuntimeApiConfig(), restoreSession()]);
       } catch (error) {
         console.error('App initialization error:', error);
       } finally {

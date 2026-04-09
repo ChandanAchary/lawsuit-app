@@ -11,7 +11,7 @@ export const initRuntimeApiConfig = async (): Promise<string> => {
   const buildTimeBaseUrl = normalizeApiBaseUrl(API_BASE_URL || DEFAULT_API_BASE_URL);
   if (buildTimeBaseUrl) {
     currentApiBaseUrl = buildTimeBaseUrl;
-    await storage.setApiBaseUrl(buildTimeBaseUrl).catch(() => {});
+    void storage.setApiBaseUrl(buildTimeBaseUrl).catch(() => {});
     initialized = true;
     return currentApiBaseUrl;
   }

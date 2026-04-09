@@ -34,8 +34,25 @@ const shouldSkipRefreshForRequest = (url?: string): boolean => {
     cleanUrl.includes('/auth/verify-otp') ||
     cleanUrl.includes('/auth/request-otp') ||
     cleanUrl.includes('/auth/restore-password') ||
+    cleanUrl.includes('/auth/logout') ||
     cleanUrl.includes('/auth/refresh')
   );
+};
+
+const shouldInvalidateSessionOnRefreshError = (error: any): boolean => {
+  const status = error?.response?.status;
+  if (status === 401 || status === 403) return true;
+
+  const message = String(
+    error?.response?.data?.error || error?.response?.data?.message || error?.message || ''
+  ).toLowerCase();
+
+  // Some APIs use 400 for invalid/expired refresh tokens.
+  if (status === 400 && /(refresh|token|jwt|session|expired|invalid)/.test(message)) {
+    return true;
+  }
+
+  return false;
 };
 
 const api: AxiosInstance = axios.create({
@@ -57,13 +74,14 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    const originalRequest = error.config;
+    const originalRequest = error.config || {};
     const shouldSkipRefresh = shouldSkipRefreshForRequest(originalRequest?.url);
     if (error.response?.status === 401 && !originalRequest?._retry && !shouldSkipRefresh) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({
             resolve: (token: string) => {
+              originalRequest.headers = originalRequest.headers || {};
               originalRequest.headers.Authorization = `Bearer ${token}`;
               resolve(api(originalRequest));
             },
@@ -81,12 +99,15 @@ api.interceptors.response.use(
         await storage.setToken(newToken);
         if (data.refreshToken) await storage.setRefreshToken(data.refreshToken);
         processQueue(null, newToken);
+        originalRequest.headers = originalRequest.headers || {};
         originalRequest.headers.Authorization = `Bearer ${newToken}`;
         return api(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError, null);
-        await storage.clear();
-        try { getResetAuth()(); } catch {}
+        if (shouldInvalidateSessionOnRefreshError(refreshError)) {
+          await storage.clear();
+          try { getResetAuth()(); } catch {}
+        }
         throw refreshError;
       } finally {
         isRefreshing = false;
