@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Dimensions, Image,
 } from 'react-native';
@@ -10,6 +10,7 @@ import { useAuthStore } from '../../stores/authStore';
 import {  useThemeStore , useColors } from '../../stores/themeStore';
 import { useWalletStore } from '../../stores/walletStore';
 import { useUserStore } from '../../stores/userStore';
+import { dashboardApi } from '../../services/api';
 
 const { width } = Dimensions.get('window');
 
@@ -32,6 +33,21 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
   const isProfileHydrated = Boolean(user?.name && (((user as any)?.avatarUrl || user?.avatar || '').trim().length > 0));
 
+  const [stats, setStats] = useState<{ upcoming: number; activeCases: number; completed: number; spentInr: number } | null>(null);
+
+  const loadStats = React.useCallback(async () => {
+    try {
+      const { data } = await dashboardApi.clientDashboard();
+      const d = data?.data || data || {};
+      setStats({
+        upcoming: d.upcomingAppointments ?? d.upcoming ?? 0,
+        activeCases: d.activeCases ?? d.openCases ?? 0,
+        completed: d.completedAppointments ?? d.completed ?? 0,
+        spentInr: Math.round((d.totalSpent ?? d.amountSpent ?? 0) / 100),
+      });
+    } catch { /* keep prior */ }
+  }, []);
+
   useEffect(() => {
     if (!isProfileHydrated) {
       void getUser();
@@ -41,10 +57,11 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   useFocusEffect(
     React.useCallback(() => {
       void fetchBalance();
+      void loadStats();
       if (!isProfileHydrated) {
         void getUser();
       }
-    }, [fetchBalance, getUser, isProfileHydrated]),
+    }, [fetchBalance, getUser, isProfileHydrated, loadStats]),
   );
 
   return (
@@ -115,6 +132,35 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           </View>
         </TouchableOpacity>
       </LinearGradient>
+
+      {/* Overview Stats */}
+      {stats && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Your Activity</Text>
+          <View style={styles.statsGrid}>
+            <View style={[styles.statTile, { backgroundColor: '#EEF2FF' }]}>
+              <Ionicons name="calendar-outline" size={20} color="#4F46E5" />
+              <Text style={styles.statVal}>{stats.upcoming}</Text>
+              <Text style={styles.statLbl}>Upcoming</Text>
+            </View>
+            <View style={[styles.statTile, { backgroundColor: '#FEF3C7' }]}>
+              <Ionicons name="briefcase-outline" size={20} color="#B45309" />
+              <Text style={styles.statVal}>{stats.activeCases}</Text>
+              <Text style={styles.statLbl}>Active Cases</Text>
+            </View>
+            <View style={[styles.statTile, { backgroundColor: '#D1FAE5' }]}>
+              <Ionicons name="checkmark-done-outline" size={20} color="#047857" />
+              <Text style={styles.statVal}>{stats.completed}</Text>
+              <Text style={styles.statLbl}>Completed</Text>
+            </View>
+            <View style={[styles.statTile, { backgroundColor: '#FEE2E2' }]}>
+              <Ionicons name="cash-outline" size={20} color="#B91C1C" />
+              <Text style={styles.statVal}>₹{stats.spentInr.toLocaleString('en-IN')}</Text>
+              <Text style={styles.statLbl}>Spent</Text>
+            </View>
+          </View>
+        </View>
+      )}
 
       {/* Features */}
       <View style={styles.section}>
@@ -289,6 +335,19 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     flexWrap: 'wrap',
     gap: SPACING.md,
   },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.md,
+  },
+  statTile: {
+    width: (width - SPACING.xl * 2 - SPACING.md) / 2,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.lg,
+    gap: 4,
+  },
+  statVal: { fontSize: FONT_SIZE.xxl, fontWeight: '900', color: COLORS.text, marginTop: 4 },
+  statLbl: { fontSize: FONT_SIZE.xs, color: COLORS.textMuted, fontWeight: '700' },
   featureCard: {
     width: (width - SPACING.xl * 2 - SPACING.md) / 2,
     backgroundColor: COLORS.white,

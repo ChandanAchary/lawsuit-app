@@ -2,7 +2,7 @@ import {  useThemeStore , useColors } from '../../stores/themeStore';
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity,
-  Image, ActivityIndicator, Alert, Linking,
+  Image, ActivityIndicator, Alert, Linking, Modal, TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
@@ -31,6 +31,11 @@ export const AppointmentDetailScreen: React.FC<Props> = ({ navigation, route }) 
   const [paymentDetails, setPaymentDetails] = useState<any | null>((passedAppt as any)?.payment || null);
   const [loading, setLoading] = useState(!passedAppt);
   const [refreshing, setRefreshing] = useState(false);
+  const [showReschedule, setShowReschedule] = useState(false);
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [rescheduleTime, setRescheduleTime] = useState('');
+  const [rescheduling, setRescheduling] = useState(false);
+  const [completing, setCompleting] = useState(false);
 
   const fetchAppointment = useCallback(async () => {
     try {
@@ -134,6 +139,44 @@ export const AppointmentDetailScreen: React.FC<Props> = ({ navigation, route }) 
     ]);
   };
 
+  const submitReschedule = async () => {
+    if (!appointment) return;
+    const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+    const timeRe = /^\d{2}:\d{2}$/;
+    if (!dateRe.test(rescheduleDate)) return Alert.alert('Error', 'Date must be YYYY-MM-DD');
+    if (!timeRe.test(rescheduleTime)) return Alert.alert('Error', 'Time must be HH:MM (24-hr)');
+    const iso = new Date(`${rescheduleDate}T${rescheduleTime}:00`).toISOString();
+    if (new Date(iso).getTime() <= Date.now()) return Alert.alert('Error', 'Choose a future date/time');
+    setRescheduling(true);
+    try {
+      await appointmentsApi.reschedule(appointment.id, iso);
+      Alert.alert('Rescheduled', 'Appointment rescheduled');
+      setShowReschedule(false); setRescheduleDate(''); setRescheduleTime('');
+      fetchAppointment();
+    } catch (err: any) {
+      Alert.alert('Error', err?.response?.data?.error || 'Failed to reschedule');
+    } finally { setRescheduling(false); }
+  };
+
+  const handleComplete = () => {
+    if (!appointment) return;
+    Alert.alert('Mark Complete', 'Mark this appointment as completed?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Complete', onPress: async () => {
+          setCompleting(true);
+          try {
+            await appointmentsApi.complete(appointment.id);
+            Alert.alert('Completed', 'Appointment marked as completed');
+            fetchAppointment();
+          } catch (err: any) {
+            Alert.alert('Error', err?.response?.data?.error || 'Failed to complete');
+          } finally { setCompleting(false); }
+        },
+      },
+    ]);
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -159,6 +202,8 @@ export const AppointmentDetailScreen: React.FC<Props> = ({ navigation, route }) 
     appointment.status === 'COMPLETED' as any;
   const canCancel = appointment.status === AppointmentStatus.PENDING || appointment.status === AppointmentStatus.CONFIRMED;
   const canAcceptReject = !isClient && appointment.status === AppointmentStatus.PENDING;
+  const canReschedule = isClient && (appointment.status === AppointmentStatus.PENDING || appointment.status === AppointmentStatus.CONFIRMED);
+  const canComplete = !isClient && (appointment.status === AppointmentStatus.CONFIRMED || appointment.status === AppointmentStatus.ATTENDED);
   const effectivePayment = paymentDetails || (appointment as any).payment || null;
   const shouldShowPaymentCard = !!effectivePayment || !!(appointment as any).paymentId;
   const paymentAmount = Number((effectivePayment as any)?.amount ?? 0);
@@ -282,6 +327,24 @@ export const AppointmentDetailScreen: React.FC<Props> = ({ navigation, route }) 
               icon={<Ionicons name="chatbubble-ellipses" size={16} color={COLORS.primary} />}
             />
           )}
+          {canReschedule && (
+            <Button
+              title="Reschedule"
+              variant="outline"
+              onPress={() => setShowReschedule(true)}
+              size="lg"
+              style={{ marginTop: 10 }}
+            />
+          )}
+          {canComplete && (
+            <Button
+              title="Mark Complete"
+              onPress={handleComplete}
+              size="lg"
+              loading={completing}
+              style={{ marginTop: 10 }}
+            />
+          )}
           {canCancel && isClient && (
             <Button
               title="Cancel Appointment"
@@ -292,6 +355,40 @@ export const AppointmentDetailScreen: React.FC<Props> = ({ navigation, route }) 
             />
           )}
         </View>
+
+        <Modal visible={showReschedule} transparent animationType="slide" onRequestClose={() => setShowReschedule(false)}>
+          <View style={styles.rmOverlay}>
+            <View style={styles.rmContent}>
+              <View style={styles.rmHeader}>
+                <Text style={styles.rmTitle}>Reschedule Appointment</Text>
+                <TouchableOpacity onPress={() => setShowReschedule(false)}>
+                  <Ionicons name="close" size={24} color={COLORS.text} />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.rmBody}>
+                <Text style={styles.rmLabel}>New Date (YYYY-MM-DD)</Text>
+                <TextInput
+                  style={styles.rmInput}
+                  value={rescheduleDate}
+                  onChangeText={setRescheduleDate}
+                  placeholder="2026-05-20"
+                  placeholderTextColor={COLORS.textMuted}
+                  autoCapitalize="none"
+                />
+                <Text style={styles.rmLabel}>Time (HH:MM, 24-hr)</Text>
+                <TextInput
+                  style={styles.rmInput}
+                  value={rescheduleTime}
+                  onChangeText={setRescheduleTime}
+                  placeholder="14:30"
+                  placeholderTextColor={COLORS.textMuted}
+                  autoCapitalize="none"
+                />
+                <Button title="Confirm Reschedule" onPress={submitReschedule} loading={rescheduling} size="lg" />
+              </View>
+            </View>
+          </View>
+        </Modal>
 
         <View style={{ height: 100 }} />
       </ScrollView>
@@ -365,4 +462,12 @@ const getStyles = (COLORS: any) => StyleSheet.create({
 
   actionsCard: { marginHorizontal: SPACING.xl, marginTop: SPACING.lg },
   actionsRow: { flexDirection: 'row', marginBottom: 10 },
+
+  rmOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  rmContent: { backgroundColor: COLORS.white, borderTopLeftRadius: BORDER_RADIUS.xxl, borderTopRightRadius: BORDER_RADIUS.xxl, paddingBottom: SPACING.xxl },
+  rmHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.xl, paddingVertical: SPACING.lg, borderBottomWidth: 1, borderBottomColor: COLORS.borderLight },
+  rmTitle: { fontSize: FONT_SIZE.xl, fontWeight: '800', color: COLORS.text },
+  rmBody: { padding: SPACING.xl },
+  rmLabel: { fontSize: FONT_SIZE.sm, color: COLORS.textSecondary, marginBottom: 4, marginTop: SPACING.sm },
+  rmInput: { backgroundColor: COLORS.surfaceAlt, borderRadius: BORDER_RADIUS.lg, paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md, fontSize: FONT_SIZE.md, color: COLORS.text, marginBottom: SPACING.md },
 });

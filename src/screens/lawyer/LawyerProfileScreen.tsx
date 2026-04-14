@@ -215,7 +215,11 @@ export const LawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigation 
           <MenuItem icon="gift-outline" label="Referral Program" subtitle="Earn ₹5,000 per referral"
             onPress={() => navigation.navigate('ReferralProgram')} />
           <MenuItem icon="diamond-outline" label="Pro Subscription" subtitle="Unlock premium features"
-            onPress={() => navigation.navigate('ProSubscription')} last />
+            onPress={() => navigation.navigate('ProSubscription')} />
+          <MenuItem icon="people-outline" label="Mediations" subtitle="View & mediate disputes"
+            onPress={() => navigation.navigate('Mediations')} />
+          <MenuItem icon="hand-right-outline" label="Mediator Settings" subtitle="Availability, fee, specializations"
+            onPress={() => navigation.navigate('MediatorSettings')} last />
         </View>
 
         {/* ── ACCOUNT Section ── */}

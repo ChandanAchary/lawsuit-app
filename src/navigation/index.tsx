@@ -73,6 +73,13 @@ import { AppointmentDetailScreen } from '../screens/shared/AppointmentDetailScre
 import { TeleLawScreen } from '../screens/shared/TeleLawScreen';
 import { PaymentHistoryScreen } from '../screens/shared/PaymentHistoryScreen';
 import { CourtAdminLoginScreen } from '../screens/auth/CourtAdminLoginScreen';
+import { MediationInviteAcceptScreen } from '../screens/auth/MediationInviteAcceptScreen';
+import { MediationsListScreen } from '../screens/shared/MediationsListScreen';
+import { NewMediationInviteScreen } from '../screens/shared/NewMediationInviteScreen';
+import { MediationDetailScreen } from '../screens/shared/MediationDetailScreen';
+import { MediationMediatorsScreen } from '../screens/shared/MediationMediatorsScreen';
+import { MediationRoomScreen } from '../screens/shared/MediationRoomScreen';
+import { MediatorSettingsScreen } from '../screens/lawyer/MediatorSettingsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -110,6 +117,7 @@ export const AuthStack = () => (
     <Stack.Screen name="AdminLogin" component={AdminLoginScreen} />
     <Stack.Screen name="CourtAdminLogin" component={CourtAdminLoginScreen} />
     <Stack.Screen name="CourtAdminRegister" component={CourtAdminRegisterScreen} />
+    <Stack.Screen name="MediationInviteAccept" component={MediationInviteAcceptScreen} />
   </Stack.Navigator>
 );
 
@@ -309,6 +317,14 @@ export const MainStack = () => {
       <Stack.Screen name="CourtAdminManagement" component={CourtAdminManagementScreen} />
       {/* Court Admin screens (also accessible from stack) */}
       <Stack.Screen name="LawyerVerification" component={LawyerVerificationScreen} />
+      {/* Mediation screens */}
+      <Stack.Screen name="Mediations" component={MediationsListScreen} />
+      <Stack.Screen name="NewMediationInvite" component={NewMediationInviteScreen} />
+      <Stack.Screen name="MediationDetail" component={MediationDetailScreen as ComponentType<any>} />
+      <Stack.Screen name="MediationMediators" component={MediationMediatorsScreen as ComponentType<any>} />
+      <Stack.Screen name="MediationRoom" component={MediationRoomScreen as ComponentType<any>} />
+      <Stack.Screen name="MediatorSettings" component={MediatorSettingsScreen} />
+      <Stack.Screen name="MediationInviteAccept" component={MediationInviteAcceptScreen as ComponentType<any>} />
     </Stack.Navigator>
   );
 };

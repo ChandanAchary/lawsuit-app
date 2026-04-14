@@ -116,7 +116,7 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
         </View>
       </View>
 
-      {(isUpcoming || isAttended || effectiveStatus === AppointmentStatus.PENDING || effectiveStatus === AppointmentStatus.MISSED) && (
+      {(isUpcoming || isAttended || effectiveStatus === AppointmentStatus.MISSED) && (
         <View style={styles.actions}>
           {effectiveStatus === AppointmentStatus.PENDING && role === 'LAWYER' && (
             <>

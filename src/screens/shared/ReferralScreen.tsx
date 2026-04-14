@@ -2,7 +2,7 @@ import {  useThemeStore , useColors } from '../../stores/themeStore';
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Share, Alert,
-  ActivityIndicator,
+  ActivityIndicator, TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -23,6 +23,9 @@ export const ReferralScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   const [code, setCode] = useState('');
   const [info, setInfo] = useState<ReferralInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [applyCode, setApplyCode] = useState('');
+  const [applying, setApplying] = useState(false);
+  const [referredBy, setReferredBy] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -45,6 +48,7 @@ export const ReferralScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
         rewardsPaid: d.rewardsPaid || 0,
         totalEarnings: d.totalEarnings ? d.totalEarnings / 100 : 0,
       });
+      setReferredBy(d.referredBy || d.referredByCode || null);
     } catch {
       setInfo({ totalReferred: 0, rewardsPaid: 0, totalEarnings: 0 });
     } finally { setLoading(false); }
@@ -54,6 +58,21 @@ export const ReferralScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
     if (!code) return;
     await Clipboard.setStringAsync(code);
     Alert.alert('Copied', 'Referral code copied to clipboard');
+  };
+
+  const handleApply = async () => {
+    const trimmed = applyCode.trim().toUpperCase();
+    if (!trimmed) return Alert.alert('Error', 'Enter a referral code');
+    if (trimmed === String(code).toUpperCase()) return Alert.alert('Error', 'You cannot use your own code');
+    setApplying(true);
+    try {
+      await referralApi.apply(trimmed);
+      Alert.alert('Applied', 'Referral code applied successfully');
+      setApplyCode('');
+      fetchData();
+    } catch (err: any) {
+      Alert.alert('Error', err?.response?.data?.error || 'Failed to apply code');
+    } finally { setApplying(false); }
   };
 
   const handleShare = async () => {
@@ -126,6 +145,34 @@ export const ReferralScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
         </View>
       </View>
 
+      {/* Apply a referral code */}
+      {!referredBy ? (
+        <View style={styles.codeCard}>
+          <Text style={styles.codeLabel}>Have a referral code?</Text>
+          <TextInput
+            style={styles.applyInput}
+            value={applyCode}
+            onChangeText={(t) => setApplyCode(t.toUpperCase())}
+            placeholder="Enter code"
+            placeholderTextColor={COLORS.textMuted}
+            autoCapitalize="characters"
+          />
+          <TouchableOpacity
+            style={[styles.shareBtn, { opacity: applying ? 0.6 : 1 }]}
+            onPress={handleApply}
+            disabled={applying}
+          >
+            <Ionicons name="checkmark-circle-outline" size={18} color={COLORS.white} />
+            <Text style={styles.shareBtnText}>{applying ? 'Applying…' : 'Apply Code'}</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.codeCard}>
+          <Text style={styles.codeLabel}>Referred by</Text>
+          <Text style={[styles.codeText, { fontSize: FONT_SIZE.xl }]}>{referredBy}</Text>
+        </View>
+      )}
+
       {/* How it works */}
       <View style={styles.howCard}>
         <Text style={styles.howTitle}>How It Works</Text>
@@ -185,6 +232,12 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     paddingHorizontal: SPACING.xxl, borderRadius: BORDER_RADIUS.full,
   },
   shareBtnText: { fontSize: FONT_SIZE.md, fontWeight: '700', color: COLORS.white },
+  applyInput: {
+    width: '100%', backgroundColor: COLORS.surfaceAlt, borderRadius: BORDER_RADIUS.lg,
+    paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md,
+    fontSize: FONT_SIZE.lg, color: COLORS.text, marginBottom: SPACING.md,
+    textAlign: 'center', letterSpacing: 2, fontWeight: '700',
+  },
   statsRow: { flexDirection: 'row', gap: SPACING.md, marginHorizontal: SPACING.xl, marginTop: SPACING.xl },
   statCard: {
     flex: 1, alignItems: 'center', backgroundColor: COLORS.white,

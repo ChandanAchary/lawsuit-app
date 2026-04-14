@@ -405,6 +405,8 @@ export const videoApi = {
     api.get(`/video/chat/${encodeURIComponent(chatId)}/session`),
   endChatSession: (chatId: string) =>
     api.post(`/video/chat/${encodeURIComponent(chatId)}/session/end`),
+  getCallHistory: (params?: { page?: number; limit?: number }) =>
+    api.get('/video/call-history', { params }),
 };
 
 // ─── Payments API ───────────────────────────────────────────
@@ -462,6 +464,42 @@ export const courtAdminApi = {
   },
   verifyLawyer: (lawyerId: string, data: { status: string; remarks?: string }) =>
     api.post(`/court-admin/verify/${encodeURIComponent(lawyerId)}`, data),
+};
+
+// ─── Mediation API ──────────────────────────────────────────
+export const mediationApi = {
+  // Invites
+  createInvite: (data: {
+    respondentEmail: string;
+    respondentName?: string;
+    respondentPhone?: string;
+    disputeTitle: string;
+    disputeDescription: string;
+    initiatorLawyerId?: string;
+  }) => api.post('/mediations/invites', data),
+  getInviteByToken: (token: string) => api.get(`/mediations/invites/public/${encodeURIComponent(token)}`),
+  acceptInvite: (token: string) => api.post(`/mediations/invites/${encodeURIComponent(token)}/accept`),
+  declineInvite: (token: string) => api.post(`/mediations/invites/${encodeURIComponent(token)}/decline`),
+
+  // Mediator directory / profile
+  listMediators: () => api.get('/mediations/mediators'),
+  updateMediatorProfile: (data: {
+    isMediator: boolean;
+    mediatorBio?: string;
+    mediationFee?: number;
+    mediationSpecializations?: string[];
+  }) => api.put('/mediations/me/mediator-profile', data),
+
+  // Mediation lifecycle
+  list: () => api.get('/mediations'),
+  getById: (id: string) => api.get(`/mediations/${encodeURIComponent(id)}`),
+  attachRespondentLawyer: (id: string, lawyerId: string) =>
+    api.post(`/mediations/${encodeURIComponent(id)}/respondent-lawyer`, { lawyerId }),
+  pickMediator: (id: string, mediatorId: string) =>
+    api.post(`/mediations/${encodeURIComponent(id)}/mediator-pick`, { mediatorId }),
+  getRoom: (id: string) => api.get(`/mediations/${encodeURIComponent(id)}/room`),
+  conclude: (id: string, data: { outcome: 'RESOLVED' | 'ESCALATED_TO_CASE'; settlementTerms?: string; closureNotes?: string }) =>
+    api.post(`/mediations/${encodeURIComponent(id)}/conclude`, data),
 };
 
 export default api;

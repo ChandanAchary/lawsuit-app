@@ -157,71 +157,50 @@ export const AppointmentsScreen: React.FC<{ navigation: any }> = ({ navigation }
   };
 
   const tabsWithCounts = React.useMemo(() => {
-    return TABS.map((item) => {
-      let count = 0;
-      switch (item.key) {
-        case 'all':
-          count = allAppointments.length;
-          break;
-        case 'pending':
-          count = allAppointments.filter((a) => getEffectiveAppointmentStatus(a) === AppointmentStatus.PENDING).length;
-          break;
-        case 'upcoming':
-          count = allAppointments.filter((a) => isUpcomingAppointment(a)).length;
-          break;
-        case 'attended':
-          count = allAppointments.filter((a) => getEffectiveAppointmentStatus(a) === AppointmentStatus.ATTENDED).length;
-          break;
-        case 'completed':
-          count = allAppointments.filter((a) => getEffectiveAppointmentStatus(a) === AppointmentStatus.COMPLETED).length;
-          break;
-        case 'missed':
-          count = allAppointments.filter((a) => getEffectiveAppointmentStatus(a) === AppointmentStatus.MISSED).length;
-          break;
-        case 'cancelled':
-          count = allAppointments.filter((a) => getEffectiveAppointmentStatus(a) === AppointmentStatus.CANCELLED).length;
-          break;
-        default:
-          count = 0;
-      }
-
-      return {
-        ...item,
-        label: `${item.label} (${count})`,
-      };
-    });
+    const counts: Record<string, number> = {
+      all: allAppointments.length,
+      pending: 0, upcoming: 0, attended: 0, completed: 0, missed: 0, cancelled: 0,
+    };
+    for (const a of allAppointments) {
+      const st = getEffectiveAppointmentStatus(a);
+      if (st === AppointmentStatus.PENDING) counts.pending++;
+      if (isUpcomingAppointment(a)) counts.upcoming++;
+      if (st === AppointmentStatus.ATTENDED) counts.attended++;
+      if (st === AppointmentStatus.COMPLETED) counts.completed++;
+      if (st === AppointmentStatus.MISSED) counts.missed++;
+      if (st === AppointmentStatus.CANCELLED) counts.cancelled++;
+    }
+    return TABS.map((item) => ({ ...item, label: `${item.label} (${counts[item.key] ?? 0})` }));
   }, [allAppointments]);
 
-  const renderItem = ({ item }: { item: Appointment }) => (
-    (() => {
-      const status = getEffectiveAppointmentStatus(item);
-      return (
-    <AppointmentCard
-      appointment={item}
-      role="CLIENT"
-      onPress={() => navigation.navigate('AppointmentDetail', { appointmentId: item.id, appointment: item })}
-      onCancel={
-        status === AppointmentStatus.PENDING || status === AppointmentStatus.CONFIRMED || status === AppointmentStatus.MISSED
-          ? () => handleCancel(item.id) : undefined
-      }
-      onChat={
-        status === AppointmentStatus.CONFIRMED || status === AppointmentStatus.ATTENDED || status === AppointmentStatus.COMPLETED
-          ? () => navigation.navigate('ChatScreen', { otherUserId: item.lawyerId, name: item.lawyer?.name })
-          : undefined
-      }
-      onViewAgreement={item.agreementUrl ? () => handleViewAgreement(item.agreementUrl!) : undefined}
-      onReschedule={
-        status === AppointmentStatus.CONFIRMED || status === AppointmentStatus.MISSED
-          ? () => openReschedule(item.id) : undefined
-      }
-      onJoinVideo={
-        status === AppointmentStatus.CONFIRMED
-          ? () => navigation.navigate('VideoCall', { appointmentId: item.id }) : undefined
-      }
-    />
-      );
-    })()
-  );
+  const renderItem = React.useCallback(({ item }: { item: Appointment }) => {
+    const status = getEffectiveAppointmentStatus(item);
+    return (
+      <AppointmentCard
+        appointment={item}
+        role="CLIENT"
+        onPress={() => navigation.navigate('AppointmentDetail', { appointmentId: item.id, appointment: item })}
+        onCancel={
+          status === AppointmentStatus.PENDING || status === AppointmentStatus.CONFIRMED || status === AppointmentStatus.MISSED
+            ? () => handleCancel(item.id) : undefined
+        }
+        onChat={
+          status === AppointmentStatus.CONFIRMED || status === AppointmentStatus.ATTENDED || status === AppointmentStatus.COMPLETED
+            ? () => navigation.navigate('ChatScreen', { otherUserId: item.lawyerId, name: item.lawyer?.name })
+            : undefined
+        }
+        onViewAgreement={item.agreementUrl ? () => handleViewAgreement(item.agreementUrl!) : undefined}
+        onReschedule={
+          status === AppointmentStatus.CONFIRMED || status === AppointmentStatus.MISSED
+            ? () => openReschedule(item.id) : undefined
+        }
+        onJoinVideo={
+          status === AppointmentStatus.CONFIRMED
+            ? () => navigation.navigate('VideoCall', { appointmentId: item.id }) : undefined
+        }
+      />
+    );
+  }, [navigation]);
 
   return (
     <View style={styles.container}>

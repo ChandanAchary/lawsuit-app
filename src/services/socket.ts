@@ -64,14 +64,19 @@ class SocketService {
       autoConnect: true,
     });
 
+    // Re-attach any handlers registered via on() before socket was created.
+    for (const [event, callbacks] of this.handlers.entries()) {
+      for (const cb of callbacks) this.socket.on(event, cb);
+    }
+
     this.socket.on('connect', () => {
-      console.log('[Socket] Connected');
+      if (__DEV__) console.log('[Socket] Connected');
     });
 
     this.socket.on('disconnect', (reason) => {
       // Transport errors are transient during reload/network changes.
       if (reason === 'transport error' || reason === 'transport close') return;
-      console.log('[Socket] Disconnected:', reason);
+      if (__DEV__) console.log('[Socket] Disconnected:', reason);
     });
 
     this.socket.io.on('reconnect_attempt', async () => {
@@ -88,7 +93,7 @@ class SocketService {
         now - this.lastConnectErrorLogAt >= 15000;
 
       if (shouldLog) {
-        console.warn('[Socket] Connect error:', message);
+        if (__DEV__) console.warn('[Socket] Connect error:', message);
         this.lastConnectErrorMessage = message;
         this.lastConnectErrorLogAt = now;
       }

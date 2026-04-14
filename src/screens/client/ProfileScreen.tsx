@@ -187,7 +187,9 @@ export const ProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
           <MenuItem icon="shield-checkmark-outline" label="Security & Account" subtitle="Password, account deletion"
             onPress={() => navigation.navigate('Security')} />
           <MenuItem icon="gift-outline" label="Referral Program" subtitle="Earn ₹5,000 per referral"
-            onPress={() => navigation.navigate('ReferralProgram')} last />
+            onPress={() => navigation.navigate('ReferralProgram')} />
+          <MenuItem icon="people-outline" label="Mediations" subtitle="Resolve disputes via neutral mediation"
+            onPress={() => navigation.navigate('Mediations')} last />
         </View>
 
         {/* ── PREFERENCES Section ── */}

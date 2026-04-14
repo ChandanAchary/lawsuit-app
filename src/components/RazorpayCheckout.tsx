@@ -81,7 +81,7 @@ export const RazorpayCheckout: React.FC<RazorpayCheckoutProps> = ({
         <WebView
           ref={webViewRef}
           source={{ html }}
-          originWhitelist={['*']}
+          originWhitelist={['https://*', 'about:*']}
           javaScriptEnabled
           domStorageEnabled
           onMessage={handleMessage}

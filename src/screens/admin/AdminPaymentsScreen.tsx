@@ -1,11 +1,12 @@
 import {  useThemeStore , useColors } from '../../stores/themeStore';
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl,
+  View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Modal, TextInput, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
-import { adminApi } from '../../services/api';
+import { adminApi, paymentsApi } from '../../services/api';
+import { Button } from '../../components/Button';
 import { TabBar } from '../../components/TabBar';
 import { Loading, EmptyState } from '../../components/Common';
 import { formatDate, formatTime } from '../../utils/date';
@@ -34,6 +35,9 @@ export const AdminPaymentsScreen: React.FC<{ navigation: any }> = ({ navigation 
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [refundTarget, setRefundTarget] = useState<any | null>(null);
+  const [refundReason, setRefundReason] = useState('');
+  const [refunding, setRefunding] = useState(false);
 
   const fetchPayments = useCallback(async (showLoader = true) => {
     if (showLoader) setLoading(true);
@@ -49,6 +53,20 @@ export const AdminPaymentsScreen: React.FC<{ navigation: any }> = ({ navigation 
   useEffect(() => { fetchPayments(); }, [fetchPayments]);
 
   const sc = (status: string) => STATUS_COLORS[status] || STATUS_COLORS.PENDING;
+
+  const submitRefund = async () => {
+    if (!refundTarget) return;
+    if (!refundReason.trim()) return Alert.alert('Error', 'Reason is required');
+    setRefunding(true);
+    try {
+      await paymentsApi.refund(refundTarget.id, refundReason.trim());
+      Alert.alert('Refunded', 'Payment refunded successfully');
+      setRefundTarget(null); setRefundReason('');
+      fetchPayments(false);
+    } catch (err: any) {
+      Alert.alert('Error', err?.response?.data?.error || 'Failed to refund');
+    } finally { setRefunding(false); }
+  };
 
   const renderItem = ({ item }: { item: any }) => {
     const c = sc(item.status);
@@ -72,6 +90,12 @@ export const AdminPaymentsScreen: React.FC<{ navigation: any }> = ({ navigation 
             <Text style={styles.escrowText}>Escrow: {item.escrowStatus}</Text>
           )}
         </View>
+        {item.status === 'COMPLETED' && (
+          <TouchableOpacity style={styles.refundBtn} onPress={() => setRefundTarget(item)}>
+            <Ionicons name="return-down-back" size={14} color="#EF4444" />
+            <Text style={styles.refundText}>Refund</Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   };
@@ -95,6 +119,36 @@ export const AdminPaymentsScreen: React.FC<{ navigation: any }> = ({ navigation 
           ListEmptyComponent={<EmptyState icon="💳" title="No Payments" message="No payments found" />}
         />
       )}
+
+      <Modal visible={!!refundTarget} transparent animationType="slide" onRequestClose={() => setRefundTarget(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Refund Payment</Text>
+              <TouchableOpacity onPress={() => setRefundTarget(null)}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.modalBody}>
+              {refundTarget && (
+                <Text style={styles.modalInfo}>
+                  Amount: ₹{Number(refundTarget.amount || 0).toLocaleString('en-IN')}{'\n'}
+                  Payment ID: {String(refundTarget.id).slice(0, 16)}…
+                </Text>
+              )}
+              <TextInput
+                style={styles.input}
+                value={refundReason}
+                onChangeText={setRefundReason}
+                placeholder="Reason for refund"
+                placeholderTextColor={COLORS.textMuted}
+                multiline
+              />
+              <Button title="Confirm Refund" onPress={submitRefund} loading={refunding} size="lg" variant="danger" />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -126,4 +180,22 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   },
   dateText: { fontSize: FONT_SIZE.xs, color: COLORS.textMuted },
   escrowText: { fontSize: FONT_SIZE.xs, fontWeight: '600', color: COLORS.warning },
+  refundBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-end',
+    marginTop: SPACING.md, paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.full, backgroundColor: '#FEE2E2',
+  },
+  refundText: { fontSize: FONT_SIZE.xs, fontWeight: '800', color: '#EF4444' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: COLORS.white, borderTopLeftRadius: BORDER_RADIUS.xxl, borderTopRightRadius: BORDER_RADIUS.xxl, paddingBottom: SPACING.xxl },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.xl, paddingVertical: SPACING.lg, borderBottomWidth: 1, borderBottomColor: COLORS.borderLight },
+  modalTitle: { fontSize: FONT_SIZE.xl, fontWeight: '800', color: COLORS.text },
+  modalBody: { padding: SPACING.xl },
+  modalInfo: { fontSize: FONT_SIZE.sm, color: COLORS.textSecondary, marginBottom: SPACING.md, lineHeight: 20 },
+  input: {
+    backgroundColor: COLORS.surfaceAlt, borderRadius: BORDER_RADIUS.lg,
+    paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md,
+    fontSize: FONT_SIZE.md, color: COLORS.text, marginBottom: SPACING.md,
+    height: 90, textAlignVertical: 'top',
+  },
 });
