@@ -26,6 +26,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { useColors, useThemeStore } from '../../stores/themeStore';
 import { requestMediaLibraryPermission } from '../../utils/permissions';
 import { loadStateOptions } from '../../utils/addressOptions';
+import { formatErrorMessage } from '../../utils/formatError';
 
 const COURT_TYPE_OPTIONS = [
   { label: 'Supreme Court', value: 'SUPREME_COURT' },
@@ -441,7 +442,7 @@ export const EditCourtAdminProfileScreen: React.FC<{ navigation: any; route: any
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch (err: any) {
-      Alert.alert('Update Failed', err?.response?.data?.error || 'Please try again.');
+      Alert.alert('Update Failed', formatErrorMessage(err) || 'Please try again.');
     } finally {
       setSaving(false);
     }

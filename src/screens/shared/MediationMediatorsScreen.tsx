@@ -8,6 +8,7 @@ import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { mediationApi } from '../../services/api';
 import { Loading, EmptyState } from '../../components/Common';
 import { MediatorProfile } from '../../types';
+import { formatErrorMessage } from '../../utils/formatError';
 
 export const MediationMediatorsScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
@@ -26,7 +27,7 @@ export const MediationMediatorsScreen: React.FC<{ navigation: any; route: any }>
       const { data } = await mediationApi.listMediators();
       setList(data.data || data.items || []);
     } catch (err: any) {
-      Alert.alert('Error', err?.response?.data?.error || 'Failed to load mediators');
+      Alert.alert('Error', formatErrorMessage(err) || 'Failed to load mediators');
       setList([]);
     } finally { setLoading(false); setRefreshing(false); }
   }, []);
@@ -50,7 +51,7 @@ export const MediationMediatorsScreen: React.FC<{ navigation: any; route: any }>
                 { text: 'OK', onPress: () => navigation.goBack() },
               ]);
             } catch (err: any) {
-              Alert.alert('Error', err?.response?.data?.error || 'Failed to pick mediator');
+              Alert.alert('Error', formatErrorMessage(err) || 'Failed to pick mediator');
             } finally { setPickingId(null); }
           },
         },

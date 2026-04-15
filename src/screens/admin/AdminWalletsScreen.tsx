@@ -9,6 +9,7 @@ import { adminApi } from '../../services/api';
 import { TabBar } from '../../components/TabBar';
 import { Loading, EmptyState } from '../../components/Common';
 import { Button } from '../../components/Button';
+import { formatErrorMessage } from '../../utils/formatError';
 
 const MAIN_TABS = [
   { key: 'wallets', label: 'Wallets' },
@@ -68,7 +69,7 @@ export const AdminWalletsScreen: React.FC<{ navigation: any }> = ({ navigation }
       setActionUserId(''); setActionAmount(''); setActionReason('');
       fetchData(false);
     } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.error || `Failed to ${showAction} wallet`);
+      Alert.alert('Error', formatErrorMessage(err) || `Failed to ${showAction} wallet`);
     } finally { setSubmitting(false); }
   };
 
@@ -89,7 +90,7 @@ export const AdminWalletsScreen: React.FC<{ navigation: any }> = ({ navigation }
       setReverseReason('');
       fetchData(false);
     } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.error || 'Failed to reverse');
+      Alert.alert('Error', formatErrorMessage(err) || 'Failed to reverse');
     } finally {
       setSubmitting(false);
     }

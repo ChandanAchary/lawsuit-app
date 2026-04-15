@@ -22,6 +22,7 @@ import { Button } from '../../components/Button';
 import { useAuthStore } from '../../stores/authStore';
 import { addressApi } from '../../services/api';
 import { loadStateOptions } from '../../utils/addressOptions';
+import { formatErrorMessage } from '../../utils/formatError';
 
 type Step = 'info' | 'password';
 
@@ -306,7 +307,7 @@ export const CourtAdminRegisterScreen: React.FC<{ navigation: any }> = ({ naviga
 
       navigation.navigate('OtpVerify', { identifier: email.trim() });
     } catch (err: any) {
-      Alert.alert('Registration Failed', err?.response?.data?.error || 'Please try again.');
+      Alert.alert('Registration Failed', formatErrorMessage(err) || 'Please try again.');
     }
   };
 

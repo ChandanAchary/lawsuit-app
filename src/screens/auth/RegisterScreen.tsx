@@ -10,6 +10,7 @@ import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { useAuthStore } from '../../stores/authStore';
 import { safeGoBack } from '../../utils/navigation';
+import { formatErrorMessage } from '../../utils/formatError';
 
 type Step = 'info' | 'password';
 
@@ -119,7 +120,7 @@ export const RegisterScreen: React.FC<{ navigation: any; route: any }> = ({ navi
       // Pass referral code to OTP screen — it will be applied after verification when auth token exists
       navigation.navigate('OtpVerify', { identifier: email.trim(), referralCode: referralCode.trim() || undefined });
     } catch (err: any) {
-      Alert.alert('Registration Failed', err.response?.data?.message || err.response?.data?.error || 'Please try again');
+      Alert.alert('Registration Failed', formatErrorMessage(err) || 'Please try again');
     }
   };
 

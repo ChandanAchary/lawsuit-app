@@ -10,6 +10,7 @@ import { PaymentStatus } from '../../types';
 import { TabBar } from '../../components/TabBar';
 import { Loading, EmptyState } from '../../components/Common';
 import { formatDate, formatTime } from '../../utils/date';
+import { formatErrorMessage } from '../../utils/formatError';
 
 const STATUS_TABS = [
   { key: 'all', label: 'All' },
@@ -94,7 +95,7 @@ export const PaymentHistoryScreen: React.FC<{ navigation: any }> = ({ navigation
             setSelectedPayment(null);
             fetchPayments(1, false);
           } catch (err: any) {
-            Alert.alert('Error', err.response?.data?.error || 'Failed to request refund');
+            Alert.alert('Error', formatErrorMessage(err) || 'Failed to request refund');
           } finally { setRefunding(false); }
         },
       },

@@ -12,6 +12,7 @@ import { Appointment, AppointmentStatus } from '../../types';
 import { useAuthStore } from '../../stores/authStore';
 import { Button } from '../../components/Button';
 import { useWalletStore } from '../../stores/walletStore';
+import { formatErrorMessage } from '../../utils/formatError';
 
 interface Props {
   navigation: any;
@@ -118,7 +119,7 @@ export const AppointmentDetailScreen: React.FC<Props> = ({ navigation, route }) 
       Alert.alert('Accepted', 'Appointment confirmed.');
       fetchAppointment();
     } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.error || 'Failed');
+      Alert.alert('Error', formatErrorMessage(err) || 'Failed');
     }
   };
 
@@ -133,7 +134,7 @@ export const AppointmentDetailScreen: React.FC<Props> = ({ navigation, route }) 
           Alert.alert('Rejected', 'Appointment rejected. Payment refunded.');
           fetchAppointment();
         } catch (err: any) {
-          Alert.alert('Error', err.response?.data?.error || 'Failed');
+          Alert.alert('Error', formatErrorMessage(err) || 'Failed');
         }
       }},
     ]);
@@ -154,7 +155,7 @@ export const AppointmentDetailScreen: React.FC<Props> = ({ navigation, route }) 
       setShowReschedule(false); setRescheduleDate(''); setRescheduleTime('');
       fetchAppointment();
     } catch (err: any) {
-      Alert.alert('Error', err?.response?.data?.error || 'Failed to reschedule');
+      Alert.alert('Error', formatErrorMessage(err) || 'Failed to reschedule');
     } finally { setRescheduling(false); }
   };
 
@@ -170,7 +171,7 @@ export const AppointmentDetailScreen: React.FC<Props> = ({ navigation, route }) 
             Alert.alert('Completed', 'Appointment marked as completed');
             fetchAppointment();
           } catch (err: any) {
-            Alert.alert('Error', err?.response?.data?.error || 'Failed to complete');
+            Alert.alert('Error', formatErrorMessage(err) || 'Failed to complete');
           } finally { setCompleting(false); }
         },
       },

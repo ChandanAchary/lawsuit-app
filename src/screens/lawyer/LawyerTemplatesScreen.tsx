@@ -10,6 +10,7 @@ import { AgreementTemplate } from '../../types';
 import { Button } from '../../components/Button';
 import { BottomSheet } from '../../components/Modals';
 import { Loading, EmptyState } from '../../components/Common';
+import { formatErrorMessage } from '../../utils/formatError';
 
 export const LawyerTemplatesScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
@@ -50,7 +51,7 @@ export const LawyerTemplatesScreen: React.FC<{ navigation: any }> = ({ navigatio
       }
       setShowForm(false);
     } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.error || err.response?.data?.message || 'Save failed');
+      Alert.alert('Error', formatErrorMessage(err) || 'Save failed');
     } finally { setSaving(false); }
   };
 

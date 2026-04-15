@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { mediationApi, usersApi } from '../../services/api';
 import { Button } from '../../components/Button';
+import { formatErrorMessage, isEndpointMissing } from '../../utils/formatError';
 
 const DEFAULT_SPECS = ['Family', 'Commercial', 'Employment', 'Property', 'Consumer', 'Civil'];
 
@@ -52,7 +53,14 @@ export const MediatorSettingsScreen: React.FC<{ navigation: any }> = ({ navigati
       Alert.alert('Saved', 'Mediator settings updated');
       navigation.goBack();
     } catch (err: any) {
-      Alert.alert('Error', err?.response?.data?.error || 'Failed to save');
+      if (isEndpointMissing(err)) {
+        Alert.alert(
+          'Feature Unavailable',
+          'Mediator settings are not enabled on the server yet. Please try again later.',
+        );
+      } else {
+        Alert.alert('Error', formatErrorMessage(err) || 'Failed to save');
+      }
     } finally { setSubmitting(false); }
   };
 

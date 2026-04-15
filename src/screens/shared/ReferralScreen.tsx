@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { referralApi } from '../../services/api';
+import { formatErrorMessage } from '../../utils/formatError';
 
 interface ReferralInfo {
   totalReferred: number;
@@ -71,7 +72,7 @@ export const ReferralScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
       setApplyCode('');
       fetchData();
     } catch (err: any) {
-      Alert.alert('Error', err?.response?.data?.error || 'Failed to apply code');
+      Alert.alert('Error', formatErrorMessage(err) || 'Failed to apply code');
     } finally { setApplying(false); }
   };
 

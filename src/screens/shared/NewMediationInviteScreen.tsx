@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { mediationApi } from '../../services/api';
 import { Button } from '../../components/Button';
+import { formatErrorMessage, isEndpointMissing } from '../../utils/formatError';
 
 export const NewMediationInviteScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
@@ -43,7 +44,11 @@ export const NewMediationInviteScreen: React.FC<{ navigation: any }> = ({ naviga
         { text: 'OK', onPress: () => navigation.replace('Mediations') },
       ]);
     } catch (err: any) {
-      Alert.alert('Error', err?.response?.data?.error || 'Failed to create invite');
+      if (isEndpointMissing(err)) {
+        Alert.alert('Feature Unavailable', 'Mediations are not enabled on the server yet.');
+      } else {
+        Alert.alert('Error', formatErrorMessage(err) || 'Failed to create invite');
+      }
     } finally {
       setSubmitting(false);
     }

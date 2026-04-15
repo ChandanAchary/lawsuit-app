@@ -11,6 +11,7 @@ import { Loading } from '../../components/Common';
 import { useAuthStore } from '../../stores/authStore';
 import { MediationInvite } from '../../types';
 import { formatDate } from '../../utils/date';
+import { formatErrorMessage } from '../../utils/formatError';
 
 export const MediationInviteAcceptScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
@@ -31,7 +32,7 @@ export const MediationInviteAcceptScreen: React.FC<{ navigation: any; route: any
       const { data } = await mediationApi.getInviteByToken(t.trim());
       setInvite(data.data || data);
     } catch (err: any) {
-      Alert.alert('Error', err?.response?.data?.error || 'Invite not found');
+      Alert.alert('Error', formatErrorMessage(err) || 'Invite not found');
       setInvite(null);
     } finally { setLoading(false); }
   }, []);
@@ -63,7 +64,7 @@ export const MediationInviteAcceptScreen: React.FC<{ navigation: any; route: any
         },
       ]);
     } catch (err: any) {
-      Alert.alert('Error', err?.response?.data?.error || 'Failed to accept invite');
+      Alert.alert('Error', formatErrorMessage(err) || 'Failed to accept invite');
     } finally { setSubmitting(false); }
   };
 
@@ -74,7 +75,7 @@ export const MediationInviteAcceptScreen: React.FC<{ navigation: any; route: any
       await mediationApi.declineInvite(invite.token);
       Alert.alert('Declined', 'Invite declined.', [{ text: 'OK', onPress: () => navigation.goBack() }]);
     } catch (err: any) {
-      Alert.alert('Error', err?.response?.data?.error || 'Failed to decline');
+      Alert.alert('Error', formatErrorMessage(err) || 'Failed to decline');
     } finally { setSubmitting(false); }
   };
 

@@ -10,6 +10,7 @@ import { Button } from '../../components/Button';
 import { TabBar } from '../../components/TabBar';
 import { Loading, EmptyState } from '../../components/Common';
 import { formatDate, formatTime } from '../../utils/date';
+import { formatErrorMessage } from '../../utils/formatError';
 
 const STATUS_TABS = [
   { key: 'all', label: 'All' },
@@ -64,7 +65,7 @@ export const AdminPaymentsScreen: React.FC<{ navigation: any }> = ({ navigation 
       setRefundTarget(null); setRefundReason('');
       fetchPayments(false);
     } catch (err: any) {
-      Alert.alert('Error', err?.response?.data?.error || 'Failed to refund');
+      Alert.alert('Error', formatErrorMessage(err) || 'Failed to refund');
     } finally { setRefunding(false); }
   };
 

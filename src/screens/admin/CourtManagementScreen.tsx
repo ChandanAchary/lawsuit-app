@@ -8,6 +8,7 @@ import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { courtAdminApi } from '../../services/api';
 import { Loading, EmptyState } from '../../components/Common';
 import { Button } from '../../components/Button';
+import { formatErrorMessage } from '../../utils/formatError';
 
 const COURT_TYPES = ['HIGH_COURT', 'DISTRICT_COURT', 'SUPREME_COURT'];
 
@@ -66,7 +67,7 @@ export const CourtManagementScreen: React.FC<{ navigation: any }> = ({ navigatio
       resetForm();
       fetchCourts(false);
     } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.error || 'Operation failed');
+      Alert.alert('Error', formatErrorMessage(err) || 'Operation failed');
     } finally { setSubmitting(false); }
   };
 
@@ -79,7 +80,7 @@ export const CourtManagementScreen: React.FC<{ navigation: any }> = ({ navigatio
           Alert.alert('Deleted', 'Court removed');
           fetchCourts(false);
         } catch (err: any) {
-          Alert.alert('Error', err.response?.data?.error || 'Delete failed');
+          Alert.alert('Error', formatErrorMessage(err) || 'Delete failed');
         }
       }},
     ]);

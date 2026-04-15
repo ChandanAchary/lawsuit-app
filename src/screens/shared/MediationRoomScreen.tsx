@@ -8,6 +8,7 @@ import { WebView } from 'react-native-webview';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { useThemeStore, useColors } from '../../stores/themeStore';
 import { mediationApi } from '../../services/api';
+import { formatErrorMessage } from '../../utils/formatError';
 
 export const MediationRoomScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
@@ -27,7 +28,7 @@ export const MediationRoomScreen: React.FC<{ navigation: any; route: any }> = ({
       setRoomUrl(payload.url || payload.roomUrl || payload.dailyRoomUrl || null);
       setToken(payload.token || null);
     } catch (err: any) {
-      Alert.alert('Error', err?.response?.data?.error || 'Failed to get room access', [
+      Alert.alert('Error', formatErrorMessage(err) || 'Failed to get room access', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } finally { setLoading(false); }

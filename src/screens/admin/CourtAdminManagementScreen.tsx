@@ -8,6 +8,7 @@ import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { courtAdminApi } from '../../services/api';
 import { Loading, EmptyState } from '../../components/Common';
 import { Button } from '../../components/Button';
+import { formatErrorMessage } from '../../utils/formatError';
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   ACTIVE: { bg: '#D1FAE5', text: '#10B981' },
@@ -58,7 +59,7 @@ export const CourtAdminManagementScreen: React.FC<{ navigation: any }> = ({ navi
       setFormData({ name: '', email: '', phone: '', password: '', courtId: '', registrationNumber: '' });
       fetchAdmins(false);
     } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.error || 'Failed to create');
+      Alert.alert('Error', formatErrorMessage(err) || 'Failed to create');
     } finally { setSubmitting(false); }
   };
 
@@ -73,7 +74,7 @@ export const CourtAdminManagementScreen: React.FC<{ navigation: any }> = ({ navi
             Alert.alert('Success', `Status changed to ${s}`);
             fetchAdmins(false);
           } catch (err: any) {
-            Alert.alert('Error', err.response?.data?.error || 'Status change failed');
+            Alert.alert('Error', formatErrorMessage(err) || 'Status change failed');
           }
         },
       })),

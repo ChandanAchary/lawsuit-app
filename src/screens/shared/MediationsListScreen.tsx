@@ -11,6 +11,7 @@ import { Loading, EmptyState } from '../../components/Common';
 import { useAuthStore } from '../../stores/authStore';
 import { UserRole, Mediation } from '../../types';
 import { formatDate } from '../../utils/date';
+import { formatErrorMessage, isEndpointMissing } from '../../utils/formatError';
 
 const TABS = [
   { key: 'active', label: 'Active' },
@@ -38,15 +39,21 @@ export const MediationsListScreen: React.FC<{ navigation: any }> = ({ navigation
   const [items, setItems] = useState<Mediation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
 
   const load = useCallback(async (showLoader = true) => {
     if (showLoader) setLoading(true);
     try {
       const { data } = await mediationApi.list();
       setItems(data.data || data.items || []);
+      setUnavailable(false);
     } catch (err: any) {
-      Alert.alert('Error', err?.response?.data?.error || 'Failed to load mediations');
       setItems([]);
+      if (isEndpointMissing(err)) {
+        setUnavailable(true);
+      } else {
+        Alert.alert('Error', formatErrorMessage(err) || 'Failed to load mediations');
+      }
     } finally {
       setLoading(false); setRefreshing(false);
     }
@@ -101,7 +108,7 @@ export const MediationsListScreen: React.FC<{ navigation: any }> = ({ navigation
 
       <TabBar tabs={TABS} active={tab} onSelect={setTab} />
 
-      {isClient && (
+      {isClient && !unavailable && (
         <View style={styles.ctaRow}>
           <TouchableOpacity style={styles.cta} onPress={() => navigation.navigate('NewMediationInvite')}>
             <Ionicons name="add-circle" size={18} color="#FFFFFF" />
@@ -119,9 +126,11 @@ export const MediationsListScreen: React.FC<{ navigation: any }> = ({ navigation
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(false); }} colors={[COLORS.primary]} />}
           ListEmptyComponent={
             <EmptyState
-              icon="🤝"
-              title={tab === 'active' ? 'No active mediations' : 'No concluded mediations'}
-              message={isClient && tab === 'active' ? 'Start one by inviting a respondent.' : 'Nothing here yet.'}
+              icon={unavailable ? '🚧' : '🤝'}
+              title={unavailable ? 'Mediations not available' : (tab === 'active' ? 'No active mediations' : 'No concluded mediations')}
+              message={unavailable
+                ? 'This feature is not enabled on the server yet. Please try again later.'
+                : (isClient && tab === 'active' ? 'Start one by inviting a respondent.' : 'Nothing here yet.')}
             />
           }
         />

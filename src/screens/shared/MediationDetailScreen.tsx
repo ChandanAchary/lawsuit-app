@@ -11,6 +11,7 @@ import { Button } from '../../components/Button';
 import { useAuthStore } from '../../stores/authStore';
 import { UserRole, Mediation, MediationOutcome } from '../../types';
 import { formatDate, formatTime } from '../../utils/date';
+import { formatErrorMessage } from '../../utils/formatError';
 
 const statusColor: Record<string, { bg: string; fg: string }> = {
   AWAITING_RESPONDENT_LAWYER: { bg: '#FEF3C7', fg: '#B45309' },
@@ -47,7 +48,7 @@ export const MediationDetailScreen: React.FC<{ navigation: any; route: any }> = 
       const { data } = await mediationApi.getById(id);
       setM(data.data || data);
     } catch (err: any) {
-      Alert.alert('Error', err?.response?.data?.error || 'Failed to load mediation');
+      Alert.alert('Error', formatErrorMessage(err) || 'Failed to load mediation');
     } finally {
       setLoading(false); setRefreshing(false);
     }
@@ -79,7 +80,7 @@ export const MediationDetailScreen: React.FC<{ navigation: any; route: any }> = 
       Alert.alert('Attached', 'Lawyer attached successfully');
       load(false);
     } catch (err: any) {
-      Alert.alert('Error', err?.response?.data?.error || 'Failed to attach lawyer');
+      Alert.alert('Error', formatErrorMessage(err) || 'Failed to attach lawyer');
     } finally { setSubmitting(false); }
   };
 
@@ -95,7 +96,7 @@ export const MediationDetailScreen: React.FC<{ navigation: any; route: any }> = 
       Alert.alert('Concluded', 'Mediation concluded.');
       load(false);
     } catch (err: any) {
-      Alert.alert('Error', err?.response?.data?.error || 'Failed to conclude');
+      Alert.alert('Error', formatErrorMessage(err) || 'Failed to conclude');
     } finally { setSubmitting(false); }
   };
 

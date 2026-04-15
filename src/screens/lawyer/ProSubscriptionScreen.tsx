@@ -12,6 +12,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { format } from 'date-fns';
 import { RazorpayCheckout } from '../../components/RazorpayCheckout';
 import { RazorpayOrderOptions, RazorpayPaymentResult } from '../../utils/razorpay';
+import { formatErrorMessage } from '../../utils/formatError';
 
 const PRO_FEATURES = [
   { icon: 'star', title: 'Priority Listing', desc: 'Appear at the top of search results' },
@@ -74,7 +75,7 @@ export const ProSubscriptionScreen: React.FC<{ navigation: any }> = ({ navigatio
               fetchBalance();
               Alert.alert('Success', 'You are now a Pro member!');
             } catch (err: any) {
-              Alert.alert('Error', err.response?.data?.error || 'Subscription failed');
+              Alert.alert('Error', formatErrorMessage(err) || 'Subscription failed');
             } finally { setSubscribing(false); }
           },
         },
@@ -105,7 +106,7 @@ export const ProSubscriptionScreen: React.FC<{ navigation: any }> = ({ navigatio
       });
       setShowRazorpay(true);
     } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.error || 'Failed to initiate payment');
+      Alert.alert('Error', formatErrorMessage(err) || 'Failed to initiate payment');
     } finally { setSubscribing(false); }
   };
 

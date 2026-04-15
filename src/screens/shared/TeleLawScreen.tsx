@@ -6,6 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS, CASTE_OPTIONS, GENDER_OPTIONS } from '../../constants';
 import { teleLawApi } from '../../services/api';
 import { loadStateOptions } from '../../utils/addressOptions';
+import { formatErrorMessage } from '../../utils/formatError';
 
 export const TeleLawScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
@@ -116,7 +117,7 @@ export const TeleLawScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
       setEligibilityResult(res.data?.data || res.data);
     } catch (err: any) {
       console.log('Failed to check eligibility');
-      Alert.alert('Error', err.response?.data?.error || 'Failed to check eligibility');
+      Alert.alert('Error', formatErrorMessage(err) || 'Failed to check eligibility');
     } finally {
       setChecking(false);
     }

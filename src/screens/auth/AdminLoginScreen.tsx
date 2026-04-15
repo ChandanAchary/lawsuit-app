@@ -8,6 +8,7 @@ import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../constants';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { useAuthStore } from '../../stores/authStore';
+import { formatErrorMessage } from '../../utils/formatError';
 
 export const AdminLoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
@@ -27,7 +28,7 @@ export const AdminLoginScreen: React.FC<{ navigation: any }> = ({ navigation }) 
     try {
       await login(email.trim(), password);
     } catch (err: any) {
-      Alert.alert('Login Failed', err.response?.data?.error || err.response?.data?.message || 'Invalid credentials');
+      Alert.alert('Login Failed', formatErrorMessage(err) || 'Invalid credentials');
     }
   };
 

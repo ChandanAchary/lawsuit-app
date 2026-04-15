@@ -11,6 +11,7 @@ import { Input } from '../../components/Input';
 import { useAuthStore } from '../../stores/authStore';
 import { authApi } from '../../services/api';
 import { safeGoBack } from '../../utils/navigation';
+import { formatErrorMessage } from '../../utils/formatError';
 
 type Step = 'email' | 'otp' | 'newPassword';
 
@@ -61,7 +62,7 @@ export const ForgotPasswordScreen: React.FC<{ navigation: any }> = ({ navigation
       setStep('otp');
       Alert.alert('Success', 'OTP sent to your email');
     } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.message || err.response?.data?.error || 'Failed to send OTP');
+      Alert.alert('Error', formatErrorMessage(err) || 'Failed to send OTP');
     }
   };
 
@@ -90,7 +91,7 @@ export const ForgotPasswordScreen: React.FC<{ navigation: any }> = ({ navigation
       await authApi.verifyOtp(email.trim(), code);
       setStep('newPassword');
     } catch (err: any) {
-      Alert.alert('Invalid OTP', err.response?.data?.message || err.response?.data?.error || 'The OTP you entered is incorrect');
+      Alert.alert('Invalid OTP', formatErrorMessage(err) || 'The OTP you entered is incorrect');
     }
   };
 
@@ -101,7 +102,7 @@ export const ForgotPasswordScreen: React.FC<{ navigation: any }> = ({ navigation
       setOtp(['', '', '', '', '', '']);
       Alert.alert('Success', 'OTP resent successfully');
     } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.message || 'Failed to resend OTP');
+      Alert.alert('Error', formatErrorMessage(err) || 'Failed to resend OTP');
     }
   };
 
@@ -121,7 +122,7 @@ export const ForgotPasswordScreen: React.FC<{ navigation: any }> = ({ navigation
         { text: 'Sign In', onPress: () => navigation.navigate('Login') },
       ]);
     } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.message || err.response?.data?.error || 'Failed to reset password');
+      Alert.alert('Error', formatErrorMessage(err) || 'Failed to reset password');
     }
   };
 

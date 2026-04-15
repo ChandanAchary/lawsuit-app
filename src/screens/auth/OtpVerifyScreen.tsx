@@ -8,6 +8,7 @@ import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../constants';
 import { Button } from '../../components/Button';
 import { useAuthStore } from '../../stores/authStore';
 import { safeGoBack } from '../../utils/navigation';
+import { formatErrorMessage } from '../../utils/formatError';
 
 export const OtpVerifyScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
@@ -55,7 +56,7 @@ export const OtpVerifyScreen: React.FC<{ navigation: any; route: any }> = ({ nav
         try { await applyReferral(referralCode); } catch {}
       }
     } catch (err: any) {
-      Alert.alert('Verification Failed', err.response?.data?.message || err.response?.data?.error || 'Invalid OTP');
+      Alert.alert('Verification Failed', formatErrorMessage(err) || 'Invalid OTP');
     }
   };
 
@@ -66,7 +67,7 @@ export const OtpVerifyScreen: React.FC<{ navigation: any; route: any }> = ({ nav
       setOtp(['', '', '', '', '', '']);
       Alert.alert('Success', 'OTP sent successfully');
     } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.message || 'Failed to resend OTP');
+      Alert.alert('Error', formatErrorMessage(err) || 'Failed to resend OTP');
     }
   };
 
