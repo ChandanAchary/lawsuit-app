@@ -56,6 +56,13 @@ import { CourtAdminDashboardScreen } from '../screens/courtAdmin/CourtAdminDashb
 import { LawyerVerificationScreen } from '../screens/courtAdmin/LawyerVerificationScreen';
 import { CourtAdminProfileScreen } from '../screens/courtAdmin/CourtAdminProfileScreen';
 import { EditCourtAdminProfileScreen } from '../screens/courtAdmin/EditCourtAdminProfileScreen';
+import { OrgVerificationScreen } from '../screens/courtAdmin/OrgVerificationScreen';
+
+// Organization screens
+import { OrgDashboardScreen } from '../screens/organization/OrgDashboardScreen';
+import { OrgProfileScreen } from '../screens/organization/OrgProfileScreen';
+import { OrgLawyersScreen } from '../screens/organization/OrgLawyersScreen';
+import { OrgRequestsScreen } from '../screens/organization/OrgRequestsScreen';
 
 // Shared screens
 import { ChatScreen } from '../screens/shared/ChatScreen';
@@ -80,6 +87,8 @@ import { MediationDetailScreen } from '../screens/shared/MediationDetailScreen';
 import { MediationMediatorsScreen } from '../screens/shared/MediationMediatorsScreen';
 import { MediationRoomScreen } from '../screens/shared/MediationRoomScreen';
 import { MediatorSettingsScreen } from '../screens/lawyer/MediatorSettingsScreen';
+import { CallHistoryScreen } from '../screens/shared/CallHistoryScreen';
+import { DocumentAiScreen } from '../screens/shared/DocumentAiScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -265,12 +274,49 @@ const CourtAdminTabs = () => {
   );
 };
 
+// ─── Organization Tab Navigator ─────────────────────────
+const OrgTabs = () => {
+  const C = useColors();
+  const isDark = useThemeStore((s) => s.isDark);
+  return (
+    <Tab.Navigator
+      safeAreaInsets={{ bottom: 0 }}
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarActiveTintColor: C.primary,
+        tabBarInactiveTintColor: isDark ? 'rgba(210,217,230,0.88)' : C.textMuted,
+        tabBarActiveBackgroundColor: 'transparent',
+        tabBarLabelStyle: { fontSize: FONT_SIZE.xs - 1, fontWeight: '700', marginTop: 0 },
+        tabBarIconStyle: { marginBottom: -1 },
+        tabBarItemStyle: { paddingHorizontal: 0, borderRadius: 22, marginHorizontal: 2 },
+        tabBarStyle: getFloatingTabBarStyle(isDark),
+        tabBarHideOnKeyboard: true,
+        tabBarIcon: ({ focused, color }) => {
+          const icons: Record<string, string> = {
+            OrgDashboard: focused ? 'grid' : 'grid-outline',
+            OrgRequests: focused ? 'calendar' : 'calendar-outline',
+            OrgLawyers: focused ? 'people' : 'people-outline',
+            OrgProfile: focused ? 'person' : 'person-outline',
+          };
+          return <Ionicons name={icons[route.name] as any} size={22} color={color} />;
+        },
+      })}
+    >
+      <Tab.Screen name="OrgDashboard" component={OrgDashboardScreen} options={{ title: 'Dashboard' }} />
+      <Tab.Screen name="OrgRequests" component={OrgRequestsScreen} options={{ title: 'Requests' }} />
+      <Tab.Screen name="OrgLawyers" component={OrgLawyersScreen} options={{ title: 'Lawyers' }} />
+      <Tab.Screen name="OrgProfile" component={OrgProfileScreen} options={{ title: 'Profile' }} />
+    </Tab.Navigator>
+  );
+};
+
 // ─── Role-based Main Navigator ──────────────────────────
 const getRoleTabs = (role: UserRole | string) => {
   switch (role) {
     case UserRole.LAWYER: return LawyerTabs;
     case UserRole.ADMIN: return AdminTabs;
     case UserRole.COURT_ADMIN: return CourtAdminTabs;
+    case UserRole.ORGANIZATION: return OrgTabs;
     default: return ClientTabs;
   }
 };
@@ -310,6 +356,8 @@ export const MainStack = () => {
       <Stack.Screen name="TeleLaw" component={TeleLawScreen} />
       {/* Payment History */}
       <Stack.Screen name="PaymentHistory" component={PaymentHistoryScreen} />
+      <Stack.Screen name="CallHistory" component={CallHistoryScreen} />
+      <Stack.Screen name="DocumentAi" component={DocumentAiScreen} />
       {/* Admin-only screens */}
       <Stack.Screen name="AdminPayments" component={AdminPaymentsScreen} />
       <Stack.Screen name="AdminWallets" component={AdminWalletsScreen} />
@@ -317,6 +365,12 @@ export const MainStack = () => {
       <Stack.Screen name="CourtAdminManagement" component={CourtAdminManagementScreen} />
       {/* Court Admin screens (also accessible from stack) */}
       <Stack.Screen name="LawyerVerification" component={LawyerVerificationScreen} />
+      <Stack.Screen name="OrgVerification" component={OrgVerificationScreen} />
+      {/* Organization screens */}
+      <Stack.Screen name="OrgDashboard" component={OrgDashboardScreen} />
+      <Stack.Screen name="OrgRequests" component={OrgRequestsScreen} />
+      <Stack.Screen name="OrgLawyers" component={OrgLawyersScreen} />
+      <Stack.Screen name="OrgProfile" component={OrgProfileScreen} />
       {/* Mediation screens */}
       <Stack.Screen name="Mediations" component={MediationsListScreen} />
       <Stack.Screen name="NewMediationInvite" component={NewMediationInviteScreen} />

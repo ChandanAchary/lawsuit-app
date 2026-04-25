@@ -327,9 +327,14 @@ export const CaseDetailScreen: React.FC<{ navigation: any; route: any }> = ({ na
                   <Text style={styles.docName} numberOfLines={1}>{doc.name}</Text>
                   <Text style={styles.docMeta}>{formatDate(doc.createdAt)}</Text>
                 </View>
-                <TouchableOpacity>
-                  <Ionicons name="download-outline" size={20} color={COLORS.primary} />
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: SPACING.md }}>
+                  <TouchableOpacity onPress={() => navigation.navigate('DocumentAi', { caseId, document: doc })}>
+                    <Ionicons name="flash-outline" size={20} color={COLORS.primary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity>
+                    <Ionicons name="download-outline" size={20} color={COLORS.primary} />
+                  </TouchableOpacity>
+                </View>
               </View>
             ))
           )}

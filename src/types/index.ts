@@ -4,6 +4,7 @@ export enum UserRole {
   LAWYER = 'LAWYER',
   COURT_ADMIN = 'COURT_ADMIN',
   ADMIN = 'ADMIN',
+  ORGANIZATION = 'ORGANIZATION',
 }
 
 export enum AppointmentStatus {
@@ -19,7 +20,13 @@ export enum AppointmentStatus {
 export enum CaseStatus {
   OPEN = 'OPEN',
   IN_PROGRESS = 'IN_PROGRESS',
+  PENDING_DOCUMENTS = 'PENDING_DOCUMENTS',
+  UNDER_REVIEW = 'UNDER_REVIEW',
+  HEARING_SCHEDULED = 'HEARING_SCHEDULED',
   CLOSED = 'CLOSED',
+  WON = 'WON',
+  LOST = 'LOST',
+  SETTLED = 'SETTLED',
   RESOLVED = 'RESOLVED',
   DISMISSED = 'DISMISSED',
 }
@@ -61,6 +68,31 @@ export enum NotificationType {
   DOCUMENT_UPLOADED = 'DOCUMENT_UPLOADED',
   VIDEO_CALL = 'VIDEO_CALL',
   TASK_ASSIGNED = 'TASK_ASSIGNED',
+  MEDIATION_INVITE = 'MEDIATION_INVITE',
+  MEDIATION_ACCEPTED = 'MEDIATION_ACCEPTED',
+  MEDIATION_DECLINED = 'MEDIATION_DECLINED',
+  MEDIATION_MEDIATOR_SELECTED = 'MEDIATION_MEDIATOR_SELECTED',
+  MEDIATION_SESSION_READY = 'MEDIATION_SESSION_READY',
+  MEDIATION_RESOLVED = 'MEDIATION_RESOLVED',
+  MEDIATION_ESCALATED = 'MEDIATION_ESCALATED',
+  ORGANIZATION_VERIFIED = 'ORGANIZATION_VERIFIED',
+  ORGANIZATION_REJECTED = 'ORGANIZATION_REJECTED',
+  ORG_APPOINTMENT_REQUEST_RECEIVED = 'ORG_APPOINTMENT_REQUEST_RECEIVED',
+  ORG_APPOINTMENT_REQUEST_ASSIGNED = 'ORG_APPOINTMENT_REQUEST_ASSIGNED',
+  ORG_APPOINTMENT_REQUEST_REJECTED = 'ORG_APPOINTMENT_REQUEST_REJECTED',
+}
+
+export enum CallStatus {
+  COMPLETED = 'COMPLETED',
+  MISSED = 'MISSED',
+  DECLINED = 'DECLINED',
+  FAILED = 'FAILED',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum CallType {
+  CHAT = 'CHAT',
+  APPOINTMENT = 'APPOINTMENT',
 }
 
 export enum ResolutionMethod {
@@ -147,6 +179,26 @@ export interface Case {
   updatedAt: string;
 }
 
+export interface Organization {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  type?: string;
+  registrationNumber?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  description?: string;
+  logoUrl?: string;
+  website?: string;
+  status?: string;
+  verifiedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Document {
   id: string;
   caseId: string;
@@ -156,6 +208,10 @@ export interface Document {
   mimeType: string;
   size?: number;
   uploadedBy: string;
+  extractedText?: string | null;
+  extractionStatus?: 'NOT_STARTED' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+  extractionError?: string | null;
+  summary?: string | null;
   createdAt: string;
 }
 
@@ -452,5 +508,23 @@ export interface MediatorProfile {
   languages?: string[];
   city?: string | null;
   state?: string | null;
+}
+
+export interface CallHistory {
+  id: string;
+  callType: CallType;
+  referenceId: string;
+  callerId: string;
+  callerName: string;
+  callerAvatar?: string | null;
+  calleeId: string;
+  calleeName: string;
+  calleeAvatar?: string | null;
+  status: CallStatus;
+  duration: number;
+  roomName?: string | null;
+  startedAt?: string | null;
+  endedAt?: string | null;
+  createdAt: string;
 }
 

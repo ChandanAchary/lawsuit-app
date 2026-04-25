@@ -136,6 +136,26 @@ export const CourtAdminDashboardScreen: React.FC<{ navigation: any }> = ({ navig
           </View>
         )}
       </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Verification Tools</Text>
+        <MenuItem
+          icon="business-outline"
+          label="Organization Verifications"
+          desc="Verify law firms and legal organizations"
+          COLORS={COLORS}
+          styles={styles}
+          onPress={() => navigation.navigate('OrgVerification')}
+        />
+        <MenuItem
+          icon="person-outline"
+          label="Lawyer Verifications"
+          desc="Verify individual lawyer registrations"
+          COLORS={COLORS}
+          styles={styles}
+          onPress={() => navigation.navigate('LawyerVerification', { tab: 'pending', statusFilter: 'ALL' })}
+        />
+      </View>
     </ScrollView>
   );
 };

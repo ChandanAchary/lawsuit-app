@@ -40,7 +40,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       const { data } = await dashboardApi.clientDashboard();
       const d = data?.data || data || {};
       setStats({
-        upcoming: d.upcomingAppointments ?? d.upcoming ?? 0,
+        upcoming: Array.isArray(d.upcomingAppointments) ? d.upcomingAppointments.length : (d.upcomingAppointments ?? d.upcoming ?? 0),
         activeCases: d.activeCases ?? d.openCases ?? 0,
         completed: d.completedAppointments ?? d.completed ?? 0,
         spentInr: Math.round((d.totalSpent ?? d.amountSpent ?? 0) / 100),

@@ -209,6 +209,9 @@ export const casesApi = {
     api.get(`/cases/${encodeURIComponent(caseId)}/getpresignedUrl`, { params: { fileName, mimeType } }),
   saveDocuments: (caseId: string, documents: { filename: string; url: string; mimeType: string; size?: number }[]) =>
     api.post(`/cases/${encodeURIComponent(caseId)}/saveDocuments`, { documents }),
+  extractText: (caseId: string, documentId: string) => api.post(`/cases/${encodeURIComponent(caseId)}/documents/${encodeURIComponent(documentId)}/extract`),
+  summarize: (caseId: string, documentId: string) => api.post(`/cases/${encodeURIComponent(caseId)}/documents/${encodeURIComponent(documentId)}/summarize`),
+  askQuestion: (caseId: string, documentId: string, question: string) => api.post(`/cases/${encodeURIComponent(caseId)}/documents/${encodeURIComponent(documentId)}/ask`, { question }),
   getTasks: (caseId: string) => api.get(`/cases/${encodeURIComponent(caseId)}/tasks`),
   createTask: (caseId: string, data: { title: string; description?: string; assignedToId?: string; dueDate?: string }) =>
     api.post(`/cases/${encodeURIComponent(caseId)}/tasks`, data),
@@ -462,8 +465,12 @@ export const courtAdminApi = {
       throw err;
     }
   },
-  verifyLawyer: (lawyerId: string, data: { status: string; remarks?: string }) =>
+  verifyLawyer: (lawyerId: string, data: { status: 'APPROVED' | 'REJECTED'; verificationNotes?: string; tier?: string }) =>
     api.post(`/court-admin/verify/${encodeURIComponent(lawyerId)}`, data),
+  getPendingOrganizationVerifications: () => api.get('/court-admin/organization-verifications/pending'),
+  getMyOrganizationVerifications: () => api.get('/court-admin/organization-verifications'),
+  verifyOrganization: (organizationId: string, data: { status: 'APPROVED' | 'REJECTED'; notes?: string }) =>
+    api.post(`/court-admin/verify-organization/${encodeURIComponent(organizationId)}`, data),
 };
 
 // ─── Mediation API ──────────────────────────────────────────
@@ -500,6 +507,28 @@ export const mediationApi = {
   getRoom: (id: string) => api.get(`/mediations/${encodeURIComponent(id)}/room`),
   conclude: (id: string, data: { outcome: 'RESOLVED' | 'ESCALATED_TO_CASE'; settlementTerms?: string; closureNotes?: string }) =>
     api.post(`/mediations/${encodeURIComponent(id)}/conclude`, data),
+};
+
+// ─── Organization API ──────────────────────────────────────────
+export const organizationsApi = {
+  listPublic: (params?: any) => api.get('/organizations', { params }),
+  getPublicById: (id: string) => api.get(`/organizations/${encodeURIComponent(id)}`),
+  getMine: () => api.get('/organizations/me'),
+  updateMine: (data: any) => api.put('/organizations/me', data),
+  getEligibleCourtAdmins: () => api.get('/organizations/me/eligible-court-admins'),
+  requestVerification: (data: any) => api.post('/organizations/me/verification-request', data),
+  createLawyer: (data: any) => api.post('/organizations/me/lawyers', data),
+  listLawyers: () => api.get('/organizations/me/lawyers'),
+  listOrgAppointmentRequests: () => api.get('/organizations/me/appointment-requests'),
+  assignAppointmentRequest: (id: string, data: { lawyerId: string; suggestedDate?: string }) =>
+    api.post(`/organizations/me/appointment-requests/${encodeURIComponent(id)}/assign`, data),
+  rejectAppointmentRequest: (id: string, data: { reason?: string }) =>
+    api.post(`/organizations/me/appointment-requests/${encodeURIComponent(id)}/reject`, data),
+  listClientAppointmentRequests: () => api.get('/organizations/clients/me/requests'),
+  cancelClientAppointmentRequest: (id: string) =>
+    api.post(`/organizations/clients/me/requests/${encodeURIComponent(id)}/cancel`),
+  createAppointmentRequest: (id: string, data: any) =>
+    api.post(`/organizations/${encodeURIComponent(id)}/appointment-requests`, data),
 };
 
 export default api;

@@ -233,6 +233,8 @@ export const LawyerProfileScreen: React.FC<{ navigation: any }> = ({ navigation 
             onPress={() => navigation.navigate('Wallet')} />
           <MenuItem icon="card-outline" label="Bank & UPI Accounts" subtitle="Manage withdrawal accounts"
             onPress={() => navigation.navigate('BankAccounts')} />
+          <MenuItem icon="call-outline" label="Call History" subtitle="View past video calls"
+            onPress={() => navigation.navigate('CallHistory')} />
           <MenuItem icon="shield-checkmark-outline" label="Security & Account" subtitle="Password, account deletion"
             onPress={() => navigation.navigate('Security')} last />
         </View>

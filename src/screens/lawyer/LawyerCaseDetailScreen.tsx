@@ -266,6 +266,9 @@ export const LawyerCaseDetailScreen: React.FC<{ navigation: any; route: any }> =
               <View key={d.id || i} style={styles.docItem}>
                 <Ionicons name="document-text" size={20} color={COLORS.primary} />
                 <Text style={styles.docName} numberOfLines={1}>{d.name}</Text>
+                <TouchableOpacity onPress={() => navigation.navigate('DocumentAi', { caseId, document: d })}>
+                  <Ionicons name="flash-outline" size={20} color={COLORS.primary} />
+                </TouchableOpacity>
               </View>
             ))
           }
