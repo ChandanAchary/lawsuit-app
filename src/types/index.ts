@@ -185,18 +185,53 @@ export interface Organization {
   email: string;
   phone?: string;
   type?: string;
+  avatarUrl?: string;
+  isVerified?: boolean;
+  emailVerified?: boolean;
   registrationNumber?: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  pincode?: string;
-  description?: string;
-  logoUrl?: string;
+  registrationCertUrl?: string;
+  gstNumber?: string;
+  gstProofUrl?: string;
+  panNumber?: string;
+  about?: string;
   website?: string;
+  practiceAreas?: string[];
+  consultationFee?: number;
+  country?: string;
+  state?: string;
+  district?: string;
+  city?: string;
+  pincode?: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
   status?: string;
   verifiedAt?: string;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
+  lawyers?: Lawyer[];
+}
+
+export type OrgAppointmentRequestStatus = 'PENDING' | 'ASSIGNED' | 'REJECTED' | 'CANCELLED';
+export type MeetingType = 'AUDIO_CALL' | 'VIDEO_CALL' | 'OFFICE_VISIT';
+
+export interface OrgAppointmentRequest {
+  id: string;
+  organizationId: string;
+  clientId: string;
+  assignedLawyerId?: string;
+  appointmentId?: string;
+  scheduledAt: string;
+  durationMins: number;
+  meetingType: MeetingType;
+  notes?: string;
+  status: OrgAppointmentRequestStatus;
+  rejectionReason?: string;
+  organization?: { id: string; name: string; avatarUrl?: string; consultationFee?: number; pincode?: string; city?: string; state?: string };
+  client?: { id: string; name: string; email?: string; phone?: string; avatarUrl?: string };
+  assignedLawyer?: { id: string; name: string; email?: string; avatarUrl?: string };
+  appointment?: { id: string; status: string; scheduledAt: string; paymentId?: string };
+  createdAt?: string;
 }
 
 export interface Document {

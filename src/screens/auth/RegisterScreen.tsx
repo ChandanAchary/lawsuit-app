@@ -37,8 +37,9 @@ export const RegisterScreen: React.FC<{ navigation: any; route: any }> = ({ navi
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [role, setRole] = useState<'CLIENT' | 'LAWYER'>('CLIENT');
+  const [role, setRole] = useState<'CLIENT' | 'LAWYER' | 'ORGANIZATION'>('CLIENT');
   const [referralCode, setReferralCode] = useState('');
+  const [registrationNumber, setRegistrationNumber] = useState('');
   const [showReferral, setShowReferral] = useState(false);
   const [showReferralCode, setShowReferralCode] = useState(false);
   const [password, setPassword] = useState('');
@@ -115,6 +116,7 @@ export const RegisterScreen: React.FC<{ navigation: any; route: any }> = ({ navi
         phone: phone.trim(),
         password,
         role,
+        ...(role === 'ORGANIZATION' && registrationNumber.trim() ? { registrationNumber: registrationNumber.trim() } : {}),
       });
 
       // Pass referral code to OTP screen — it will be applied after verification when auth token exists
@@ -167,7 +169,7 @@ export const RegisterScreen: React.FC<{ navigation: any; route: any }> = ({ navi
             >
               <Ionicons
                 name="person"
-                size={20}
+                size={18}
                 color={role === 'CLIENT' ? COLORS.white : COLORS.textSecondary}
               />
               <Text style={[styles.roleText, role === 'CLIENT' && styles.roleTextActive]}>
@@ -180,11 +182,24 @@ export const RegisterScreen: React.FC<{ navigation: any; route: any }> = ({ navi
             >
               <Ionicons
                 name="briefcase"
-                size={20}
+                size={18}
                 color={role === 'LAWYER' ? COLORS.white : COLORS.textSecondary}
               />
               <Text style={[styles.roleText, role === 'LAWYER' && styles.roleTextActive]}>
                 Lawyer
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.roleBtn, role === 'ORGANIZATION' && styles.roleBtnActive]}
+              onPress={() => setRole('ORGANIZATION')}
+            >
+              <Ionicons
+                name="business"
+                size={18}
+                color={role === 'ORGANIZATION' ? COLORS.white : COLORS.textSecondary}
+              />
+              <Text style={[styles.roleText, role === 'ORGANIZATION' && styles.roleTextActive]}>
+                Organization
               </Text>
             </TouchableOpacity>
           </View>
@@ -214,6 +229,16 @@ export const RegisterScreen: React.FC<{ navigation: any; route: any }> = ({ navi
               keyboardType="phone-pad"
               icon={<Ionicons name="call-outline" size={20} color={COLORS.textMuted} />}
             />
+
+            {role === 'ORGANIZATION' && (
+              <Input
+                label="Registration Number (optional)"
+                placeholder="Enter firm registration number"
+                value={registrationNumber}
+                onChangeText={setRegistrationNumber}
+                icon={<Ionicons name="document-text-outline" size={20} color={COLORS.textMuted} />}
+              />
+            )}
 
             {!showReferral ? (
               <TouchableOpacity

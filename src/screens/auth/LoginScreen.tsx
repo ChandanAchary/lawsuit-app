@@ -10,7 +10,7 @@ import { Input } from '../../components/Input';
 import { useAuthStore } from '../../stores/authStore';
 import { safeGoBack } from '../../utils/navigation';
 
-type RoleChoice = 'CLIENT' | 'LAWYER';
+type RoleChoice = 'CLIENT' | 'LAWYER' | 'ORGANIZATION';
 
 export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
@@ -94,6 +94,21 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 <Ionicons name="arrow-forward" size={20} color={COLORS.midnight} />
               </View>
             </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.roleCard}
+              activeOpacity={0.7}
+              onPress={() => setSelectedRole('ORGANIZATION')}
+            >
+              <View style={[styles.roleCardIcon, { backgroundColor: '#8B5CF6' + '12' }]}>
+                <Ionicons name="business" size={32} color="#8B5CF6" />
+              </View>
+              <Text style={styles.roleCardTitle}>Organization</Text>
+              <Text style={styles.roleCardDesc}>Manage your law firm, lawyers & clients</Text>
+              <View style={styles.roleCardArrow}>
+                <Ionicons name="arrow-forward" size={20} color="#8B5CF6" />
+              </View>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.footer}>
@@ -132,7 +147,7 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           <Text style={styles.subtitle}>
             Sign in as{' '}
             <Text style={{ fontWeight: '700', color: COLORS.primary }}>
-              {selectedRole === 'CLIENT' ? 'Client' : 'Lawyer'}
+              {selectedRole === 'CLIENT' ? 'Client' : selectedRole === 'LAWYER' ? 'Lawyer' : 'Organization'}
             </Text>
           </Text>
         </View>

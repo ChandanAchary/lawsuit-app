@@ -63,6 +63,14 @@ import { OrgDashboardScreen } from '../screens/organization/OrgDashboardScreen';
 import { OrgProfileScreen } from '../screens/organization/OrgProfileScreen';
 import { OrgLawyersScreen } from '../screens/organization/OrgLawyersScreen';
 import { OrgRequestsScreen } from '../screens/organization/OrgRequestsScreen';
+import { EditOrgProfileScreen } from '../screens/organization/EditOrgProfileScreen';
+import { OrgVerificationRequestScreen } from '../screens/organization/OrgVerificationRequestScreen';
+
+// Client Organization screens
+import { OrgListScreen } from '../screens/client/OrgListScreen';
+import { OrgDetailScreen } from '../screens/client/OrgDetailScreen';
+import { OrgBookingScreen } from '../screens/client/OrgBookingScreen';
+import { ClientOrgRequestsScreen } from '../screens/client/ClientOrgRequestsScreen';
 
 // Shared screens
 import { ChatScreen } from '../screens/shared/ChatScreen';
@@ -371,6 +379,13 @@ export const MainStack = () => {
       <Stack.Screen name="OrgRequests" component={OrgRequestsScreen} />
       <Stack.Screen name="OrgLawyers" component={OrgLawyersScreen} />
       <Stack.Screen name="OrgProfile" component={OrgProfileScreen} />
+      <Stack.Screen name="EditOrgProfile" component={EditOrgProfileScreen} />
+      <Stack.Screen name="OrgVerificationRequest" component={OrgVerificationRequestScreen} />
+      {/* Client-side Organization screens */}
+      <Stack.Screen name="OrgList" component={OrgListScreen} />
+      <Stack.Screen name="OrgDetail" component={OrgDetailScreen as ComponentType<any>} />
+      <Stack.Screen name="OrgBooking" component={OrgBookingScreen as ComponentType<any>} />
+      <Stack.Screen name="ClientOrgRequests" component={ClientOrgRequestsScreen} />
       {/* Mediation screens */}
       <Stack.Screen name="Mediations" component={MediationsListScreen} />
       <Stack.Screen name="NewMediationInvite" component={NewMediationInviteScreen} />

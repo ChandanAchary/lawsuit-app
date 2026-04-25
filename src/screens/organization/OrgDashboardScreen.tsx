@@ -30,9 +30,9 @@ export const OrgDashboardScreen: React.FC<{ navigation: any }> = ({ navigation }
 
       setOrg(orgRes.data.organization || orgRes.data);
       const lawyers = lawyersRes.data.lawyers || lawyersRes.data.items || lawyersRes.data || [];
-      setLawyerCount(lawyers.length);
+      setLawyerCount(Array.isArray(lawyers) ? lawyers.length : 0);
       const requests = requestsRes.data.requests || requestsRes.data.items || requestsRes.data || [];
-      const pendingReqs = requests.filter((r: any) => r.status === 'PENDING');
+      const pendingReqs = Array.isArray(requests) ? requests.filter((r: any) => r.status === 'PENDING') : [];
       setRequestCount(pendingReqs.length);
     } catch (err) {
       // Ignore
@@ -42,6 +42,8 @@ export const OrgDashboardScreen: React.FC<{ navigation: any }> = ({ navigation }
   useEffect(() => { fetchDashboardData(); }, []);
 
   const onRefresh = () => { setRefreshing(true); fetchDashboardData().finally(() => setRefreshing(false)); };
+
+  const isVerified = org?.isVerified === true;
 
   return (
     <ScrollView
@@ -57,7 +59,12 @@ export const OrgDashboardScreen: React.FC<{ navigation: any }> = ({ navigation }
           <Ionicons name="business" size={32} color={COLORS.accent} />
         </View>
         <Text style={styles.heroTitle}>{org?.name || 'Organization'}</Text>
-        <Text style={styles.heroSub}>{org?.status === 'APPROVED' ? 'Verified' : 'Verification Pending'}</Text>
+        <View style={styles.verificationBadge}>
+          <Ionicons name={isVerified ? 'checkmark-circle' : 'time-outline'} size={16} color={isVerified ? '#10B981' : '#FBBF24'} />
+          <Text style={[styles.heroSub, { color: isVerified ? '#A7F3D0' : '#FDE68A' }]}>
+            {isVerified ? 'Verified Organization' : 'Verification Pending'}
+          </Text>
+        </View>
       </LinearGradient>
 
       <View style={styles.statsRow}>
@@ -109,22 +116,52 @@ export const OrgDashboardScreen: React.FC<{ navigation: any }> = ({ navigation }
         />
 
         <MenuItem
-          icon="document-text-outline"
-          label="Verification Status"
-          desc="Check your firm's verification"
+          icon="create-outline"
+          label="Edit Profile"
+          desc="Update organization details"
+          COLORS={COLORS}
+          styles={styles}
+          onPress={() => navigation.navigate('EditOrgProfile')}
+        />
+
+        {!isVerified && (
+          <MenuItem
+            icon="shield-checkmark-outline"
+            label="Request Verification"
+            desc="Get verified by a court admin"
+            COLORS={COLORS}
+            styles={styles}
+            onPress={() => navigation.navigate('OrgVerificationRequest')}
+            highlight
+          />
+        )}
+
+        <MenuItem
+          icon="person-outline"
+          label="Organization Profile"
+          desc="View your complete profile"
           COLORS={COLORS}
           styles={styles}
           onPress={() => navigation.navigate('OrgProfile')}
+        />
+
+        <MenuItem
+          icon="notifications-outline"
+          label="Notifications"
+          desc="View all notifications"
+          COLORS={COLORS}
+          styles={styles}
+          onPress={() => navigation.navigate('Notifications')}
         />
       </View>
     </ScrollView>
   );
 };
 
-const MenuItem = ({ icon, label, desc, badge, onPress, COLORS, styles }: any) => (
-  <TouchableOpacity style={styles.menuItem} onPress={onPress}>
-    <View style={styles.menuIcon}>
-      <Ionicons name={icon} size={22} color={COLORS.primary} />
+const MenuItem = ({ icon, label, desc, badge, onPress, COLORS, styles, highlight }: any) => (
+  <TouchableOpacity style={[styles.menuItem, highlight && styles.menuItemHighlight]} onPress={onPress}>
+    <View style={[styles.menuIcon, highlight && { backgroundColor: COLORS.primary + '15' }]}>
+      <Ionicons name={icon} size={22} color={highlight ? COLORS.primary : COLORS.primary} />
     </View>
     <View style={styles.menuInfo}>
       <Text style={styles.menuLabel}>{label}</Text>
@@ -163,7 +200,12 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.md,
   },
   heroTitle: { fontSize: FONT_SIZE.hero, fontWeight: '900', color: COLORS.white },
-  heroSub: { fontSize: FONT_SIZE.md, color: 'rgba(255,255,255,0.7)', marginTop: SPACING.xs },
+  heroSub: { fontSize: FONT_SIZE.md, marginTop: SPACING.xs },
+  verificationBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.xs,
+    marginTop: SPACING.sm, backgroundColor: 'rgba(0,0,0,0.2)',
+    paddingHorizontal: SPACING.md, paddingVertical: 4, borderRadius: BORDER_RADIUS.full,
+  },
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -184,6 +226,9 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   menuItem: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.white,
     borderRadius: BORDER_RADIUS.xl, padding: SPACING.xl, marginBottom: SPACING.md, ...SHADOWS.sm,
+  },
+  menuItemHighlight: {
+    borderWidth: 1, borderColor: COLORS.primary + '30', backgroundColor: COLORS.primary + '04',
   },
   menuIcon: {
     width: 44, height: 44, borderRadius: 14, backgroundColor: COLORS.primaryLight + '20',

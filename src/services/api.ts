@@ -518,7 +518,7 @@ export const organizationsApi = {
   getEligibleCourtAdmins: () => api.get('/organizations/me/eligible-court-admins'),
   requestVerification: (data: any) => api.post('/organizations/me/verification-request', data),
   createLawyer: (data: any) => api.post('/organizations/me/lawyers', data),
-  listLawyers: () => api.get('/organizations/me/lawyers'),
+  listLawyers: (params?: any) => api.get('/organizations/me/lawyers', { params }),
   listOrgAppointmentRequests: () => api.get('/organizations/me/appointment-requests'),
   assignAppointmentRequest: (id: string, data: { lawyerId: string; suggestedDate?: string }) =>
     api.post(`/organizations/me/appointment-requests/${encodeURIComponent(id)}/assign`, data),
