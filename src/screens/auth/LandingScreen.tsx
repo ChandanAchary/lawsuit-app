@@ -1,6 +1,6 @@
-import {  useThemeStore , useColors } from '../../stores/themeStore';
-import React from 'react';
-import { View, Text, StyleSheet, Dimensions, StatusBar } from 'react-native';
+import { useThemeStore, useColors } from '../../stores/themeStore';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Dimensions, StatusBar, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../constants';
 import { Button } from '../../components/Button';
@@ -12,6 +12,73 @@ export const LandingScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
   const COLORS = useColors();
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
 
+  const pulseAnim1 = useRef(new Animated.Value(1)).current;
+  const pulseAnim2 = useRef(new Animated.Value(1)).current;
+  const pulseAnim3 = useRef(new Animated.Value(1)).current;
+  const floatAnim = useRef(new Animated.Value(0)).current;
+
+  // For staggered features
+  const featuresAnim = useRef([
+    new Animated.Value(0),
+    new Animated.Value(0),
+    new Animated.Value(0),
+    new Animated.Value(0),
+  ]).current;
+
+  useEffect(() => {
+    // Pulse animations for circles
+    const createPulse = (anim: Animated.Value, delay: number) => {
+      return Animated.loop(
+        Animated.sequence([
+          Animated.timing(anim, {
+            toValue: 1.1,
+            duration: 2000,
+            useNativeDriver: true,
+            delay,
+          }),
+          Animated.timing(anim, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+    };
+
+    createPulse(pulseAnim1, 0).start();
+    createPulse(pulseAnim2, 500).start();
+    createPulse(pulseAnim3, 1000).start();
+
+    // Floating animation for logo
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, {
+          toValue: -10,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(floatAnim, {
+          toValue: 0,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
+    // Staggered fade and slide for features
+    Animated.stagger(200,
+      featuresAnim.map(anim =>
+        Animated.spring(anim, {
+          toValue: 1,
+          friction: 6,
+          tension: 60,
+          useNativeDriver: true,
+        })
+      )
+    ).start();
+
+  }, []);
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
@@ -22,17 +89,17 @@ export const LandingScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
         style={styles.gradient}
       >
         {/* Decorative circles */}
-        <View style={[styles.decorCircle, styles.circle1]} />
-        <View style={[styles.decorCircle, styles.circle2]} />
-        <View style={[styles.decorCircle, styles.circle3]} />
+        <Animated.View style={[styles.decorCircle, styles.circle1, { transform: [{ scale: pulseAnim1 }] }]} />
+        <Animated.View style={[styles.decorCircle, styles.circle2, { transform: [{ scale: pulseAnim2 }] }]} />
+        <Animated.View style={[styles.decorCircle, styles.circle3, { transform: [{ scale: pulseAnim3 }] }]} />
 
         <View style={styles.content}>
           <View style={styles.logoSection}>
-            <View style={styles.logoContainer}>
+            <Animated.View style={[styles.logoContainer, { transform: [{ translateY: floatAnim }] }]}>
               <View style={styles.logoBg}>
                 <Text style={styles.logoIcon}>⚖️</Text>
               </View>
-            </View>
+            </Animated.View>
             <Text style={styles.appName}>NyayaX</Text>
             <Text style={styles.tagline}>Your Legal Companion</Text>
           </View>
@@ -44,7 +111,21 @@ export const LandingScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
               { icon: '💬', title: 'Chat & Consult', desc: 'Connect via chat or video call' },
               { icon: '📁', title: 'Track Cases', desc: 'Manage all your legal matters' },
             ].map((f, i) => (
-              <View key={i} style={styles.featureRow}>
+              <Animated.View
+                key={i}
+                style={[
+                  styles.featureRow,
+                  {
+                    opacity: featuresAnim[i],
+                    transform: [{
+                      translateY: featuresAnim[i].interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [20, 0]
+                      })
+                    }]
+                  }
+                ]}
+              >
                 <View style={styles.featureIcon}>
                   <Text style={styles.featureEmoji}>{f.icon}</Text>
                 </View>
@@ -52,7 +133,7 @@ export const LandingScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
                   <Text style={styles.featureTitle}>{f.title}</Text>
                   <Text style={styles.featureDesc}>{f.desc}</Text>
                 </View>
-              </View>
+              </Animated.View>
             ))}
           </View>
 
@@ -75,13 +156,6 @@ export const LandingScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
             <Button
               title="Court Admin Login"
               onPress={() => navigation.navigate('CourtAdminLogin')}
-              variant="ghost"
-              size="sm"
-              textStyle={styles.loginBtnText}
-            />
-            <Button
-              title="Organization Login"
-              onPress={() => navigation.navigate('Login')}
               variant="ghost"
               size="sm"
               textStyle={styles.loginBtnText}
