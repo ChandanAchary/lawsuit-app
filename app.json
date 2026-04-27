@@ -15,7 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "buildNumber": "1",
-      "bundleIdentifier": "com.chandan.NyayaX",
+      "bundleIdentifier": "com.legal.NyayaX",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "NyayaX needs your location to find lawyers near you.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "NyayaX needs your location to find lawyers near you.",
@@ -34,7 +34,7 @@
       },
       "softwareKeyboardLayoutMode": "resize",
       "predictiveBackGestureEnabled": false,
-      "package": "com.msdchandan.lawsuitapp",
+      "package": "com.legal.NyayaX",
       "permissions": [
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
