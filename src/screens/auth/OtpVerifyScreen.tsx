@@ -74,7 +74,7 @@ export const OtpVerifyScreen: React.FC<{ navigation: any; route: any }> = ({ nav
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <View style={styles.content}>

@@ -1,7 +1,7 @@
 import { useThemeStore, useColors } from '../../stores/themeStore';
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
@@ -38,6 +38,29 @@ export const OrgProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) 
   if (loading) return <Loading />;
 
   const isVerified = org?.isVerified === true;
+  const status = org?.verificationStatus || (isVerified ? 'APPROVED' : 'UNVERIFIED');
+
+  let badgeColor = '#FBBF24'; // Pending
+  let badgeText = 'Pending';
+  let badgeIcon = 'time';
+  let badgeBg = '#FEF3C7';
+
+  if (status === 'APPROVED' || isVerified) {
+    badgeColor = '#10B981';
+    badgeText = 'Verified';
+    badgeIcon = 'checkmark-circle';
+    badgeBg = '#D1FAE5';
+  } else if (status === 'REJECTED') {
+    badgeColor = '#EF4444';
+    badgeText = 'Rejected';
+    badgeIcon = 'close-circle';
+    badgeBg = '#FEE2E2';
+  } else if (status === 'UNVERIFIED') {
+    badgeColor = '#D97706';
+    badgeText = 'Not Verified';
+    badgeIcon = 'alert-circle';
+    badgeBg = '#FEF3C7';
+  }
 
   return (
     <View style={styles.container}>
@@ -64,16 +87,16 @@ export const OrgProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) 
           <Text style={styles.name}>{org?.name || 'Firm Name'}</Text>
           <Text style={styles.email}>{org?.email}</Text>
 
-          <View style={[styles.statusBadge, { backgroundColor: isVerified ? '#D1FAE5' : '#FEF3C7' }]}>
-            <Ionicons name={isVerified ? 'checkmark-circle' : 'time'} size={14} color={isVerified ? '#10B981' : '#D97706'} />
-            <Text style={[styles.statusText, { color: isVerified ? '#10B981' : '#D97706' }]}>
-              {isVerified ? 'Verified' : 'Not Verified'}
+          <View style={[styles.statusBadge, { backgroundColor: badgeBg }]}>
+            <Ionicons name={badgeIcon as any} size={14} color={badgeColor} />
+            <Text style={[styles.statusText, { color: badgeColor }]}>
+              {badgeText}
             </Text>
           </View>
         </View>
 
         {/* Verification Action */}
-        {!isVerified && (
+        {status === 'UNVERIFIED' && (
           <TouchableOpacity
             style={styles.verificationCard}
             onPress={() => navigation.navigate('OrgVerificationRequest')}
@@ -87,6 +110,18 @@ export const OrgProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) 
             </View>
             <Ionicons name="chevron-forward" size={20} color={COLORS.primary} />
           </TouchableOpacity>
+        )}
+
+        {status === 'PENDING' && (
+          <View style={[styles.verificationCard, { backgroundColor: '#FEF3C7', borderColor: '#F59E0B' }]}>
+            <View style={[styles.verificationIcon, { backgroundColor: '#FDE68A' }]}>
+              <Ionicons name="time" size={24} color="#D97706" />
+            </View>
+            <View style={styles.verificationInfo}>
+              <Text style={[styles.verificationTitle, { color: '#D97706' }]}>Verification Pending</Text>
+              <Text style={[styles.verificationDesc, { color: '#B45309' }]}>Your verification request is currently under review by a court admin.</Text>
+            </View>
+          </View>
         )}
 
         {/* About Section */}
@@ -153,7 +188,12 @@ export const OrgProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) 
           <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
+        <TouchableOpacity style={styles.logoutBtn} onPress={() => {
+          Alert.alert('Log Out', 'Are you sure you want to log out?', [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Log Out', style: 'destructive', onPress: () => logout() },
+          ]);
+        }}>
           <Ionicons name="log-out-outline" size={20} color={COLORS.error} />
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>

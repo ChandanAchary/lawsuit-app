@@ -44,11 +44,17 @@ export const OrgLawyersScreen: React.FC<{ navigation: any }> = ({ navigation }) 
   const [experienceYears, setExperienceYears] = useState('');
   const [adding, setAdding] = useState(false);
 
+  const [org, setOrg] = useState<any>(null);
+
   const fetchLawyers = async (showLoader = true) => {
     if (showLoader) setLoading(true);
     try {
-      const { data } = await organizationsApi.listLawyers();
-      setLawyers(data.lawyers || data.items || data || []);
+      const [lawyersRes, orgRes] = await Promise.all([
+        organizationsApi.listLawyers(),
+        organizationsApi.getMine(),
+      ]);
+      setLawyers(lawyersRes.data.lawyers || lawyersRes.data.items || lawyersRes.data || []);
+      setOrg(orgRes.data.organization || orgRes.data);
     } catch {
       // ignore
     } finally {
@@ -72,6 +78,15 @@ export const OrgLawyersScreen: React.FC<{ navigation: any }> = ({ navigation }) 
     );
   };
 
+  const handleAddPress = () => {
+    const isVerified = org?.isVerified === true || org?.verificationStatus === 'APPROVED';
+    if (!isVerified) {
+      Alert.alert('Verification Required', 'Your organization must be verified by a Court Admin before you can add lawyers.');
+      return;
+    }
+    setShowAdd(true);
+  };
+
   const handleAddLawyer = async () => {
     if (!name.trim() || !email.trim()) return Alert.alert('Required', 'Name and email are required');
     if (!password || password.length < 8) return Alert.alert('Required', 'Password must be at least 8 characters');
@@ -86,7 +101,7 @@ export const OrgLawyersScreen: React.FC<{ navigation: any }> = ({ navigation }) 
       if (licenseNumber.trim()) payload.licenseNumber = licenseNumber.trim();
       if (barCouncilId.trim()) payload.barCouncilId = barCouncilId.trim();
       if (specializations.length > 0) payload.specializations = specializations;
-      if (feePerConsultation) payload.feePerConsultation = parseInt(feePerConsultation, 10);
+      if (feePerConsultation) payload.feePerConsultation = parseInt(feePerConsultation, 10) * 100;
       if (pincode.trim()) payload.pincode = pincode.trim();
       if (city.trim()) payload.city = city.trim();
       if (state.trim()) payload.state = state.trim();
@@ -149,7 +164,7 @@ export const OrgLawyersScreen: React.FC<{ navigation: any }> = ({ navigation }) 
             <Text style={styles.metaText}>📅 {item.experienceYears} yrs</Text>
           )}
           {item.feePerConsultation != null && (
-            <Text style={styles.metaText}>💰 ₹{item.feePerConsultation}</Text>
+            <Text style={styles.metaText}>💰 ₹{Math.round(item.feePerConsultation / 100)}</Text>
           )}
           {item.rating != null && item.rating > 0 && (
             <Text style={styles.metaText}>⭐ {item.rating.toFixed(1)}</Text>
@@ -167,7 +182,7 @@ export const OrgLawyersScreen: React.FC<{ navigation: any }> = ({ navigation }) 
           <Ionicons name="arrow-back" size={22} color={COLORS.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Team Lawyers</Text>
-        <TouchableOpacity style={styles.addBtn} onPress={() => setShowAdd(true)}>
+        <TouchableOpacity style={styles.addBtn} onPress={handleAddPress}>
           <Ionicons name="add" size={20} color={COLORS.white} />
         </TouchableOpacity>
       </View>
@@ -185,7 +200,7 @@ export const OrgLawyersScreen: React.FC<{ navigation: any }> = ({ navigation }) 
 
       {/* Add Lawyer Modal */}
       <Modal visible={showAdd} transparent animationType="slide" onRequestClose={() => setShowAdd(false)}>
-        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Add Lawyer</Text>

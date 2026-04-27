@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
-import { courtAdminApi } from '../../services/api';
+import { courtAdminApi, lawyersApi } from '../../services/api';
 import { TabBar } from '../../components/TabBar';
 import { Loading, EmptyState } from '../../components/Common';
 import { Button } from '../../components/Button';
@@ -33,6 +33,27 @@ export const OrgVerificationScreen: React.FC<{ navigation: any }> = ({ navigatio
   const [actionType, setActionType] = useState<'APPROVED' | 'REJECTED' | null>(null);
   const [remarks, setRemarks] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Lawyers modal
+  const [orgLawyers, setOrgLawyers] = useState<any[]>([]);
+  const [showLawyersModal, setShowLawyersModal] = useState(false);
+  const [loadingLawyers, setLoadingLawyers] = useState(false);
+
+  const fetchLawyersForOrg = async (orgId: string) => {
+    setLoadingLawyers(true);
+    setShowLawyersModal(true);
+    try {
+      const { data } = await lawyersApi.getAll({ organizationId: orgId });
+      let fetchedLawyers = data.lawyers || data.items || data || [];
+      // Client-side filter to ensure we only show lawyers for this org
+      fetchedLawyers = fetchedLawyers.filter((l: any) => l.organizationId === orgId);
+      setOrgLawyers(fetchedLawyers);
+    } catch {
+      setOrgLawyers([]);
+    } finally {
+      setLoadingLawyers(false);
+    }
+  };
 
   const getErrorMessage = (err: any, fallback: string) => {
     const raw = err?.response?.data?.error ?? err?.message;
@@ -286,7 +307,72 @@ export const OrgVerificationScreen: React.FC<{ navigation: any }> = ({ navigatio
               {renderDetailRow('Status', selectedDetails?.status)}
               {renderDetailRow('Verified On', selectedDetails?.verifiedAt ? formatDate(selectedDetails?.verifiedAt) : undefined)}
               {renderDetailRow('Remarks', selectedDetails?.remarks)}
+
+              {String(selectedDetails?.status || '').toUpperCase() === 'APPROVED' && orgData?.id && (
+                <Button 
+                  title="View Organization Lawyers" 
+                  onPress={() => {
+                    setSelectedDetails(null);
+                    fetchLawyersForOrg(orgData.id);
+                  }} 
+                  style={{ marginTop: SPACING.xl }} 
+                />
+              )}
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Lawyers List Modal */}
+      <Modal visible={showLawyersModal} transparent animationType="slide" onRequestClose={() => setShowLawyersModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: '90%' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Organization Lawyers</Text>
+              <TouchableOpacity onPress={() => setShowLawyersModal(false)}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+
+            {loadingLawyers ? (
+              <View style={{ padding: SPACING.xxxl }}><Loading /></View>
+            ) : (
+              <FlatList
+                data={orgLawyers}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={{ padding: SPACING.xl, paddingBottom: SPACING.xxl }}
+                renderItem={({ item }) => (
+                  <View style={styles.lawyerCard}>
+                    <View style={styles.lawyerHeader}>
+                      <View style={styles.lawyerAvatar}>
+                        {item.avatarUrl ? (
+                          <Image source={{ uri: item.avatarUrl }} style={styles.avatarImage} />
+                        ) : (
+                          <Ionicons name="person" size={20} color={COLORS.primary} />
+                        )}
+                      </View>
+                      <View style={styles.lawyerInfo}>
+                        <Text style={styles.lawyerName}>{item.name}</Text>
+                        <Text style={styles.lawyerEmail}>{item.email}</Text>
+                      </View>
+                      {item.isVerified && (
+                        <View style={[styles.badge, { backgroundColor: '#D1FAE5' }]}>
+                          <Text style={[styles.badgeText, { color: '#10B981' }]}>Verified</Text>
+                        </View>
+                      )}
+                    </View>
+                    <View style={styles.lawyerDetails}>
+                      {item.licenseNumber && <Text style={styles.lawyerText}>License: {item.licenseNumber}</Text>}
+                      {item.barCouncilId && <Text style={styles.lawyerText}>Bar Council: {item.barCouncilId}</Text>}
+                      {item.phone && <Text style={styles.lawyerText}>Phone: {item.phone}</Text>}
+                    </View>
+                  </View>
+                )}
+                ListEmptyComponent={
+                  <EmptyState icon="👥" title="No Lawyers Found" message="This organization hasn't added any lawyers yet." />
+                }
+              />
+            )}
           </View>
         </View>
       </Modal>
@@ -380,4 +466,15 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md,
     fontSize: FONT_SIZE.md, color: COLORS.text, marginBottom: SPACING.lg,
   },
+  lawyerCard: {
+    backgroundColor: COLORS.white, borderRadius: BORDER_RADIUS.xl, padding: SPACING.lg,
+    marginBottom: SPACING.md, ...SHADOWS.sm, borderWidth: 1, borderColor: COLORS.borderLight,
+  },
+  lawyerHeader: { flexDirection: 'row', alignItems: 'center' },
+  lawyerAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#E0E7FF', alignItems: 'center', justifyContent: 'center' },
+  lawyerInfo: { flex: 1, marginLeft: SPACING.md },
+  lawyerName: { fontSize: FONT_SIZE.sm, fontWeight: '700', color: COLORS.text },
+  lawyerEmail: { fontSize: FONT_SIZE.xs, color: COLORS.textSecondary, marginTop: 2 },
+  lawyerDetails: { marginTop: SPACING.sm, paddingTop: SPACING.sm, borderTopWidth: 1, borderTopColor: COLORS.borderLight },
+  lawyerText: { fontSize: FONT_SIZE.xs, color: COLORS.textSecondary, marginBottom: 2 },
 });

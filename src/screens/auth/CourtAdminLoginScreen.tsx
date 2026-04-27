@@ -57,7 +57,7 @@ export const CourtAdminLoginScreen: React.FC<{ navigation: any }> = ({ navigatio
   };
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <LinearGradient colors={[COLORS.primaryDark, COLORS.primary]} style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => safeGoBack(navigation, 'Landing')}>
           <Ionicons name="arrow-back" size={22} color={COLORS.white} />

@@ -133,7 +133,7 @@ export const RegisterScreen: React.FC<{ navigation: any; route: any }> = ({ navi
     return (
       <KeyboardAvoidingView
         style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
         <ScrollView
@@ -297,7 +297,7 @@ export const RegisterScreen: React.FC<{ navigation: any; route: any }> = ({ navi
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <ScrollView

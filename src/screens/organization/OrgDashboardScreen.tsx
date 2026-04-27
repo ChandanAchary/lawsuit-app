@@ -44,6 +44,29 @@ export const OrgDashboardScreen: React.FC<{ navigation: any }> = ({ navigation }
   const onRefresh = () => { setRefreshing(true); fetchDashboardData().finally(() => setRefreshing(false)); };
 
   const isVerified = org?.isVerified === true;
+  const status = org?.verificationStatus || (isVerified ? 'APPROVED' : 'UNVERIFIED');
+
+  let badgeColor = '#FBBF24'; // Pending
+  let badgeText = 'Verification Pending';
+  let badgeIcon = 'time-outline';
+  let textColor = '#FDE68A';
+
+  if (status === 'APPROVED' || isVerified) {
+    badgeColor = '#10B981';
+    badgeText = 'Verified Organization';
+    badgeIcon = 'checkmark-circle';
+    textColor = '#A7F3D0';
+  } else if (status === 'REJECTED') {
+    badgeColor = '#EF4444';
+    badgeText = 'Verification Rejected';
+    badgeIcon = 'close-circle';
+    textColor = '#FECACA';
+  } else if (status === 'UNVERIFIED') {
+    badgeColor = '#9CA3AF';
+    badgeText = 'Not Verified';
+    badgeIcon = 'alert-circle-outline';
+    textColor = '#E5E7EB';
+  }
 
   return (
     <ScrollView
@@ -60,9 +83,9 @@ export const OrgDashboardScreen: React.FC<{ navigation: any }> = ({ navigation }
         </View>
         <Text style={styles.heroTitle}>{org?.name || 'Organization'}</Text>
         <View style={styles.verificationBadge}>
-          <Ionicons name={isVerified ? 'checkmark-circle' : 'time-outline'} size={16} color={isVerified ? '#10B981' : '#FBBF24'} />
-          <Text style={[styles.heroSub, { color: isVerified ? '#A7F3D0' : '#FDE68A' }]}>
-            {isVerified ? 'Verified Organization' : 'Verification Pending'}
+          <Ionicons name={badgeIcon as any} size={16} color={badgeColor} />
+          <Text style={[styles.heroSub, { color: textColor }]}>
+            {badgeText}
           </Text>
         </View>
       </LinearGradient>
@@ -124,7 +147,7 @@ export const OrgDashboardScreen: React.FC<{ navigation: any }> = ({ navigation }
           onPress={() => navigation.navigate('EditOrgProfile')}
         />
 
-        {!isVerified && (
+        {status !== 'APPROVED' && status !== 'PENDING' && (
           <MenuItem
             icon="shield-checkmark-outline"
             label="Request Verification"

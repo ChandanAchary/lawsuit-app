@@ -16,6 +16,7 @@ export const CourtAdminDashboardScreen: React.FC<{ navigation: any }> = ({ navig
 
   const user = useAuthStore((s) => s.user);
   const [pendingCount, setPendingCount] = useState(0);
+  const [pendingOrgCount, setPendingOrgCount] = useState(0);
   const [approvedCount, setApprovedCount] = useState(0);
   const [rejectedCount, setRejectedCount] = useState(0);
   const [pendingItems, setPendingItems] = useState<any[]>([]);
@@ -23,15 +24,20 @@ export const CourtAdminDashboardScreen: React.FC<{ navigation: any }> = ({ navig
 
   const fetchDashboardStats = useCallback(async () => {
     try {
-      const [pendingRes, historyRes] = await Promise.all([
+      const [pendingRes, historyRes, pendingOrgRes] = await Promise.all([
         courtAdminApi.getPendingVerifications(),
         courtAdminApi.getMyVerifications({ page: 1, limit: 500 }),
+        courtAdminApi.getPendingOrganizationVerifications(),
       ]);
 
       const pendingItemsRaw = pendingRes.data.items || pendingRes.data.lawyers || pendingRes.data || [];
       const pendingArr = Array.isArray(pendingItemsRaw) ? pendingItemsRaw : [];
       setPendingItems(pendingArr);
       setPendingCount(pendingArr.length);
+
+      const pendingOrgItemsRaw = pendingOrgRes.data.items || pendingOrgRes.data.organizations || pendingOrgRes.data || [];
+      const pendingOrgArr = Array.isArray(pendingOrgItemsRaw) ? pendingOrgItemsRaw : [];
+      setPendingOrgCount(pendingOrgArr.length);
 
       const historyRows = historyRes.data.verifications || historyRes.data.items || historyRes.data || [];
       const historyArr = Array.isArray(historyRows) ? historyRows : [];
@@ -43,6 +49,7 @@ export const CourtAdminDashboardScreen: React.FC<{ navigation: any }> = ({ navig
     } catch {
       setPendingItems([]);
       setPendingCount(0);
+      setPendingOrgCount(0);
       setApprovedCount(0);
       setRejectedCount(0);
     }
@@ -79,7 +86,19 @@ export const CourtAdminDashboardScreen: React.FC<{ navigation: any }> = ({ navig
             <Ionicons name="hourglass" size={24} color="#F59E0B" />
           </View>
           <Text style={styles.statValue}>{pendingCount}</Text>
-          <Text style={styles.statLabel}>Pending Requests</Text>
+          <Text style={styles.statLabel}>Pending Lawyers</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={styles.statCard}
+          onPress={() => navigation.navigate('OrgVerification')}
+        >
+          <View style={[styles.statIcon, { backgroundColor: '#E0E7FF' }]}>
+            <Ionicons name="business" size={24} color="#6366F1" />
+          </View>
+          <Text style={styles.statValue}>{pendingOrgCount}</Text>
+          <Text style={styles.statLabel}>Pending Orgs</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -205,15 +224,17 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   heroSub: { fontSize: FONT_SIZE.md, color: 'rgba(255,255,255,0.7)', marginTop: SPACING.xs },
   statsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     marginHorizontal: SPACING.xl, marginTop: -SPACING.xxl,
     gap: SPACING.sm,
   },
   statCard: {
-    flex: 1,
+    width: '48%',
     alignItems: 'center',
     backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS.xl, padding: SPACING.xl, ...SHADOWS.md,
+    borderRadius: BORDER_RADIUS.xl, padding: SPACING.lg, ...SHADOWS.md,
+    marginBottom: SPACING.sm,
   },
   statIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.sm },
   statValue: { fontSize: FONT_SIZE.xxl, fontWeight: '900', color: COLORS.text },

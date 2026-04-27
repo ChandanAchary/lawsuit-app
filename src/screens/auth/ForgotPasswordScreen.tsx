@@ -131,7 +131,7 @@ export const ForgotPasswordScreen: React.FC<{ navigation: any }> = ({ navigation
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <StatusBar barStyle="dark-content" />
       <ScrollView

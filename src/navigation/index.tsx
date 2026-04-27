@@ -269,6 +269,7 @@ const CourtAdminTabs = () => {
           const icons: Record<string, string> = {
             CourtAdminDashboard: focused ? 'shield-checkmark' : 'shield-checkmark-outline',
             LawyerVerification: focused ? 'checkmark-done-circle' : 'checkmark-done-circle-outline',
+            OrgVerification: focused ? 'business' : 'business-outline',
             CourtAdminProfile: focused ? 'person' : 'person-outline',
           };
           return <Ionicons name={icons[route.name] as any} size={22} color={color} />;
@@ -276,7 +277,8 @@ const CourtAdminTabs = () => {
       })}
     >
       <Tab.Screen name="CourtAdminDashboard" component={CourtAdminDashboardScreen} options={{ title: 'Dashboard' }} />
-      <Tab.Screen name="LawyerVerification" component={LawyerVerificationScreen} options={{ title: 'Verifications' }} />
+      <Tab.Screen name="LawyerVerification" component={LawyerVerificationScreen} options={{ title: 'Lawyers' }} />
+      <Tab.Screen name="OrgVerification" component={OrgVerificationScreen} options={{ title: 'Orgs' }} />
       <Tab.Screen name="CourtAdminProfile" component={CourtAdminProfileScreen} options={{ title: 'Profile' }} />
     </Tab.Navigator>
   );
