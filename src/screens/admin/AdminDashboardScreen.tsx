@@ -62,6 +62,9 @@ export const AdminDashboardScreen: React.FC<{ navigation: any }> = ({ navigation
         <MenuItem icon="wallet-outline" label="Wallet Management" desc="Credit, debit & withdrawals" onPress={() => navigation.navigate('AdminWallets')} COLORS={COLORS} styles={styles} />
         <MenuItem icon="business-outline" label="Court Management" desc="Manage courts" onPress={() => navigation.navigate('CourtManagement')} COLORS={COLORS} styles={styles} />
         <MenuItem icon="shield-outline" label="Court Admins" desc="Manage court administrators" onPress={() => navigation.navigate('CourtAdminManagement')} COLORS={COLORS} styles={styles} />
+        {user?.level === 'SUPER_ADMIN' && (
+          <MenuItem icon="people-circle-outline" label="Admin Team" desc="Invite, edit & deactivate admins" onPress={() => navigation.navigate('AdminTeam')} COLORS={COLORS} styles={styles} />
+        )}
         <MenuItem icon="notifications-outline" label="Notifications" desc="System notifications" onPress={() => navigation.navigate('Notifications')} COLORS={COLORS} styles={styles} />
       </View>
     </ScrollView>
