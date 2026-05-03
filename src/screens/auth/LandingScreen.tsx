@@ -160,6 +160,13 @@ export const LandingScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
               size="sm"
               textStyle={styles.loginBtnText}
             />
+            <Button
+              title="Admin / Super Admin Login"
+              onPress={() => navigation.navigate('AdminLogin')}
+              variant="ghost"
+              size="sm"
+              textStyle={styles.loginBtnText}
+            />
           </View>
         </View>
       </LinearGradient>

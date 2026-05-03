@@ -1,7 +1,7 @@
 import {  useThemeStore , useColors } from '../../stores/themeStore';
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, StatusBar, Alert,
+  View, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, StatusBar, Alert, TouchableOpacity,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../constants';
@@ -9,6 +9,7 @@ import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { useAuthStore } from '../../stores/authStore';
 import { formatErrorMessage } from '../../utils/formatError';
+import { safeGoBack } from '../../utils/navigation';
 
 export const AdminLoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
@@ -39,12 +40,15 @@ export const AdminLoginScreen: React.FC<{ navigation: any }> = ({ navigation }) 
     >
       <StatusBar barStyle="dark-content" />
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        <TouchableOpacity style={styles.backBtn} onPress={() => safeGoBack(navigation, 'Landing')}>
+          <Ionicons name="arrow-back" size={22} color={COLORS.text} />
+        </TouchableOpacity>
         <View style={styles.headerSection}>
           <View style={styles.iconBg}>
             <Ionicons name="shield" size={36} color={COLORS.primary} />
           </View>
           <Text style={styles.title}>Admin Portal</Text>
-          <Text style={styles.subtitle}>Access the management dashboard</Text>
+          <Text style={styles.subtitle}>Sign in as Admin or Super Admin</Text>
         </View>
 
         <View style={styles.form}>
@@ -79,6 +83,17 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: SPACING.xxl,
     paddingBottom: SPACING.xxxl,
+  },
+  backBtn: {
+    position: 'absolute',
+    top: SPACING.huge,
+    left: SPACING.xxl,
+    width: 40,
+    height: 40,
+    borderRadius: BORDER_RADIUS.lg,
+    backgroundColor: COLORS.surfaceAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerSection: { alignItems: 'center', marginBottom: SPACING.xxxl },
   iconBg: {
