@@ -107,6 +107,11 @@ export enum VerificationStatus {
   REJECTED = 'REJECTED',
 }
 
+export enum AdminLevel {
+  SUPER_ADMIN = 'SUPER_ADMIN',
+  ADMIN = 'ADMIN',
+}
+
 // ─── Interfaces ─────────────────────────────────────────────
 export interface User {
   id: string;
@@ -115,11 +120,37 @@ export interface User {
   phone?: string;
   role: UserRole;
   avatar?: string;
+  avatarUrl?: string;
   isVerified?: boolean;
   isEmailVerified?: boolean;
   isPhoneVerified?: boolean;
+  // Admin-only: SUPER_ADMIN can manage the admin team via /admin/admins.
+  level?: AdminLevel | string;
+  // True until LAWYER (org-onboarded) or ADMIN (super-admin-invited) rotates
+  // their server-generated temp password via POST /auth/change-password.
+  // While true, every endpoint except /auth/me, /auth/change-password,
+  // /auth/refresh, /auth/logout returns 403 (mustChangePasswordGuard).
+  mustChangePassword?: boolean;
+  // Admin soft-delete flag.
+  isActive?: boolean;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface AdminTeamMember {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  avatarUrl?: string | null;
+  level: AdminLevel | 'SUPER_ADMIN' | 'ADMIN';
+  isActive: boolean;
+  mustChangePassword: boolean;
+  passwordChangedAt?: string | null;
+  createdById?: string | null;
+  createdBy?: { id: string; name: string; email: string } | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Lawyer {

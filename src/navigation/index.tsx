@@ -17,6 +17,7 @@ import { OtpVerifyScreen } from '../screens/auth/OtpVerifyScreen';
 import { ForgotPasswordScreen } from '../screens/auth/ForgotPasswordScreen';
 import { AdminLoginScreen } from '../screens/auth/AdminLoginScreen';
 import { CourtAdminRegisterScreen } from '../screens/auth/CourtAdminRegisterScreen';
+import { ChangePasswordScreen } from '../screens/auth/ChangePasswordScreen';
 
 // Client screens
 import { HomeScreen } from '../screens/client/HomeScreen';
@@ -50,6 +51,7 @@ import { AdminPaymentsScreen } from '../screens/admin/AdminPaymentsScreen';
 import { AdminWalletsScreen } from '../screens/admin/AdminWalletsScreen';
 import { CourtManagementScreen } from '../screens/admin/CourtManagementScreen';
 import { CourtAdminManagementScreen } from '../screens/admin/CourtAdminManagementScreen';
+import { AdminTeamScreen } from '../screens/admin/AdminTeamScreen';
 
 // Court Admin screens
 import { CourtAdminDashboardScreen } from '../screens/courtAdmin/CourtAdminDashboardScreen';
@@ -331,13 +333,29 @@ const getRoleTabs = (role: UserRole | string) => {
   }
 };
 
+// Wrapper so ChangePasswordScreen can render in forced mode without nav props.
+const ForcedChangePasswordScreen = () => <ChangePasswordScreen forced />;
+
 export const MainStack = () => {
-  const role = useAuthStore((s) => s.user?.role) || UserRole.CLIENT;
+  const user = useAuthStore((s) => s.user);
+  const role = user?.role || UserRole.CLIENT;
   const RoleTabs = getRoleTabs(role);
+
+  // Server-side mustChangePasswordGuard returns 403 on every endpoint until
+  // an org-onboarded lawyer or super-admin-invited admin rotates their temp
+  // password. Force the change-password screen as the only entry point.
+  if (user?.mustChangePassword) {
+    return (
+      <Stack.Navigator screenOptions={{ headerShown: false, gestureEnabled: false, animation: 'fade' }}>
+        <Stack.Screen name="ForceChangePassword" component={ForcedChangePasswordScreen} />
+      </Stack.Navigator>
+    );
+  }
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
       <Stack.Screen name="MainTabs" component={RoleTabs} />
+      <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
       {/* Shared screens accessible to all roles */}
       <Stack.Screen name="LawyerDetail" component={LawyerDetailScreen} />
       <Stack.Screen name="CaseDetail" component={CaseDetailScreen} />
@@ -373,6 +391,7 @@ export const MainStack = () => {
       <Stack.Screen name="AdminWallets" component={AdminWalletsScreen} />
       <Stack.Screen name="CourtManagement" component={CourtManagementScreen} />
       <Stack.Screen name="CourtAdminManagement" component={CourtAdminManagementScreen} />
+      <Stack.Screen name="AdminTeam" component={AdminTeamScreen} />
       {/* Court Admin screens (also accessible from stack) */}
       <Stack.Screen name="LawyerVerification" component={LawyerVerificationScreen} />
       <Stack.Screen name="OrgVerification" component={OrgVerificationScreen} />

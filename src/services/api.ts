@@ -144,6 +144,11 @@ export const authApi = {
   getMe: () => api.get('/auth/me'),
   restorePassword: (identifier: string, code: string, password: string) =>
     api.put('/auth/restore-password', { identifier, code, password }),
+  // Required for org-onboarded lawyers and super-admin-invited admins on first
+  // login. Server-side mustChangePasswordGuard returns 403 on all other routes
+  // until this clears.
+  changePassword: (currentPassword: string, newPassword: string) =>
+    api.post('/auth/change-password', { currentPassword, newPassword }),
   logout: () => api.post('/auth/logout'),
 };
 
@@ -328,6 +333,22 @@ export const adminApi = {
   getNotVerifiedLawyers: () => api.get('/admin/not-verified-lawyers'),
   verifyLawyer: (id: string) => api.put(`/admin/${encodeURIComponent(id)}/verifylawyer`),
   verifyClient: (id: string) => api.put(`/admin/${encodeURIComponent(id)}/verifyclient`),
+};
+
+// ─── Admin Management API (SUPER_ADMIN only) ───────────────
+// Phase 1 super-admin: manage the admin team. Server enforces SUPER_ADMIN
+// level via requireAdminLevel middleware; the FE hides the entry point.
+export const adminManagementApi = {
+  list: (params?: { level?: 'SUPER_ADMIN' | 'ADMIN'; isActive?: boolean; page?: number; limit?: number }) =>
+    api.get('/admin/admins', { params }),
+  getById: (id: string) => api.get(`/admin/admins/${encodeURIComponent(id)}`),
+  create: (data: { name: string; email: string; phone: string; level: 'SUPER_ADMIN' | 'ADMIN' }) =>
+    api.post('/admin/admins', data),
+  update: (
+    id: string,
+    data: Partial<{ name: string; phone: string; avatarUrl: string | null; level: 'SUPER_ADMIN' | 'ADMIN'; isActive: boolean }>,
+  ) => api.put(`/admin/admins/${encodeURIComponent(id)}`, data),
+  delete: (id: string) => api.delete(`/admin/admins/${encodeURIComponent(id)}`),
 };
 
 // ─── Storage API ────────────────────────────────────────────
