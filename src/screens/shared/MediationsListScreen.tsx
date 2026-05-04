@@ -6,6 +6,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { mediationApi } from '../../services/api';
+import { socketService } from '../../services/socket';
 import { TabBar } from '../../components/TabBar';
 import { Loading, EmptyState } from '../../components/Common';
 import { useAuthStore } from '../../stores/authStore';
@@ -60,6 +61,16 @@ export const MediationsListScreen: React.FC<{ navigation: any }> = ({ navigation
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Auto-refresh on server-side mediation state changes. Server emits to every
+  // participant's `user:${id}` room so this reaches both initiator/respondent
+  // sides without requiring a per-mediation join.
+  useEffect(() => {
+    const off = socketService.on('mediation:updated', () => {
+      if (!unavailable) load(false);
+    });
+    return off;
+  }, [load, unavailable]);
 
   const CONCLUDED = new Set(['RESOLVED', 'ESCALATED_TO_CASE', 'CANCELLED']);
   const filtered = items.filter((m) => tab === 'active' ? !CONCLUDED.has(m.status) : CONCLUDED.has(m.status));
