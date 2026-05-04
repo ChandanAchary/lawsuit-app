@@ -52,8 +52,8 @@ import { AdminWalletsScreen } from '../screens/admin/AdminWalletsScreen';
 import { CourtManagementScreen } from '../screens/admin/CourtManagementScreen';
 import { CourtAdminManagementScreen } from '../screens/admin/CourtAdminManagementScreen';
 import { AdminTeamScreen } from '../screens/admin/AdminTeamScreen';
+import { AdminPayoutsScreen } from '../screens/admin/AdminPayoutsScreen';
 import { AdminProfileScreen } from '../screens/admin/AdminProfileScreen';
-import { EditAdminProfileScreen } from '../screens/admin/EditAdminProfileScreen';
 
 // Court Admin screens
 import { CourtAdminDashboardScreen } from '../screens/courtAdmin/CourtAdminDashboardScreen';
@@ -401,6 +401,7 @@ export const MainStack = () => {
       <Stack.Screen name="CourtManagement" component={CourtManagementScreen} />
       <Stack.Screen name="CourtAdminManagement" component={CourtAdminManagementScreen} />
       <Stack.Screen name="AdminTeam" component={AdminTeamScreen} />
+      <Stack.Screen name="AdminPayouts" component={AdminPayoutsScreen} />
       {/* Court Admin screens (also accessible from stack) */}
       <Stack.Screen name="LawyerVerification" component={LawyerVerificationScreen} />
       <Stack.Screen name="OrgVerification" component={OrgVerificationScreen} />

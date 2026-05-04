@@ -351,6 +351,25 @@ export const adminManagementApi = {
   delete: (id: string) => api.delete(`/admin/admins/${encodeURIComponent(id)}`),
 };
 
+// ─── Booking Payouts API (SUPER_ADMIN only) ────────────────
+// Booking fees are received into the platform (super admin) wallet first
+// and then disbursed to the beneficiary lawyer / organization. Server
+// enforces SUPER_ADMIN level via requireAdminLevel middleware.
+export type PayoutStatus = 'HELD_BY_PLATFORM' | 'PAYABLE' | 'PAID_OUT' | 'REFUNDED';
+export type BeneficiaryType = 'LAWYER' | 'ORGANIZATION';
+
+export const payoutsApi = {
+  list: (params?: {
+    payoutStatus?: PayoutStatus;
+    beneficiaryType?: BeneficiaryType;
+    page?: number;
+    limit?: number;
+  }) => api.get('/admin/payouts', { params }),
+  summary: () => api.get('/admin/payouts/summary'),
+  disburse: (paymentId: string) =>
+    api.post(`/admin/payouts/${encodeURIComponent(paymentId)}/disburse`),
+};
+
 // ─── Storage API ────────────────────────────────────────────
 export const storageApi = {
   getPresignedUrl: (fileName: string, mimeType: string) =>
