@@ -52,6 +52,8 @@ import { AdminWalletsScreen } from '../screens/admin/AdminWalletsScreen';
 import { CourtManagementScreen } from '../screens/admin/CourtManagementScreen';
 import { CourtAdminManagementScreen } from '../screens/admin/CourtAdminManagementScreen';
 import { AdminTeamScreen } from '../screens/admin/AdminTeamScreen';
+import { AdminProfileScreen } from '../screens/admin/AdminProfileScreen';
+import { EditAdminProfileScreen } from '../screens/admin/EditAdminProfileScreen';
 
 // Court Admin screens
 import { CourtAdminDashboardScreen } from '../screens/courtAdmin/CourtAdminDashboardScreen';
@@ -239,6 +241,7 @@ const AdminTabs = () => {
           const icons: Record<string, string> = {
             AdminDashboard: focused ? 'shield-checkmark' : 'shield-checkmark-outline',
             AdminUsers: focused ? 'people' : 'people-outline',
+            AdminProfile: focused ? 'person' : 'person-outline',
           };
           return <Ionicons name={icons[route.name] as any} size={22} color={color} />;
         },
@@ -246,6 +249,7 @@ const AdminTabs = () => {
     >
       <Tab.Screen name="AdminDashboard" component={AdminDashboardScreen} options={{ title: 'Dashboard' }} />
       <Tab.Screen name="AdminUsers" component={AdminUsersScreen} options={{ title: 'Users' }} />
+      <Tab.Screen name="AdminProfile" component={AdminProfileScreen} options={{ title: 'Profile' }} />
     </Tab.Navigator>
   );
 };
@@ -370,6 +374,7 @@ export const MainStack = () => {
       <Stack.Screen name="EditProfile" component={EditProfileScreen} />
       <Stack.Screen name="EditLawyerProfile" component={EditLawyerProfileScreen} />
       <Stack.Screen name="EditCourtAdminProfile" component={EditCourtAdminProfileScreen} />
+      <Stack.Screen name="EditAdminProfile" component={EditAdminProfileScreen} />
       <Stack.Screen name="LawyerVerificationRequest" component={LawyerVerificationRequestScreen} />
       <Stack.Screen name="LawyerTemplates" component={LawyerTemplatesScreen} />
       <Stack.Screen name="ProSubscription" component={ProSubscriptionScreen} />
