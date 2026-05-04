@@ -10,7 +10,7 @@ import { useAuthStore } from '../../stores/authStore';
 import {  useThemeStore , useColors } from '../../stores/themeStore';
 import { useWalletStore } from '../../stores/walletStore';
 import { useUserStore } from '../../stores/userStore';
-import { dashboardApi } from '../../services/api';
+import { dashboardApi, notificationsApi } from '../../services/api';
 
 const { width } = Dimensions.get('window');
 
@@ -22,6 +22,8 @@ const FEATURES = [
   { icon: 'scale', title: 'Tele-Law', desc: 'Free legal aid eligibility', route: 'TeleLaw', color: '#8B5CF6' },
   { icon: 'business', title: 'Organizations', desc: 'Browse law firms', route: 'OrgList', color: '#0EA5E9' },
   { icon: 'clipboard', title: 'Org Requests', desc: 'Track org appointments', route: 'ClientOrgRequests', color: '#EC4899' },
+  { icon: 'newspaper', title: 'Legal Updates', desc: 'Latest law changes', route: 'LegalUpdates', color: '#0D9488' },
+  { icon: 'bug', title: 'Report Issue', desc: 'Submit bugs or feedback', route: 'ReportIssue', color: '#DC2626' },
 ];
 
 export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
@@ -36,6 +38,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const isProfileHydrated = Boolean(user?.name && (((user as any)?.avatarUrl || user?.avatar || '').trim().length > 0));
 
   const [stats, setStats] = useState<{ upcoming: number; activeCases: number; completed: number; spentInr: number } | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const loadStats = React.useCallback(async () => {
     try {
@@ -60,6 +63,9 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     React.useCallback(() => {
       void fetchBalance();
       void loadStats();
+      void notificationsApi.getUnreadCount().then(({ data }) => {
+        setUnreadCount(data?.count ?? data?.data?.count ?? 0);
+      }).catch(() => {});
       if (!isProfileHydrated) {
         void getUser();
       }
@@ -92,6 +98,11 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               onPress={() => navigation.navigate('Notifications')}
             >
               <Ionicons name="notifications-outline" size={22} color={COLORS.primary} />
+              {unreadCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+                </View>
+              )}
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.profileIconBtn}
@@ -252,6 +263,25 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     ...SHADOWS.sm,
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: COLORS.white,
+  },
+  badgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#fff',
   },
   profileIconBtn: {
     width: 44,

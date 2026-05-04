@@ -101,6 +101,8 @@ import { MediationRoomScreen } from '../screens/shared/MediationRoomScreen';
 import { MediatorSettingsScreen } from '../screens/lawyer/MediatorSettingsScreen';
 import { CallHistoryScreen } from '../screens/shared/CallHistoryScreen';
 import { DocumentAiScreen } from '../screens/shared/DocumentAiScreen';
+import { LegalUpdatesScreen } from '../screens/shared/LegalUpdatesScreen';
+import { ReportIssueScreen } from '../screens/shared/ReportIssueScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -391,6 +393,8 @@ export const MainStack = () => {
       <Stack.Screen name="PaymentHistory" component={PaymentHistoryScreen} />
       <Stack.Screen name="CallHistory" component={CallHistoryScreen} />
       <Stack.Screen name="DocumentAi" component={DocumentAiScreen} />
+      <Stack.Screen name="LegalUpdates" component={LegalUpdatesScreen} />
+      <Stack.Screen name="ReportIssue" component={ReportIssueScreen} />
       {/* Admin-only screens */}
       <Stack.Screen name="AdminPayments" component={AdminPaymentsScreen} />
       <Stack.Screen name="AdminWallets" component={AdminWalletsScreen} />
