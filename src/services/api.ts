@@ -552,4 +552,17 @@ export const organizationsApi = {
     api.post(`/organizations/${encodeURIComponent(id)}/appointment-requests`, data),
 };
 
+// ─── Legal Updates API ──────────────────────────────────────
+export const legalUpdatesApi = {
+  getAll: (params?: { category?: string; search?: string }) =>
+    api.get('/legal-updates', { params }),
+};
+
+// ─── Report / Issue Tracking API ────────────────────────────
+export const reportApi = {
+  create: (data: { type?: string; title: string; description: string; metadata?: any }) =>
+    api.post('/report', data),
+  getMyReports: () => api.get('/report'),
+};
+
 export default api;
