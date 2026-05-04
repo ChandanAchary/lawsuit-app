@@ -376,6 +376,7 @@ export const MainStack = () => {
       <Stack.Screen name="EditProfile" component={EditProfileScreen} />
       <Stack.Screen name="EditLawyerProfile" component={EditLawyerProfileScreen} />
       <Stack.Screen name="EditCourtAdminProfile" component={EditCourtAdminProfileScreen} />
+      <Stack.Screen name="EditAdminProfile" component={EditAdminProfileScreen} />
       <Stack.Screen name="LawyerVerificationRequest" component={LawyerVerificationRequestScreen} />
       <Stack.Screen name="LawyerTemplates" component={LawyerTemplatesScreen} />
       <Stack.Screen name="ProSubscription" component={ProSubscriptionScreen} />
