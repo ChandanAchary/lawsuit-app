@@ -6,6 +6,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { mediationApi } from '../../services/api';
+import { socketService } from '../../services/socket';
 import { Loading } from '../../components/Common';
 import { Button } from '../../components/Button';
 import { useAuthStore } from '../../stores/authStore';
@@ -55,6 +56,20 @@ export const MediationDetailScreen: React.FC<{ navigation: any; route: any }> = 
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Server emits `mediation:updated` to every participant's user-room whenever
+  // the mediation row changes (accept invite, attach lawyer, mediator pick,
+  // session start, conclude). Refresh silently so the UI tracks server state
+  // without the user having to pull-to-refresh.
+  useEffect(() => {
+    if (!id) return;
+    const off = socketService.on('mediation:updated', (payload: unknown) => {
+      const evtId = (payload as { mediationId?: string } | undefined)?.mediationId;
+      if (evtId && evtId !== id) return;
+      load(false);
+    });
+    return off;
+  }, [id, load]);
 
   if (loading || !m) return <Loading />;
 

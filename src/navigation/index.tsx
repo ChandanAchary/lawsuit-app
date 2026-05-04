@@ -54,6 +54,7 @@ import { CourtAdminManagementScreen } from '../screens/admin/CourtAdminManagemen
 import { AdminTeamScreen } from '../screens/admin/AdminTeamScreen';
 import { AdminPayoutsScreen } from '../screens/admin/AdminPayoutsScreen';
 import { AdminProfileScreen } from '../screens/admin/AdminProfileScreen';
+import { EditAdminProfileScreen } from '../screens/admin/EditAdminProfileScreen';
 
 // Court Admin screens
 import { CourtAdminDashboardScreen } from '../screens/courtAdmin/CourtAdminDashboardScreen';

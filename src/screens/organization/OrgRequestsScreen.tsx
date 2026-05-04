@@ -24,6 +24,7 @@ export const OrgRequestsScreen: React.FC<{ navigation: any }> = ({ navigation })
   const [selectedReq, setSelectedReq] = useState<any>(null);
   const [actionType, setActionType] = useState<'ASSIGN' | 'REJECT' | null>(null);
   const [selectedLawyerId, setSelectedLawyerId] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'wallet'>('razorpay');
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -52,13 +53,21 @@ export const OrgRequestsScreen: React.FC<{ navigation: any }> = ({ navigation })
     setSubmitting(true);
     try {
       if (actionType === 'ASSIGN') {
-        await organizationsApi.assignAppointmentRequest(selectedReq.id, { lawyerId: selectedLawyerId });
-        Alert.alert('Success', 'Request assigned to lawyer');
+        await organizationsApi.assignAppointmentRequest(selectedReq.id, {
+          lawyerId: selectedLawyerId,
+          paymentMethod,
+        });
+        Alert.alert(
+          'Success',
+          paymentMethod === 'wallet'
+            ? 'Lawyer assigned and client wallet has been charged.'
+            : 'Lawyer assigned. The client has been asked to pay online to confirm.',
+        );
       } else {
         await organizationsApi.rejectAppointmentRequest(selectedReq.id, { reason });
         Alert.alert('Success', 'Request rejected');
       }
-      setSelectedReq(null); setActionType(null); setReason(''); setSelectedLawyerId('');
+      setSelectedReq(null); setActionType(null); setReason(''); setSelectedLawyerId(''); setPaymentMethod('razorpay');
       fetchData(false);
     } catch (err: any) {
       Alert.alert('Error', err?.response?.data?.error || 'Failed to process request');
@@ -115,12 +124,12 @@ export const OrgRequestsScreen: React.FC<{ navigation: any }> = ({ navigation })
         />
       )}
 
-      <Modal visible={!!actionType} transparent animationType="slide" onRequestClose={() => { setActionType(null); setSelectedReq(null); }}>
+      <Modal visible={!!actionType} transparent animationType="slide" onRequestClose={() => { setActionType(null); setSelectedReq(null); setSelectedLawyerId(''); setReason(''); setPaymentMethod('razorpay'); }}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{actionType === 'ASSIGN' ? 'Assign Lawyer' : 'Reject Request'}</Text>
-              <TouchableOpacity onPress={() => { setActionType(null); setSelectedReq(null); }}>
+              <TouchableOpacity onPress={() => { setActionType(null); setSelectedReq(null); setSelectedLawyerId(''); setReason(''); setPaymentMethod('razorpay'); }}>
                 <Ionicons name="close" size={24} color={COLORS.text} />
               </TouchableOpacity>
             </View>
@@ -141,6 +150,29 @@ export const OrgRequestsScreen: React.FC<{ navigation: any }> = ({ navigation })
                       ))}
                     </View>
                   )}
+
+                  <Text style={styles.label}>How should the client pay?</Text>
+                  <View style={styles.paymentRow}>
+                    <TouchableOpacity
+                      style={[styles.paymentChip, paymentMethod === 'razorpay' && styles.paymentChipActive]}
+                      onPress={() => setPaymentMethod('razorpay')}
+                    >
+                      <Ionicons name="card-outline" size={16} color={paymentMethod === 'razorpay' ? COLORS.white : COLORS.textSecondary} />
+                      <Text style={[styles.paymentChipText, paymentMethod === 'razorpay' && styles.paymentChipTextActive]}>Online (Razorpay)</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.paymentChip, paymentMethod === 'wallet' && styles.paymentChipActive]}
+                      onPress={() => setPaymentMethod('wallet')}
+                    >
+                      <Ionicons name="wallet-outline" size={16} color={paymentMethod === 'wallet' ? COLORS.white : COLORS.textSecondary} />
+                      <Text style={[styles.paymentChipText, paymentMethod === 'wallet' && styles.paymentChipTextActive]}>From client wallet</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.helpText}>
+                    {paymentMethod === 'wallet'
+                      ? 'The client’s wallet will be charged immediately. Fails if their balance is insufficient.'
+                      : 'The client will be notified to pay online before the appointment is confirmed.'}
+                  </Text>
                 </>
               ) : (
                 <TextInput style={[styles.input, { height: 80, textAlignVertical: 'top' }]} placeholder="Reason for rejection (optional)" value={reason} onChangeText={setReason} multiline placeholderTextColor={COLORS.textMuted} />
@@ -187,5 +219,15 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   lawyerChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   lawyerChipText: { fontSize: FONT_SIZE.sm, color: COLORS.textSecondary, fontWeight: '600' },
   lawyerChipTextActive: { color: COLORS.white },
+  paymentRow: { flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.sm },
+  paymentChip: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.xs,
+    paddingHorizontal: SPACING.md, paddingVertical: SPACING.md, borderRadius: BORDER_RADIUS.lg,
+    backgroundColor: COLORS.surfaceAlt, borderWidth: 1, borderColor: COLORS.border,
+  },
+  paymentChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  paymentChipText: { fontSize: FONT_SIZE.sm, fontWeight: '700', color: COLORS.textSecondary },
+  paymentChipTextActive: { color: COLORS.white },
+  helpText: { fontSize: FONT_SIZE.xs, color: COLORS.textMuted, marginBottom: SPACING.xl, lineHeight: 16 },
   input: { backgroundColor: COLORS.surfaceAlt, borderRadius: BORDER_RADIUS.lg, paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md, fontSize: FONT_SIZE.md, color: COLORS.text, marginBottom: SPACING.md },
 });

@@ -84,6 +84,12 @@ export async function presentDomainNotification(n: AppNotification): Promise<voi
       chatId: n.data?.chatId,
       caseId: n.data?.caseId,
       referenceId: n.data?.referenceId,
+      mediationId: n.data?.mediationId,
+      inviteId: n.data?.inviteId,
+      token: n.data?.token,
+      escalatedCaseId: n.data?.escalatedCaseId,
+      requestId: n.data?.requestId,
+      organizationId: n.data?.organizationId,
     },
   });
 }
@@ -132,6 +138,9 @@ export function resolveNotificationNavigationTarget(data: Record<string, unknown
   const appointmentId = data.appointmentId ? String(data.appointmentId) : '';
   const chatId = data.chatId ? String(data.chatId) : '';
   const caseId = data.caseId ? String(data.caseId) : '';
+  const mediationId = data.mediationId ? String(data.mediationId) : '';
+  const inviteToken = data.token ? String(data.token) : '';
+  const escalatedCaseId = data.escalatedCaseId ? String(data.escalatedCaseId) : '';
 
   switch (type) {
     case NotificationType.APPOINTMENT_BOOKED:
@@ -153,6 +162,44 @@ export function resolveNotificationNavigationTarget(data: Record<string, unknown
     case NotificationType.WALLET_CREDIT:
     case NotificationType.WALLET_DEBIT:
       return { name: 'Wallet' };
+
+    // Mediation deeplinks. Server-side notification data shapes:
+    //   MEDIATION_INVITE       → { inviteId, token }    → public accept screen
+    //   MEDIATION_DECLINED     → { inviteId }           → mediations list
+    //   MEDIATION_ACCEPTED / MEDIATOR_SELECTED / SESSION_READY / RESOLVED /
+    //   ESCALATED              → { mediationId, ... }   → MediationDetail
+    case NotificationType.MEDIATION_INVITE:
+      if (inviteToken) return { name: 'MediationInviteAccept', params: { token: inviteToken } };
+      return { name: 'Mediations' };
+    case NotificationType.MEDIATION_DECLINED:
+      return { name: 'Mediations' };
+    case NotificationType.MEDIATION_ACCEPTED:
+    case NotificationType.MEDIATION_MEDIATOR_SELECTED:
+    case NotificationType.MEDIATION_SESSION_READY:
+    case NotificationType.MEDIATION_RESOLVED:
+      return mediationId ? { name: 'MediationDetail', params: { id: mediationId } } : { name: 'Mediations' };
+    case NotificationType.MEDIATION_ESCALATED:
+      // Prefer the new case if the server attached one; fall back to mediation.
+      if (escalatedCaseId) return { name: 'CaseDetail', params: { caseId: escalatedCaseId } };
+      return mediationId ? { name: 'MediationDetail', params: { id: mediationId } } : { name: 'Mediations' };
+
+    // Organization deeplinks. Server emits:
+    //   ORG_APPOINTMENT_REQUEST_RECEIVED   → org-side requests inbox
+    //   ORG_APPOINTMENT_REQUEST_ASSIGNED   → client-side requests list (or
+    //                                         AppointmentDetail when paid)
+    //   ORG_APPOINTMENT_REQUEST_REJECTED   → client-side requests list
+    //   ORGANIZATION_VERIFIED / REJECTED   → org's own profile
+    case NotificationType.ORG_APPOINTMENT_REQUEST_RECEIVED:
+      return { name: 'OrgRequests' };
+    case NotificationType.ORG_APPOINTMENT_REQUEST_ASSIGNED:
+      if (appointmentId) return { name: 'AppointmentDetail', params: { appointmentId } };
+      return { name: 'ClientOrgRequests' };
+    case NotificationType.ORG_APPOINTMENT_REQUEST_REJECTED:
+      return { name: 'ClientOrgRequests' };
+    case NotificationType.ORGANIZATION_VERIFIED:
+    case NotificationType.ORGANIZATION_REJECTED:
+      return { name: 'OrgProfile' };
+
     default:
       return null;
   }

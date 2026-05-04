@@ -366,7 +366,21 @@ export interface Notification {
   title: string;
   body: string;
   type: NotificationType;
-  data?: { appointmentId?: string; chatId?: string; caseId?: string; referenceId?: string };
+  data?: {
+    appointmentId?: string;
+    chatId?: string;
+    caseId?: string;
+    referenceId?: string;
+    mediationId?: string;
+    inviteId?: string;
+    token?: string;
+    escalatedCaseId?: string;
+    requestId?: string;
+    organizationId?: string;
+    lawyerId?: string;
+    clientId?: string;
+    paymentId?: string;
+  };
   isRead: boolean;
   readAt?: string;
   createdAt: string;

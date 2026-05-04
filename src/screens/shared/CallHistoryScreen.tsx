@@ -83,7 +83,9 @@ export const CallHistoryScreen: React.FC<{ navigation: any }> = ({ navigation })
     const s = getStatusStyle(item.status);
     const isCaller = item.callerId === user?.id;
     const otherPartyName = isCaller ? item.calleeName : item.callerName;
-    const callDirectionIcon = isCaller ? 'arrow-up-right' : 'arrow-down-left';
+    const callDirectionIcon: keyof typeof Ionicons.glyphMap = isCaller
+      ? 'arrow-up-outline'
+      : 'arrow-down-outline';
     
     // Format duration e.g. "05:23"
     const minutes = Math.floor(item.duration / 60);

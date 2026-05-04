@@ -505,7 +505,10 @@ export const courtAdminApi = {
       throw err;
     }
   },
-  verifyLawyer: (lawyerId: string, data: { status: 'APPROVED' | 'REJECTED'; verificationNotes?: string; tier?: string }) =>
+  // Server expects `{ status, remarks? }` per court-admin.schema.ts
+  // (verifyLawyerSchema). The wider type leaked from an earlier draft and
+  // sent fields the server's strict Zod parse would reject.
+  verifyLawyer: (lawyerId: string, data: { status: 'APPROVED' | 'REJECTED'; remarks?: string }) =>
     api.post(`/court-admin/verify/${encodeURIComponent(lawyerId)}`, data),
   getPendingOrganizationVerifications: () => api.get('/court-admin/organization-verifications/pending'),
   getMyOrganizationVerifications: () => api.get('/court-admin/organization-verifications'),
@@ -560,8 +563,16 @@ export const organizationsApi = {
   createLawyer: (data: any) => api.post('/organizations/me/lawyers', data),
   listLawyers: (params?: any) => api.get('/organizations/me/lawyers', { params }),
   listOrgAppointmentRequests: () => api.get('/organizations/me/appointment-requests'),
-  assignAppointmentRequest: (id: string, data: { lawyerId: string; suggestedDate?: string }) =>
-    api.post(`/organizations/me/appointment-requests/${encodeURIComponent(id)}/assign`, data),
+  // Server contract (assignOrgAppointmentRequestSchema):
+  //   { lawyerId, paymentMethod: 'razorpay' | 'wallet' }   (paymentMethod defaults to 'razorpay')
+  // - razorpay: a Payment order is created; the client is notified to pay
+  //   online via the existing /appointments/confirm-payment flow.
+  // - wallet:   the client's wallet is debited immediately and the Appointment
+  //   row is materialised right then.
+  assignAppointmentRequest: (
+    id: string,
+    data: { lawyerId: string; paymentMethod?: 'razorpay' | 'wallet' },
+  ) => api.post(`/organizations/me/appointment-requests/${encodeURIComponent(id)}/assign`, data),
   rejectAppointmentRequest: (id: string, data: { reason?: string }) =>
     api.post(`/organizations/me/appointment-requests/${encodeURIComponent(id)}/reject`, data),
   listClientAppointmentRequests: () => api.get('/organizations/clients/me/requests'),
