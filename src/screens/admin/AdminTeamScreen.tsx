@@ -135,25 +135,45 @@ export const AdminTeamScreen: React.FC<{ navigation: any }> = ({ navigation }) =
     }
   };
 
+  // Server enforces these rules; the UI mirrors them so the action button is
+  // disabled rather than letting the admin tap and get a 403.
+  //   - SUPER_ADMINs are permanent and cannot be deleted by anyone.
+  //   - ADMINs can only be deleted by the SUPER_ADMIN that invited them.
+  const canDeleteAdmin = (admin: AdminTeamMember) => {
+    if (admin.id === me?.id) return false;
+    if (admin.level === 'SUPER_ADMIN') return false;
+    if (admin.createdById && me?.id && admin.createdById !== me.id) return false;
+    return true;
+  };
+
+  const explainNoDelete = (admin: AdminTeamMember) => {
+    if (admin.id === me?.id) return 'You cannot deactivate your own account.';
+    if (admin.level === 'SUPER_ADMIN') return 'Super admins are permanent and cannot be deleted.';
+    if (admin.createdById && me?.id && admin.createdById !== me.id) {
+      return 'Only the super admin who invited this admin can delete them.';
+    }
+    return 'You do not have permission to delete this admin.';
+  };
+
   const handleDeactivate = (admin: AdminTeamMember) => {
-    if (admin.id === me?.id) {
-      return Alert.alert('Not allowed', 'You cannot deactivate your own account.');
+    if (!canDeleteAdmin(admin)) {
+      return Alert.alert('Not allowed', explainNoDelete(admin));
     }
     Alert.alert(
-      'Deactivate admin?',
-      `${admin.name} will no longer be able to sign in. They can be reactivated later.`,
+      'Delete admin?',
+      `${admin.name} will lose access immediately. They can be reactivated later by you.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Deactivate',
+          text: 'Delete',
           style: 'destructive',
           onPress: async () => {
             try {
               await adminManagementApi.delete(admin.id);
-              Alert.alert('Deactivated', `${admin.name} is now inactive.`);
+              Alert.alert('Deleted', `${admin.name} is now inactive.`);
               fetchAdmins(false);
             } catch (err: any) {
-              Alert.alert('Error', formatErrorMessage(err) || 'Failed to deactivate');
+              Alert.alert('Error', formatErrorMessage(err) || 'Failed to delete admin');
             }
           },
         },
@@ -173,8 +193,10 @@ export const AdminTeamScreen: React.FC<{ navigation: any }> = ({ navigation }) =
 
   const renderAdmin = ({ item }: { item: AdminTeamMember }) => {
     const isSelf = item.id === me?.id;
-    const levelBg = item.level === 'SUPER_ADMIN' ? '#FEF3C7' : '#DBEAFE';
-    const levelFg = item.level === 'SUPER_ADMIN' ? '#B45309' : '#1D4ED8';
+    const isSuperRow = item.level === 'SUPER_ADMIN';
+    const deletable = canDeleteAdmin(item);
+    const levelBg = isSuperRow ? '#FEF3C7' : '#DBEAFE';
+    const levelFg = isSuperRow ? '#B45309' : '#1D4ED8';
     return (
       <View style={[styles.card, !item.isActive && styles.cardInactive]}>
         <View style={styles.cardRow}>
@@ -232,12 +254,22 @@ export const AdminTeamScreen: React.FC<{ navigation: any }> = ({ navigation }) =
           </TouchableOpacity>
           {item.isActive ? (
             <TouchableOpacity
-              style={[styles.actionBtn, styles.actionDanger]}
+              style={[
+                styles.actionBtn,
+                styles.actionDanger,
+                !deletable && styles.actionBtnDisabled,
+              ]}
               onPress={() => handleDeactivate(item)}
-              disabled={!isSuper || isSelf}
+              disabled={!deletable}
             >
-              <Ionicons name="close-circle-outline" size={16} color={COLORS.error} />
-              <Text style={[styles.actionBtnText, { color: COLORS.error }]}>Deactivate</Text>
+              <Ionicons
+                name={isSuperRow ? 'lock-closed-outline' : 'trash-outline'}
+                size={16}
+                color={COLORS.error}
+              />
+              <Text style={[styles.actionBtnText, { color: COLORS.error }]}>
+                {isSuperRow ? 'Protected' : 'Delete'}
+              </Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
@@ -398,7 +430,12 @@ export const AdminTeamScreen: React.FC<{ navigation: any }> = ({ navigation }) =
                 <Text style={styles.selectLabel}>Level</Text>
                 <View style={styles.levelRow}>
                   {(['ADMIN', 'SUPER_ADMIN'] as Level[]).map((lvl) => {
-                    const disabled = editing.id === me?.id && lvl !== editing.level;
+                    // SUPER_ADMINs can't be demoted (they're permanent), and
+                    // you can't change your own level.
+                    const isSuperTarget = editing.level === 'SUPER_ADMIN';
+                    const tryingToDemoteSuper = isSuperTarget && lvl !== 'SUPER_ADMIN';
+                    const disabled =
+                      (editing.id === me?.id && lvl !== editing.level) || tryingToDemoteSuper;
                     return (
                       <TouchableOpacity
                         key={lvl}
@@ -417,13 +454,20 @@ export const AdminTeamScreen: React.FC<{ navigation: any }> = ({ navigation }) =
                     );
                   })}
                 </View>
-                {editing.id === me?.id && (
+                {editing.level === 'SUPER_ADMIN' && (
+                  <Text style={styles.helperText}>
+                    Super admins are permanent — they cannot be demoted or deactivated.
+                  </Text>
+                )}
+                {editing.id === me?.id && editing.level !== 'SUPER_ADMIN' && (
                   <Text style={styles.helperText}>You cannot change your own level or deactivate yourself.</Text>
                 )}
                 <Text style={styles.selectLabel}>Status</Text>
                 <View style={styles.levelRow}>
                   {[true, false].map((active) => {
-                    const disabled = !active && editing.id === me?.id;
+                    const isSuperTarget = editing.level === 'SUPER_ADMIN';
+                    const disabled =
+                      (!active && editing.id === me?.id) || (!active && isSuperTarget);
                     return (
                       <TouchableOpacity
                         key={String(active)}
@@ -506,6 +550,7 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   },
   actionDanger: { backgroundColor: COLORS.error + '15' },
   actionSuccess: { backgroundColor: COLORS.success + '15' },
+  actionBtnDisabled: { opacity: 0.45 },
   actionBtnText: { fontSize: FONT_SIZE.xs, fontWeight: '700', color: COLORS.primary },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
