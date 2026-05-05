@@ -55,6 +55,19 @@ import { AdminTeamScreen } from '../screens/admin/AdminTeamScreen';
 import { AdminPayoutsScreen } from '../screens/admin/AdminPayoutsScreen';
 import { AdminProfileScreen } from '../screens/admin/AdminProfileScreen';
 import { EditAdminProfileScreen } from '../screens/admin/EditAdminProfileScreen';
+import { SuperAdminCourtAdminApprovalsScreen } from '../screens/admin/SuperAdminCourtAdminApprovalsScreen';
+// SuperAdminUserControlScreen and SuperAdminKycOverrideScreen were retired
+// in Phase 3 — their actions now live on AdminUserDetailScreen so the
+// People tab is a single drill-down flow instead of three parallel screens.
+import { SuperAdminPlatformConfigScreen } from '../screens/admin/SuperAdminPlatformConfigScreen';
+import { SuperAdminAuditLogScreen } from '../screens/admin/SuperAdminAuditLogScreen';
+import { SuperAdminCourtAdminOpsScreen } from '../screens/admin/SuperAdminCourtAdminOpsScreen';
+import { AdminUserDetailScreen } from '../screens/admin/AdminUserDetailScreen';
+import { AdminEscrowLedgerScreen } from '../screens/admin/AdminEscrowLedgerScreen';
+import { AdminReportsScreen } from '../screens/admin/AdminReportsScreen';
+import { AdminLegalUpdatesScreen } from '../screens/admin/AdminLegalUpdatesScreen';
+import { AdminAnnouncementsScreen } from '../screens/admin/AdminAnnouncementsScreen';
+import { AdminOperationsScreen } from '../screens/admin/AdminOperationsScreen';
 
 // Court Admin screens
 import { CourtAdminDashboardScreen } from '../screens/courtAdmin/CourtAdminDashboardScreen';
@@ -244,6 +257,7 @@ const AdminTabs = () => {
           const icons: Record<string, string> = {
             AdminDashboard: focused ? 'shield-checkmark' : 'shield-checkmark-outline',
             AdminUsers: focused ? 'people' : 'people-outline',
+            AdminOperations: focused ? 'cash' : 'cash-outline',
             AdminProfile: focused ? 'person' : 'person-outline',
           };
           return <Ionicons name={icons[route.name] as any} size={22} color={color} />;
@@ -252,6 +266,7 @@ const AdminTabs = () => {
     >
       <Tab.Screen name="AdminDashboard" component={AdminDashboardScreen} options={{ title: 'Dashboard' }} />
       <Tab.Screen name="AdminUsers" component={AdminUsersScreen} options={{ title: 'Users' }} />
+      <Tab.Screen name="AdminOperations" component={AdminOperationsScreen} options={{ title: 'Operations' }} />
       <Tab.Screen name="AdminProfile" component={AdminProfileScreen} options={{ title: 'Profile' }} />
     </Tab.Navigator>
   );
@@ -403,6 +418,16 @@ export const MainStack = () => {
       <Stack.Screen name="CourtAdminManagement" component={CourtAdminManagementScreen} />
       <Stack.Screen name="AdminTeam" component={AdminTeamScreen} />
       <Stack.Screen name="AdminPayouts" component={AdminPayoutsScreen} />
+      {/* Super-admin-only operational screens */}
+      <Stack.Screen name="SuperAdminCourtAdminApprovals" component={SuperAdminCourtAdminApprovalsScreen} />
+      <Stack.Screen name="SuperAdminCourtAdminOps" component={SuperAdminCourtAdminOpsScreen} />
+      <Stack.Screen name="SuperAdminPlatformConfig" component={SuperAdminPlatformConfigScreen} />
+      <Stack.Screen name="SuperAdminAuditLog" component={SuperAdminAuditLogScreen} />
+      <Stack.Screen name="AdminUserDetail" component={AdminUserDetailScreen as any} />
+      <Stack.Screen name="AdminEscrowLedger" component={AdminEscrowLedgerScreen} />
+      <Stack.Screen name="AdminReports" component={AdminReportsScreen} />
+      <Stack.Screen name="AdminLegalUpdates" component={AdminLegalUpdatesScreen} />
+      <Stack.Screen name="AdminAnnouncements" component={AdminAnnouncementsScreen} />
       {/* Court Admin screens (also accessible from stack) */}
       <Stack.Screen name="LawyerVerification" component={LawyerVerificationScreen} />
       <Stack.Screen name="OrgVerification" component={OrgVerificationScreen} />

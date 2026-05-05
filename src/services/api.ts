@@ -321,14 +321,13 @@ export const adminApi = {
     api.put(`/admin/users/${encodeURIComponent(id)}/verification`, { isVerified }),
   getPayments: (params?: Record<string, unknown>) =>
     api.get('/admin/payments', { params }),
+  // Wallet monitoring is read-only (Phase 1) — manual credit/debit endpoints
+  // were removed server-side; money in/out only flows through booking,
+  // refund, and payout. Withdrawal reverse is the only escape hatch.
   getWallets: () => api.get('/admin/wallets'),
   getWithdrawals: () => api.get('/admin/wallets/withdrawals'),
   reverseWithdrawal: (id: string, reason: string) =>
     api.put(`/admin/wallets/withdrawals/${encodeURIComponent(id)}/reverse`, { reason }),
-  creditWallet: (userId: string, amount: number, description: string) =>
-    api.post('/admin/wallets/credit', { userId, amount, description }),
-  debitWallet: (userId: string, amount: number, description: string) =>
-    api.post('/admin/wallets/debit', { userId, amount, description }),
   getNotVerifiedClients: () => api.get('/admin/not-verified-client'),
   getNotVerifiedLawyers: () => api.get('/admin/not-verified-lawyers'),
   verifyLawyer: (id: string) => api.put(`/admin/${encodeURIComponent(id)}/verifylawyer`),
@@ -366,8 +365,147 @@ export const payoutsApi = {
     limit?: number;
   }) => api.get('/admin/payouts', { params }),
   summary: () => api.get('/admin/payouts/summary'),
-  disburse: (paymentId: string) =>
-    api.post(`/admin/payouts/${encodeURIComponent(paymentId)}/disburse`),
+  escrowLedger: (beneficiaryType?: BeneficiaryType) =>
+    api.get('/admin/payouts/escrow-ledger', { params: beneficiaryType ? { beneficiaryType } : {} }),
+  history: (params?: { recipientUserId?: string; initiatedById?: string; page?: number; limit?: number }) =>
+    api.get('/admin/payouts/history', { params }),
+  reconcile: () => api.get('/admin/payouts/reconcile'),
+  disburse: (paymentId: string, data?: { providerPayoutId?: string; notes?: string }) =>
+    api.post(`/admin/payouts/${encodeURIComponent(paymentId)}/disburse`, data ?? {}),
+  refund: (paymentId: string, data: { reason: string; partialAmount?: number }) =>
+    api.post(`/admin/payouts/${encodeURIComponent(paymentId)}/refund`, data),
+  openDispute: (paymentId: string, data: { reason: string }) =>
+    api.post(`/admin/payouts/${encodeURIComponent(paymentId)}/dispute`, data),
+  resolveDispute: (
+    paymentId: string,
+    data: { outcome: 'release' | 'refund' | 'split'; resolution: string; refundAmount?: number },
+  ) => api.post(`/admin/payouts/${encodeURIComponent(paymentId)}/dispute/resolve`, data),
+};
+
+// ─── Court-admin authorization queue (SUPER_ADMIN only) ────
+// Self-onboarded court admins land in PENDING_SUPER_ADMIN_APPROVAL with
+// isAuthorized=false. Their feature routes stay locked behind
+// requireCourtAdminAuthorized until an entry here flips them.
+export const courtAdminApprovalApi = {
+  listPending: (params?: { page?: number; limit?: number }) =>
+    api.get('/admin/court-admins/pending', { params }),
+  getDetail: (id: string) => api.get(`/admin/court-admins/${encodeURIComponent(id)}`),
+  approve: (id: string, data?: { notes?: string }) =>
+    api.post(`/admin/court-admins/${encodeURIComponent(id)}/approve`, data ?? {}),
+  reject: (id: string, data: { reason: string }) =>
+    api.post(`/admin/court-admins/${encodeURIComponent(id)}/reject`, data),
+};
+
+// ─── Court-admin performance + salary (SUPER_ADMIN only) ───
+// Salary rupee fields are passed/returned in INR (integer). The cycle is
+// keyed by (cycleMonth, cycleYear) — month is 1-12.
+export type SalaryStatus = 'ACTIVE' | 'HELD' | 'PAID';
+
+export const courtAdminPerfApi = {
+  listAll: () => api.get('/admin/court-admins/performance'),
+  getOne: (id: string) => api.get(`/admin/court-admins/${encodeURIComponent(id)}/performance`),
+};
+
+export const courtAdminSalaryApi = {
+  getConfig: (id: string) => api.get(`/admin/court-admins/${encodeURIComponent(id)}/salary`),
+  setBase: (id: string, data: { baseSalary: number; reason?: string }) =>
+    api.put(`/admin/court-admins/${encodeURIComponent(id)}/salary`, data),
+  hold: (id: string, data: { reason: string }) =>
+    api.post(`/admin/court-admins/${encodeURIComponent(id)}/salary/hold`, data),
+  release: (id: string, data?: { reason?: string }) =>
+    api.post(`/admin/court-admins/${encodeURIComponent(id)}/salary/release`, data ?? {}),
+  history: (id: string, limit?: number) =>
+    api.get(`/admin/court-admins/${encodeURIComponent(id)}/salary/history`, { params: limit ? { limit } : {} }),
+  pay: (
+    id: string,
+    data: { cycleMonth?: number; cycleYear?: number; bonusAmount?: number; deductionAmount?: number; notes?: string; providerPayoutId?: string },
+  ) => api.post(`/admin/court-admins/${encodeURIComponent(id)}/salary/pay`, data),
+  currentCycle: (params?: { cycleMonth?: number; cycleYear?: number }) =>
+    api.get('/admin/salary-cycles/current', { params }),
+  payoutHistory: (params?: { courtAdminId?: string; cycleMonth?: number; cycleYear?: number; page?: number; limit?: number }) =>
+    api.get('/admin/salary-cycles/history', { params }),
+};
+
+// ─── User control (SUPER_ADMIN only) ───────────────────────
+// `role` URL segment is one of CLIENT/LAWYER/ORGANIZATION/COURT_ADMIN.
+// The server normalizes case but uppercase is the canonical form.
+export type ControllableRole = 'CLIENT' | 'LAWYER' | 'ORGANIZATION' | 'COURT_ADMIN';
+
+export const userControlApi = {
+  ban: (role: ControllableRole, userId: string, reason: string) =>
+    api.post(`/admin/users/${encodeURIComponent(role)}/${encodeURIComponent(userId)}/ban`, { reason }),
+  unban: (role: ControllableRole, userId: string, reason?: string) =>
+    api.post(`/admin/users/${encodeURIComponent(role)}/${encodeURIComponent(userId)}/unban`, { reason }),
+  softDelete: (role: ControllableRole, userId: string, reason?: string) =>
+    api.post(`/admin/users/${encodeURIComponent(role)}/${encodeURIComponent(userId)}/soft-delete`, { reason }),
+  forcePasswordReset: (role: ControllableRole, userId: string, reason?: string) =>
+    api.post(`/admin/users/${encodeURIComponent(role)}/${encodeURIComponent(userId)}/force-password-reset`, { reason }),
+  // KYC override — only for LAWYER and ORGANIZATION (the verifiable roles).
+  overrideLawyerKyc: (lawyerId: string, data: { isVerified: boolean; reason: string }) =>
+    api.post(`/admin/lawyers/${encodeURIComponent(lawyerId)}/kyc-override`, data),
+  overrideOrgKyc: (organizationId: string, data: { isVerified: boolean; reason: string }) =>
+    api.post(`/admin/organizations/${encodeURIComponent(organizationId)}/kyc-override`, data),
+};
+
+// ─── Platform configuration (SUPER_ADMIN only) ─────────────
+// Phase 1 keys: COMMISSION_PCT (0-100), GST_PCT (0-100), TDS_PCT (0-100).
+// Future phases will add subscription pricing, salary template, etc.
+export const platformConfigApi = {
+  list: () => api.get('/admin/config'),
+  upsert: (key: string, data: { value: unknown; description?: string; reason?: string }) =>
+    api.put(`/admin/config/${encodeURIComponent(key)}`, data),
+};
+
+// ─── Admin audit log (SUPER_ADMIN only, read-only) ─────────
+export type AuditAction =
+  | 'PAYOUT_DISBURSED' | 'PAYOUT_REFUNDED' | 'PAYOUT_DISPUTE_OPENED' | 'PAYOUT_DISPUTE_RESOLVED'
+  | 'COURT_ADMIN_APPROVED' | 'COURT_ADMIN_REJECTED'
+  | 'LAWYER_VERIFICATION_OVERRIDDEN' | 'ORGANIZATION_VERIFICATION_OVERRIDDEN'
+  | 'ADMIN_INVITED' | 'ADMIN_UPDATED' | 'ADMIN_DELETED'
+  | 'PLATFORM_CONFIG_UPDATED';
+
+export const auditLogApi = {
+  list: (params?: {
+    action?: AuditAction;
+    actorId?: string;
+    targetType?: string;
+    targetId?: string;
+    from?: string;
+    to?: string;
+    page?: number;
+    limit?: number;
+  }) => api.get('/admin/audit-log', { params }),
+};
+
+// ─── Admin content & moderation (Phase 4) ──────────────────
+// Reports — issue tracking. Users submit via /report; admins triage here.
+export type ReportStatus = 'OPEN' | 'IN_REVIEW' | 'RESOLVED';
+
+export const adminReportsApi = {
+  list: (params?: { status?: ReportStatus; q?: string; page?: number; limit?: number }) =>
+    api.get('/admin/reports', { params }),
+  updateStatus: (id: string, status: ReportStatus) =>
+    api.patch(`/admin/reports/${encodeURIComponent(id)}`, { status }),
+};
+
+// Legal updates — admin CRUD. User-facing list lives at legalUpdatesApi.
+export const adminLegalUpdatesApi = {
+  create: (data: { title: string; content: string; category: string; publishedAt?: string }) =>
+    api.post('/admin/legal-updates', data),
+  update: (
+    id: string,
+    data: Partial<{ title: string; content: string; category: string; publishedAt: string }>,
+  ) => api.put(`/admin/legal-updates/${encodeURIComponent(id)}`, data),
+  delete: (id: string) => api.delete(`/admin/legal-updates/${encodeURIComponent(id)}`),
+};
+
+// Announcements — SUPER_ADMIN-only fan-out. Server enforces level; the
+// dashboard tile is gated to SUPER_ADMIN to match.
+export type AnnouncementAudience = 'ALL' | 'CLIENT' | 'LAWYER' | 'ORGANIZATION' | 'COURT_ADMIN';
+
+export const adminAnnouncementsApi = {
+  broadcast: (data: { title: string; body: string; audience?: AnnouncementAudience }) =>
+    api.post('/admin/announcements', data),
 };
 
 // ─── Storage API ────────────────────────────────────────────

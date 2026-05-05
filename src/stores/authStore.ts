@@ -195,15 +195,29 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           try {
             const { data } = await authApi.getMe();
             const freshToken = await storage.getToken();
-            const user = (data?.user || data || userData) as User;
+            const fresh = (data?.user || data) as Record<string, unknown> | null;
+
+            // Defensive merge: never replace a rich persisted user with a thin
+            // /auth/me response. Empty / null / undefined values from the
+            // server are skipped so previously-good fields (name, email,
+            // phone, createdAt) survive an incomplete reconcile.
+            const base = (userData || {}) as Record<string, unknown>;
+            const merged: Record<string, unknown> = { ...base };
+            if (fresh && typeof fresh === 'object') {
+              for (const [k, v] of Object.entries(fresh)) {
+                if (v === undefined || v === null) continue;
+                if (typeof v === 'string' && v.trim() === '') continue;
+                merged[k] = v;
+              }
+            }
 
             set({
-              user,
+              user: merged as unknown as User,
               token: freshToken || token,
               isAuthenticated: true,
               isLoading: false,
             });
-            await storage.setUser(user as unknown as Record<string, unknown>);
+            await storage.setUser(merged);
           } catch (error: any) {
             if (isAuthFailure(error)) {
               await storage.clear();

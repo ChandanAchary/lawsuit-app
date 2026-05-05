@@ -1,30 +1,38 @@
-import {  useThemeStore , useColors } from '../../stores/themeStore';
-import React, { useEffect, useState, useCallback } from 'react';
+import { useThemeStore, useColors } from '../../stores/themeStore';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Alert, Image,
+  View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Image, TextInput,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { adminApi } from '../../services/api';
 import { User, UserRole } from '../../types';
-import { TabBar } from '../../components/TabBar';
 import { Loading, EmptyState } from '../../components/Common';
-import { Button } from '../../components/Button';
 
-const TABS = [
-  { key: 'all', label: 'All' },
-  { key: UserRole.CLIENT, label: 'Clients' },
-  { key: UserRole.LAWYER, label: 'Lawyers' },
-  { key: 'pending', label: 'Pending KYC' },
+// People tab — single entry point for browsing every controllable user role
+// across the platform. Tap a row to open AdminUserDetailScreen, which hosts
+// every action (verify, ban, unban, soft-delete, force-pw-reset, KYC
+// override) in one place. The standalone UserControl/KycOverride screens
+// are intentionally retired; this list-then-drill flow is now the canonical
+// path for per-user moderation.
+const TABS: { key: string; label: string }[] = [
+  { key: 'all',                    label: 'All' },
+  { key: UserRole.CLIENT,          label: 'Clients' },
+  { key: UserRole.LAWYER,          label: 'Lawyers' },
+  { key: UserRole.ORGANIZATION,    label: 'Orgs' },
+  { key: UserRole.COURT_ADMIN,     label: 'Court Admins' },
+  { key: 'pending',                label: 'Pending KYC' },
 ];
 
 export const AdminUsersScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
   const COLORS = useColors();
-  const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+  const styles = useMemo(() => getStyles(COLORS), [isDark]);
 
   const [tab, setTab] = useState('all');
-  const [users, setUsers] = useState<User[]>([]);
+  const [search, setSearch] = useState('');
+  const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -32,103 +40,169 @@ export const AdminUsersScreen: React.FC<{ navigation: any }> = ({ navigation }) 
     if (showLoader) setLoading(true);
     try {
       if (tab === 'pending') {
+        // Pending tab combines unverified clients + lawyers. ORG/COURT_ADMIN
+        // verifications go through their dedicated approval flows.
         const [clientsRes, lawyersRes] = await Promise.all([
           adminApi.getNotVerifiedClients().catch(() => ({ data: [] })),
           adminApi.getNotVerifiedLawyers().catch(() => ({ data: [] })),
         ]);
-
-        const normalize = (arr: any, role: UserRole) => {
+        const normalize = (arr: any, role: string) => {
           const list = arr?.users || arr?.items || arr?.data || arr || [];
           return (Array.isArray(list) ? list : []).map((u: any) => ({ ...u, role: u.role || role }));
         };
-
-        const pendingUsers = [
+        const pending = [
           ...normalize(clientsRes.data, UserRole.CLIENT),
           ...normalize(lawyersRes.data, UserRole.LAWYER),
         ];
-        setUsers(pendingUsers as User[]);
+        const filter = search.trim().toLowerCase();
+        const filtered = filter
+          ? pending.filter((u) =>
+              [u.name, u.email, u.phone].some((v) => String(v || '').toLowerCase().includes(filter)),
+            )
+          : pending;
+        setUsers(filtered);
       } else {
-        const params: any = {};
-        if (tab === UserRole.CLIENT || tab === UserRole.LAWYER) params.role = tab;
+        const params: any = { limit: 50 };
+        if (tab !== 'all') params.role = tab;
+        if (search.trim()) params.search = search.trim();
         const { data } = await adminApi.getUsers(params);
-        setUsers(data.users || data || []);
+        setUsers(data?.items || data?.users || data || []);
       }
-    } catch { setUsers([]); }
-    finally { setLoading(false); setRefreshing(false); }
-  }, [tab]);
+    } catch {
+      setUsers([]);
+    } finally {
+      setLoading(false); setRefreshing(false);
+    }
+  }, [tab, search]);
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
-  const handleVerify = async (userId: string, role: UserRole) => {
-    try {
-      if (role === UserRole.CLIENT) {
-        await adminApi.verifyClient(userId);
-      } else {
-        await adminApi.verifyLawyer(userId);
-      }
-      Alert.alert('Success', 'User verified');
-      fetchUsers(false);
-    } catch { Alert.alert('Error', 'Verification failed'); }
-  };
+  const renderItem = ({ item }: { item: any }) => {
+    const role = String(item.role || '').toUpperCase();
+    const isLawyer = role === UserRole.LAWYER;
+    const isOrg = role === UserRole.ORGANIZATION;
+    const isCa = role === UserRole.COURT_ADMIN;
+    const isVerified = !!item.isVerified;
+    const isBanned = !!item.bannedAt || item.isBanned === true;
+    const isDeleted = !!item.deletedAt;
 
-  const renderItem = ({ item }: { item: User }) => (
-    <View style={styles.card}>
-      <View style={styles.cardTop}>
-        {item.avatar ? (
-          <Image source={{ uri: item.avatar }} style={styles.avatar} />
-        ) : (
-          <View style={[styles.avatar, styles.avatarPH]}>
-            <Ionicons name="person" size={20} color={COLORS.textMuted} />
+    // Role badge palette — one tone per role so scanning the list at a
+    // glance lets you spot the mix without reading the badge.
+    const roleColor =
+      isLawyer ? COLORS.accent
+      : isOrg   ? '#7C3AED'
+      : isCa    ? '#0EA5E9'
+      : COLORS.primary;
+
+    return (
+      <TouchableOpacity
+        style={styles.card}
+        activeOpacity={0.85}
+        onPress={() => navigation.navigate('AdminUserDetail', { userId: item.id, role })}
+      >
+        <View style={styles.cardTop}>
+          {item.avatarUrl || item.avatar ? (
+            <Image source={{ uri: item.avatarUrl || item.avatar }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, styles.avatarPH]}>
+              <Ionicons
+                name={isOrg ? 'business' : isCa ? 'shield' : 'person'}
+                size={20}
+                color={COLORS.textMuted}
+              />
+            </View>
+          )}
+          <View style={styles.cardInfo}>
+            <Text style={styles.cardName} numberOfLines={1}>{item.name || '—'}</Text>
+            <Text style={styles.cardEmail} numberOfLines={1}>{item.email}</Text>
           </View>
-        )}
-        <View style={styles.cardInfo}>
-          <Text style={styles.cardName}>{item.name}</Text>
-          <Text style={styles.cardEmail}>{item.email}</Text>
+          <View style={[styles.roleBadge, { backgroundColor: roleColor + '20' }]}>
+            <Text style={[styles.roleText, { color: roleColor }]}>{role.replace('_', ' ')}</Text>
+          </View>
         </View>
-        <View style={[styles.roleBadge, { backgroundColor: item.role === UserRole.LAWYER ? COLORS.accent + '20' : COLORS.primary + '20' }]}>
-          <Text style={[styles.roleText, { color: item.role === UserRole.LAWYER ? COLORS.accent : COLORS.primary }]}>
-            {item.role}
-          </Text>
-        </View>
-      </View>
-      <View style={styles.cardBottom}>
-        <View style={styles.cardMeta}>
-          <Ionicons name={item.isVerified ? 'checkmark-circle' : 'close-circle'} size={16} color={item.isVerified ? COLORS.success : COLORS.error} />
-          <Text style={[styles.metaText, { color: item.isVerified ? COLORS.success : COLORS.error }]}>
-            {item.isVerified ? 'Verified' : 'Unverified'}
-          </Text>
-        </View>
-        {!item.isVerified && (
-          <Button
-            title="Verify"
-            size="sm"
-            onPress={() => handleVerify(item.id, item.role)}
-            style={{ paddingHorizontal: SPACING.xl }}
+
+        <View style={styles.flagRow}>
+          <Flag
+            label={isVerified ? 'VERIFIED' : 'UNVERIFIED'}
+            tone={isVerified ? 'ok' : 'warn'}
+            styles={styles}
           />
-        )}
-      </View>
-    </View>
-  );
+          {isBanned && <Flag label="BANNED" tone="danger" styles={styles} />}
+          {isDeleted && <Flag label="DELETED" tone="muted" styles={styles} />}
+          {item.mustChangePassword && <Flag label="MUST CHANGE PW" tone="warn" styles={styles} />}
+          {isCa && item.isAuthorized === false && <Flag label="UNAUTH" tone="warn" styles={styles} />}
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
       <View style={styles.headerBar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={COLORS.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>User Management</Text>
+        <Text style={styles.headerTitle}>People</Text>
       </View>
-      <TabBar tabs={TABS} active={tab} onSelect={setTab} />
+
+      <View style={styles.searchBar}>
+        <Ionicons name="search" size={16} color={COLORS.textMuted} />
+        <TextInput
+          style={styles.searchInput}
+          value={search}
+          onChangeText={setSearch}
+          onSubmitEditing={() => fetchUsers()}
+          placeholder="Search name, email, or phone"
+          placeholderTextColor={COLORS.textMuted}
+          autoCapitalize="none"
+          returnKeyType="search"
+        />
+        {!!search && (
+          <TouchableOpacity onPress={() => { setSearch(''); }}>
+            <Ionicons name="close-circle" size={16} color={COLORS.textMuted} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Horizontal scrollable role tabs — fits 6 keys without crushing */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.tabRow}
+      >
+        {TABS.map((t) => (
+          <TouchableOpacity
+            key={t.key}
+            style={[styles.tabChip, tab === t.key && styles.tabChipActive]}
+            onPress={() => setTab(t.key)}
+          >
+            <Text style={[styles.tabText, tab === t.key && styles.tabTextActive]}>{t.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
       {loading ? <Loading /> : (
         <FlatList
           data={users}
-          keyExtractor={(u) => u.id}
+          keyExtractor={(u, idx) => u.id || `${u.email}-${idx}`}
           renderItem={renderItem}
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchUsers(false); }} colors={[COLORS.primary]} />}
-          ListEmptyComponent={<EmptyState icon="👥" title="No Users" message="No users found in this category" />}
+          ListEmptyComponent={<EmptyState icon="👥" title="No users" message="Nothing matches the current filter." />}
         />
       )}
+    </View>
+  );
+};
+
+const Flag = ({ label, tone, styles }: any) => {
+  const palette: Record<string, { bg: string; fg: string }> = {
+    ok:     { bg: '#D1FAE5', fg: '#047857' },
+    warn:   { bg: '#FEF3C7', fg: '#B45309' },
+    danger: { bg: '#FEE2E2', fg: '#B91C1C' },
+    muted:  { bg: '#E5E7EB', fg: '#374151' },
+  };
+  const p = palette[tone] || palette.muted;
+  return (
+    <View style={[styles.flag, { backgroundColor: p.bg }]}>
+      <Text style={[styles.flagText, { color: p.fg }]}>{label}</Text>
     </View>
   );
 };
@@ -136,26 +210,51 @@ export const AdminUsersScreen: React.FC<{ navigation: any }> = ({ navigation }) 
 const getStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   headerBar: {
-    flexDirection: 'row', alignItems: 'center', gap: SPACING.md,
     paddingHorizontal: SPACING.xl, paddingTop: SPACING.huge, paddingBottom: SPACING.md,
     backgroundColor: COLORS.white, ...SHADOWS.sm,
   },
-  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: FONT_SIZE.xxl, fontWeight: '900', color: COLORS.text },
-  list: { padding: SPACING.xl, paddingBottom: 100 },
-  card: {
-    backgroundColor: COLORS.white, borderRadius: BORDER_RADIUS.xl, padding: SPACING.xl,
-    marginBottom: SPACING.md, ...SHADOWS.sm,
+
+  searchBar: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
+    marginHorizontal: SPACING.xl, marginTop: SPACING.md,
+    backgroundColor: COLORS.surfaceAlt, borderRadius: BORDER_RADIUS.lg,
+    paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm,
   },
-  cardTop: { flexDirection: 'row', alignItems: 'center' },
-  avatar: { width: 44, height: 44, borderRadius: 22 },
+  searchInput: { flex: 1, fontSize: FONT_SIZE.sm, color: COLORS.text, padding: 0 },
+
+  tabRow: {
+    paddingHorizontal: SPACING.xl, paddingVertical: SPACING.md,
+    gap: SPACING.sm,
+  },
+  tabChip: {
+    paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.full,
+    backgroundColor: COLORS.surfaceAlt, borderWidth: 1, borderColor: COLORS.border,
+    marginRight: SPACING.xs,
+  },
+  tabChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  tabText: { fontSize: FONT_SIZE.xs, fontWeight: '700', color: COLORS.textSecondary },
+  tabTextActive: { color: '#FFFFFF' },
+
+  list: { padding: SPACING.xl, paddingBottom: 120 },
+
+  card: {
+    backgroundColor: COLORS.white, borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.lg, marginBottom: SPACING.sm, ...SHADOWS.sm,
+  },
+  cardTop: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
+  avatar: { width: 40, height: 40, borderRadius: 20 },
   avatarPH: { backgroundColor: COLORS.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
-  cardInfo: { flex: 1, marginLeft: SPACING.md },
-  cardName: { fontSize: FONT_SIZE.md, fontWeight: '700', color: COLORS.text },
+  cardInfo: { flex: 1 },
+  cardName: { fontSize: FONT_SIZE.md, fontWeight: '800', color: COLORS.text },
   cardEmail: { fontSize: FONT_SIZE.xs, color: COLORS.textMuted, marginTop: 2 },
-  roleBadge: { paddingHorizontal: SPACING.md, paddingVertical: 4, borderRadius: BORDER_RADIUS.full },
-  roleText: { fontSize: FONT_SIZE.xs, fontWeight: '700' },
-  cardBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SPACING.md, paddingTop: SPACING.md, borderTopWidth: 1, borderTopColor: COLORS.borderLight },
-  cardMeta: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  metaText: { fontSize: FONT_SIZE.sm, fontWeight: '600' },
+  roleBadge: { paddingHorizontal: SPACING.sm, paddingVertical: 4, borderRadius: BORDER_RADIUS.full },
+  roleText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.3 },
+
+  flagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.xs, marginTop: SPACING.sm },
+  flag: { paddingHorizontal: SPACING.sm, paddingVertical: 2, borderRadius: BORDER_RADIUS.full },
+  flagText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.3 },
 });
+
+export default AdminUsersScreen;

@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
-import { adminApi, paymentsApi } from '../../services/api';
+import { adminApi, payoutsApi } from '../../services/api';
 import { Button } from '../../components/Button';
 import { TabBar } from '../../components/TabBar';
 import { Loading, EmptyState } from '../../components/Common';
@@ -38,6 +38,7 @@ export const AdminPaymentsScreen: React.FC<{ navigation: any }> = ({ navigation 
   const [refreshing, setRefreshing] = useState(false);
   const [refundTarget, setRefundTarget] = useState<any | null>(null);
   const [refundReason, setRefundReason] = useState('');
+  const [refundPartial, setRefundPartial] = useState('');
   const [refunding, setRefunding] = useState(false);
 
   const fetchPayments = useCallback(async (showLoader = true) => {
@@ -58,11 +59,23 @@ export const AdminPaymentsScreen: React.FC<{ navigation: any }> = ({ navigation 
   const submitRefund = async () => {
     if (!refundTarget) return;
     if (!refundReason.trim()) return Alert.alert('Error', 'Reason is required');
+    let partial: number | undefined;
+    if (refundPartial.trim()) {
+      const n = Number(refundPartial);
+      if (!Number.isFinite(n) || n <= 0) {
+        return Alert.alert('Invalid', 'Partial amount must be a positive number.');
+      }
+      partial = n;
+    }
     setRefunding(true);
     try {
-      await paymentsApi.refund(refundTarget.id, refundReason.trim());
-      Alert.alert('Refunded', 'Payment refunded successfully');
-      setRefundTarget(null); setRefundReason('');
+      // Use the SUPER_ADMIN-gated payouts refund endpoint, which writes an
+      // audit-log entry and refunds the client wallet through the payout
+      // service. The non-admin /payments/:id/refund used previously was not
+      // role-gated server-side and didn't surface in the audit log.
+      await payoutsApi.refund(refundTarget.id, { reason: refundReason.trim(), partialAmount: partial });
+      Alert.alert('Refunded', partial ? `₹${partial.toLocaleString('en-IN')} refunded.` : 'Payment refunded.');
+      setRefundTarget(null); setRefundReason(''); setRefundPartial('');
       fetchPayments(false);
     } catch (err: any) {
       Alert.alert('Error', formatErrorMessage(err) || 'Failed to refund');
@@ -137,13 +150,23 @@ export const AdminPaymentsScreen: React.FC<{ navigation: any }> = ({ navigation 
                   Payment ID: {String(refundTarget.id).slice(0, 16)}…
                 </Text>
               )}
+              <Text style={styles.label}>REASON (REQUIRED)</Text>
               <TextInput
                 style={styles.input}
                 value={refundReason}
                 onChangeText={setRefundReason}
-                placeholder="Reason for refund"
+                placeholder="Why is this payment being refunded?"
                 placeholderTextColor={COLORS.textMuted}
                 multiline
+              />
+              <Text style={styles.label}>PARTIAL AMOUNT (₹, OPTIONAL — DEFAULTS TO FULL)</Text>
+              <TextInput
+                style={[styles.input, { height: 50 }]}
+                value={refundPartial}
+                onChangeText={setRefundPartial}
+                placeholder="e.g. 500"
+                placeholderTextColor={COLORS.textMuted}
+                keyboardType="number-pad"
               />
               <Button title="Confirm Refund" onPress={submitRefund} loading={refunding} size="lg" variant="danger" />
             </View>
@@ -193,6 +216,7 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   modalTitle: { fontSize: FONT_SIZE.xl, fontWeight: '800', color: COLORS.text },
   modalBody: { padding: SPACING.xl },
   modalInfo: { fontSize: FONT_SIZE.sm, color: COLORS.textSecondary, marginBottom: SPACING.md, lineHeight: 20 },
+  label: { fontSize: FONT_SIZE.xs, fontWeight: '700', color: COLORS.textMuted, letterSpacing: 0.5, marginBottom: SPACING.xs, marginTop: SPACING.xs },
   input: {
     backgroundColor: COLORS.surfaceAlt, borderRadius: BORDER_RADIUS.lg,
     paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md,

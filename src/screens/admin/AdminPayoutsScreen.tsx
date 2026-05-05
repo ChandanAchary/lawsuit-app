@@ -1,13 +1,14 @@
 import { useThemeStore, useColors } from '../../stores/themeStore';
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Alert,
+  View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Alert, Modal, TextInput, ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { payoutsApi, PayoutStatus } from '../../services/api';
 import { TabBar } from '../../components/TabBar';
 import { Loading, EmptyState } from '../../components/Common';
+import { Button } from '../../components/Button';
 import { formatErrorMessage } from '../../utils/formatError';
 import { formatDate, formatTime } from '../../utils/date';
 import { useAuthStore } from '../../stores/authStore';
@@ -61,6 +62,16 @@ export const AdminPayoutsScreen: React.FC<{ navigation: any }> = ({ navigation }
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [disbursingId, setDisbursingId] = useState<string | null>(null);
+
+  // Dispute / refund modal state. Only Super Admins reach here.
+  const [actionTarget, setActionTarget] = useState<PayoutItem | null>(null);
+  const [actionType, setActionType] = useState<'REFUND' | 'OPEN_DISPUTE' | 'RESOLVE_DISPUTE' | null>(null);
+  const [reasonInput, setReasonInput] = useState('');
+  const [partialAmountInput, setPartialAmountInput] = useState('');
+  const [resolutionInput, setResolutionInput] = useState('');
+  const [outcomeInput, setOutcomeInput] = useState<'release' | 'refund' | 'split'>('release');
+  const [refundAmountInput, setRefundAmountInput] = useState('');
+  const [submittingAction, setSubmittingAction] = useState(false);
 
   const fetchSummary = useCallback(async () => {
     try {
@@ -184,8 +195,95 @@ export const AdminPayoutsScreen: React.FC<{ navigation: any }> = ({ navigation }
             Awaiting consultation completion before payout can be released.
           </Text>
         )}
+
+        {isSuper && (status === 'HELD_BY_PLATFORM' || status === 'PAYABLE') && (
+          <View style={styles.altActionRow}>
+            <TouchableOpacity
+              style={styles.altActionBtn}
+              onPress={() => openAction(item, 'REFUND')}
+            >
+              <Ionicons name="arrow-undo-outline" size={14} color="#B45309" />
+              <Text style={[styles.altActionText, { color: '#B45309' }]}>Refund</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.altActionBtn}
+              onPress={() => openAction(item, 'OPEN_DISPUTE')}
+            >
+              <Ionicons name="warning-outline" size={14} color="#B91C1C" />
+              <Text style={[styles.altActionText, { color: '#B91C1C' }]}>Dispute</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {isSuper && (item as any).disputeStatus === 'OPEN' && (
+          <View style={styles.altActionRow}>
+            <TouchableOpacity
+              style={[styles.altActionBtn, { backgroundColor: '#DBEAFE' }]}
+              onPress={() => openAction(item, 'RESOLVE_DISPUTE')}
+            >
+              <Ionicons name="hammer-outline" size={14} color="#1D4ED8" />
+              <Text style={[styles.altActionText, { color: '#1D4ED8' }]}>Resolve dispute</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     );
+  };
+
+  const openAction = (item: PayoutItem, type: 'REFUND' | 'OPEN_DISPUTE' | 'RESOLVE_DISPUTE') => {
+    setActionTarget(item);
+    setActionType(type);
+    setReasonInput('');
+    setPartialAmountInput('');
+    setResolutionInput('');
+    setOutcomeInput('release');
+    setRefundAmountInput('');
+  };
+
+  const closeAction = () => {
+    setActionTarget(null);
+    setActionType(null);
+  };
+
+  const submitAction = async () => {
+    if (!actionTarget || !actionType) return;
+    try {
+      if (actionType === 'REFUND') {
+        if (!reasonInput.trim()) return Alert.alert('Required', 'A refund reason is required.');
+        const partial = partialAmountInput.trim() ? Number(partialAmountInput) : undefined;
+        if (partial !== undefined && (!Number.isFinite(partial) || partial <= 0)) {
+          return Alert.alert('Invalid', 'Partial amount must be a positive number.');
+        }
+        setSubmittingAction(true);
+        await payoutsApi.refund(actionTarget.id, { reason: reasonInput.trim(), partialAmount: partial });
+        Alert.alert('Refunded', 'The payment has been refunded to the client.');
+      } else if (actionType === 'OPEN_DISPUTE') {
+        if (!reasonInput.trim()) return Alert.alert('Required', 'A dispute reason is required.');
+        setSubmittingAction(true);
+        await payoutsApi.openDispute(actionTarget.id, { reason: reasonInput.trim() });
+        Alert.alert('Dispute opened', 'This payment is now flagged as disputed.');
+      } else {
+        if (!resolutionInput.trim()) return Alert.alert('Required', 'A resolution summary is required.');
+        const refundAmt = refundAmountInput.trim() ? Number(refundAmountInput) : undefined;
+        if (outcomeInput === 'split' && (refundAmt === undefined || !Number.isFinite(refundAmt) || refundAmt <= 0)) {
+          return Alert.alert('Invalid', 'Split outcome requires a refund amount.');
+        }
+        setSubmittingAction(true);
+        await payoutsApi.resolveDispute(actionTarget.id, {
+          outcome: outcomeInput,
+          resolution: resolutionInput.trim(),
+          refundAmount: refundAmt,
+        });
+        Alert.alert('Resolved', 'Dispute resolved.');
+      }
+      closeAction();
+      fetchPayouts(false);
+      fetchSummary();
+    } catch (err: any) {
+      Alert.alert('Error', formatErrorMessage(err) || 'Action failed');
+    } finally {
+      setSubmittingAction(false);
+    }
   };
 
   if (!isSuper) {
@@ -213,6 +311,14 @@ export const AdminPayoutsScreen: React.FC<{ navigation: any }> = ({ navigation }
           <Ionicons name="arrow-back" size={22} color={COLORS.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Booking Payouts</Text>
+        <TouchableOpacity
+          onPress={() => navigation.navigate('AdminEscrowLedger')}
+          style={styles.ledgerBtn}
+          accessibilityLabel="Open ledger and history"
+        >
+          <Ionicons name="receipt-outline" size={18} color={COLORS.primary} />
+          <Text style={styles.ledgerBtnText}>Ledger</Text>
+        </TouchableOpacity>
       </View>
 
       {summary && (
@@ -269,6 +375,107 @@ export const AdminPayoutsScreen: React.FC<{ navigation: any }> = ({ navigation }
           }
         />
       )}
+
+      {/* Refund / dispute / resolve modal */}
+      <Modal visible={!!actionType} transparent animationType="slide" onRequestClose={closeAction}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {actionType === 'REFUND' ? 'Refund payment'
+                  : actionType === 'OPEN_DISPUTE' ? 'Open dispute'
+                  : 'Resolve dispute'}
+              </Text>
+              <TouchableOpacity onPress={closeAction}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView contentContainerStyle={styles.modalBody}>
+              <Text style={styles.modalSummary}>
+                ₹{Number(actionTarget?.amount || 0).toLocaleString('en-IN')} · {actionTarget?.beneficiary?.name || actionTarget?.beneficiaryType || ''}
+              </Text>
+
+              {actionType === 'REFUND' && (
+                <>
+                  <Text style={styles.modalLabel}>REASON (REQUIRED)</Text>
+                  <TextInput
+                    style={[styles.modalInput, { height: 90, textAlignVertical: 'top' }]}
+                    value={reasonInput} onChangeText={setReasonInput}
+                    placeholder="Why is this payment being refunded?" placeholderTextColor={COLORS.textMuted}
+                    multiline
+                  />
+                  <Text style={styles.modalLabel}>PARTIAL AMOUNT (₹, OPTIONAL — DEFAULTS TO FULL)</Text>
+                  <TextInput
+                    style={styles.modalInput} value={partialAmountInput}
+                    onChangeText={setPartialAmountInput} keyboardType="number-pad"
+                    placeholder="e.g. 500" placeholderTextColor={COLORS.textMuted}
+                  />
+                </>
+              )}
+
+              {actionType === 'OPEN_DISPUTE' && (
+                <>
+                  <Text style={styles.modalLabel}>DISPUTE REASON (REQUIRED)</Text>
+                  <TextInput
+                    style={[styles.modalInput, { height: 100, textAlignVertical: 'top' }]}
+                    value={reasonInput} onChangeText={setReasonInput}
+                    placeholder="What's the dispute? Goes to the audit log." placeholderTextColor={COLORS.textMuted}
+                    multiline
+                  />
+                </>
+              )}
+
+              {actionType === 'RESOLVE_DISPUTE' && (
+                <>
+                  <Text style={styles.modalLabel}>OUTCOME</Text>
+                  <View style={styles.outcomeRow}>
+                    {(['release', 'refund', 'split'] as const).map((o) => (
+                      <TouchableOpacity
+                        key={o}
+                        style={[styles.outcomeChip, outcomeInput === o && styles.outcomeChipActive]}
+                        onPress={() => setOutcomeInput(o)}
+                      >
+                        <Text style={[styles.outcomeChipText, outcomeInput === o && { color: '#FFFFFF' }]}>
+                          {o.toUpperCase()}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  {outcomeInput === 'split' && (
+                    <>
+                      <Text style={styles.modalLabel}>REFUND AMOUNT (₹)</Text>
+                      <TextInput
+                        style={styles.modalInput} value={refundAmountInput}
+                        onChangeText={setRefundAmountInput} keyboardType="number-pad"
+                        placeholder="Amount to refund — remainder goes to beneficiary"
+                        placeholderTextColor={COLORS.textMuted}
+                      />
+                    </>
+                  )}
+                  <Text style={styles.modalLabel}>RESOLUTION SUMMARY (REQUIRED)</Text>
+                  <TextInput
+                    style={[styles.modalInput, { height: 100, textAlignVertical: 'top' }]}
+                    value={resolutionInput} onChangeText={setResolutionInput}
+                    placeholder="Audit-trail explanation of the resolution"
+                    placeholderTextColor={COLORS.textMuted}
+                    multiline
+                  />
+                </>
+              )}
+
+              <Button
+                title={actionType === 'REFUND' ? 'Confirm refund'
+                  : actionType === 'OPEN_DISPUTE' ? 'Open dispute'
+                  : 'Resolve dispute'}
+                onPress={submitAction}
+                loading={submittingAction}
+                variant={actionType === 'OPEN_DISPUTE' ? 'danger' : 'primary'}
+                size="lg"
+              />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -295,6 +502,13 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   headerTitle: { flex: 1, fontSize: FONT_SIZE.xxl, fontWeight: '900', color: COLORS.text },
+  ledgerBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: SPACING.md, paddingVertical: SPACING.xs,
+    backgroundColor: COLORS.primaryLight + '20',
+    borderRadius: BORDER_RADIUS.full,
+  },
+  ledgerBtnText: { color: COLORS.primary, fontSize: FONT_SIZE.xs, fontWeight: '800' },
 
   summaryRow: {
     flexDirection: 'row', gap: SPACING.sm,
@@ -356,6 +570,49 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     color: COLORS.textMuted,
     fontStyle: 'italic',
   },
+
+  altActionRow: {
+    flexDirection: 'row', gap: SPACING.sm, marginTop: SPACING.md,
+  },
+  altActionBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.full,
+    backgroundColor: COLORS.surfaceAlt,
+  },
+  altActionText: { fontSize: FONT_SIZE.xs, fontWeight: '800' },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: BORDER_RADIUS.xxl, borderTopRightRadius: BORDER_RADIUS.xxl,
+    maxHeight: '92%', paddingBottom: SPACING.xxl,
+  },
+  modalHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: SPACING.xl, paddingVertical: SPACING.lg,
+    borderBottomWidth: 1, borderBottomColor: COLORS.borderLight,
+  },
+  modalTitle: { fontSize: FONT_SIZE.xl, fontWeight: '800', color: COLORS.text },
+  modalBody: { padding: SPACING.xl },
+  modalSummary: { fontSize: FONT_SIZE.md, color: COLORS.text, fontWeight: '700' },
+  modalLabel: {
+    fontSize: FONT_SIZE.xs, fontWeight: '700', color: COLORS.textMuted,
+    letterSpacing: 0.5, marginTop: SPACING.lg, marginBottom: SPACING.xs,
+  },
+  modalInput: {
+    backgroundColor: COLORS.surfaceAlt, borderRadius: BORDER_RADIUS.lg,
+    paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md,
+    fontSize: FONT_SIZE.md, color: COLORS.text, marginBottom: SPACING.md,
+  },
+  outcomeRow: { flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.md },
+  outcomeChip: {
+    flex: 1, alignItems: 'center', paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg, backgroundColor: COLORS.surfaceAlt,
+    borderWidth: 1, borderColor: COLORS.border,
+  },
+  outcomeChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  outcomeChipText: { fontSize: FONT_SIZE.sm, fontWeight: '800', color: COLORS.text },
 });
 
 export default AdminPayoutsScreen;
