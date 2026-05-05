@@ -330,8 +330,16 @@ export const adminApi = {
     api.put(`/admin/wallets/withdrawals/${encodeURIComponent(id)}/reverse`, { reason }),
   getNotVerifiedClients: () => api.get('/admin/not-verified-client'),
   getNotVerifiedLawyers: () => api.get('/admin/not-verified-lawyers'),
-  verifyLawyer: (id: string) => api.put(`/admin/${encodeURIComponent(id)}/verifylawyer`),
-  verifyClient: (id: string) => api.put(`/admin/${encodeURIComponent(id)}/verifyclient`),
+
+  // Single source of truth for the admin "Verify user" toggle. The earlier
+  // /admin/:id/verifylawyer + /admin/:id/verifyclient routes were removed
+  // server-side (Phase 1) and silently 404'd the mobile, leaving the
+  // lawyer.isVerified flag false even after the admin tapped Verify — which
+  // is why client / admin / super-admin views all kept showing "Not Verified
+  // by Any Court". This calls the live /admin/users/:id/verification toggle
+  // which actually flips lawyer.isVerified (and client.isVerified) in DB.
+  setUserVerified: (id: string, isVerified: boolean) =>
+    api.put(`/admin/users/${encodeURIComponent(id)}/verification`, { isVerified }),
 };
 
 // ─── Admin Management API (SUPER_ADMIN only) ───────────────

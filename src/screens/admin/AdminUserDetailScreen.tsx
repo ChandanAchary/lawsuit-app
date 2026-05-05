@@ -104,9 +104,17 @@ export const AdminUserDetailScreen: React.FC<{ navigation: any; route: { params:
       const r = reason.trim() || undefined;
       switch (action) {
         case 'VERIFY':
-          if (role === 'CLIENT') await adminApi.verifyClient(user.id);
-          else if (role === 'LAWYER') await adminApi.verifyLawyer(user.id);
-          else throw new Error('This role is not verifiable through this screen.');
+          // Uses the live /admin/users/:id/verification toggle which writes
+          // lawyer.isVerified (or client.isVerified) directly. The legacy
+          // adminApi.verifyLawyer / verifyClient routes were removed in
+          // Phase 1 and silently 404'd, leaving the flag stuck false.
+          if (role === 'CLIENT' || role === 'LAWYER') {
+            await adminApi.setUserVerified(user.id, true);
+          } else if (role === 'ORGANIZATION' || role === 'COURT_ADMIN') {
+            await adminApi.setUserVerified(user.id, true);
+          } else {
+            throw new Error('This role is not verifiable through this screen.');
+          }
           break;
         case 'BAN':
           await userControlApi.ban(role as ControllableRole, user.id, r as string);
@@ -208,7 +216,11 @@ export const AdminUserDetailScreen: React.FC<{ navigation: any; route: { params:
 
         {/* Actions */}
         <Section title="Actions" styles={styles}>
-          {!isVerified && (role === 'CLIENT' || role === 'LAWYER') && (
+          {/* Simple admin Verify shortcut — flips lawyer/client/org/court-admin
+              isVerified directly via /admin/users/:id/verification. The richer
+              KYC-override flow below (super-admin only, with reason + audit
+              log) is the canonical path for lawyer/org verification reversals. */}
+          {!isVerified && controllable && (
             <ActionRow icon="checkmark-circle-outline" label="Verify user" tone="primary" onPress={() => startAction('VERIFY')} styles={styles} COLORS={COLORS} />
           )}
 
