@@ -89,17 +89,16 @@
     "updates": {
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
-      "fallbackToCacheTimeout": 0,
-      "url": "https://u.expo.dev/73a2f4bc-1a1a-40b6-a09a-65f0b94038b9"
+      "fallbackToCacheTimeout": 0
     },
     "runtimeVersion": {
       "policy": "appVersion"
     },
-    "owner": "expo-chandan",
     "extra": {
       "eas": {
-        "projectId": "73a2f4bc-1a1a-40b6-a09a-65f0b94038b9"
+        "projectId": "7c7b95bb-eab7-4c38-a687-f2b61b59ceb1"
       }
-    }
+    },
+    "owner": "expo-chandan"
   }
 }
