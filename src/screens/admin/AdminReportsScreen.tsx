@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { adminReportsApi, ReportStatus } from '../../services/api';
 import { Loading, EmptyState } from '../../components/Common';
+import { TabBar } from '../../components/TabBar';
 import { useColors, useThemeStore } from '../../stores/themeStore';
 import { formatErrorMessage } from '../../utils/formatError';
 import { formatDate, formatTime } from '../../utils/date';
@@ -124,17 +125,11 @@ export const AdminReportsScreen: React.FC<{ navigation: any }> = ({ navigation }
         />
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabRow}>
-        {STATUS_TABS.map((t) => (
-          <TouchableOpacity
-            key={t.key}
-            style={[styles.tabChip, tab === t.key && styles.tabChipActive]}
-            onPress={() => setTab(t.key)}
-          >
-            <Text style={[styles.tabText, tab === t.key && { color: '#FFFFFF' }]}>{t.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      <TabBar
+        tabs={STATUS_TABS as { key: string; label: string }[]}
+        active={tab}
+        onSelect={(k) => setTab(k as typeof tab)}
+      />
 
       {loading ? <Loading /> : (
         <FlatList
@@ -252,15 +247,6 @@ const getStyles = (C: any) => StyleSheet.create({
     paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm,
   },
   searchInput: { flex: 1, fontSize: FONT_SIZE.sm, color: C.text, padding: 0 },
-
-  tabRow: { paddingHorizontal: SPACING.xl, paddingVertical: SPACING.md, gap: SPACING.sm },
-  tabChip: {
-    paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.full, backgroundColor: C.surfaceAlt,
-    borderWidth: 1, borderColor: C.border, marginRight: SPACING.xs,
-  },
-  tabChipActive: { backgroundColor: C.primary, borderColor: C.primary },
-  tabText: { fontSize: FONT_SIZE.xs, fontWeight: '700', color: C.textSecondary },
 
   list: { padding: SPACING.xl, paddingBottom: 120 },
 

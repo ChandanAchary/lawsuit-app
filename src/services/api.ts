@@ -330,8 +330,16 @@ export const adminApi = {
     api.put(`/admin/wallets/withdrawals/${encodeURIComponent(id)}/reverse`, { reason }),
   getNotVerifiedClients: () => api.get('/admin/not-verified-client'),
   getNotVerifiedLawyers: () => api.get('/admin/not-verified-lawyers'),
-  verifyLawyer: (id: string) => api.put(`/admin/${encodeURIComponent(id)}/verifylawyer`),
-  verifyClient: (id: string) => api.put(`/admin/${encodeURIComponent(id)}/verifyclient`),
+
+  // Single source of truth for the admin "Verify user" toggle. The earlier
+  // /admin/:id/verifylawyer + /admin/:id/verifyclient routes were removed
+  // server-side (Phase 1) and silently 404'd the mobile, leaving the
+  // lawyer.isVerified flag false even after the admin tapped Verify — which
+  // is why client / admin / super-admin views all kept showing "Not Verified
+  // by Any Court". This calls the live /admin/users/:id/verification toggle
+  // which actually flips lawyer.isVerified (and client.isVerified) in DB.
+  setUserVerified: (id: string, isVerified: boolean) =>
+    api.put(`/admin/users/${encodeURIComponent(id)}/verification`, { isVerified }),
 };
 
 // ─── Admin Management API (SUPER_ADMIN only) ───────────────
@@ -424,6 +432,151 @@ export const courtAdminSalaryApi = {
     api.get('/admin/salary-cycles/current', { params }),
   payoutHistory: (params?: { courtAdminId?: string; cycleMonth?: number; cycleYear?: number; page?: number; limit?: number }) =>
     api.get('/admin/salary-cycles/history', { params }),
+};
+
+// ─── Lawyer & Organization performance-based salary (SUPER_ADMIN) ──
+// Polymorphic salary surface that handles both LAWYER and ORGANIZATION
+// subjects through the same endpoints. The mount segment in the URL
+// (`lawyers` vs `organizations`) is what tells the server which kind of
+// subject this is; pass the matching `subject` value to switch between them.
+//
+// Net payout formula at the server, snapshotted on every payout row:
+//   base + (bonusPerConsultation × completedConsultations)
+//        + (bonusPerCaseClosed   × cases closed in cycle)
+//        + (bonusPerWonCase      × cases won/settled in cycle)
+//        + adminBonus  − adminDeduction
+//
+// Org subjects aggregate counts across every lawyer with
+// organizationId === subjectId; org-affiliated lawyers therefore
+// don't double-count when paid as LAWYER.
+export type EntitySalarySubject = 'LAWYER' | 'ORGANIZATION';
+
+const entitySalarySegment = (subject: EntitySalarySubject) =>
+  subject === 'LAWYER' ? 'lawyers' : 'organizations';
+
+export type EntitySalaryConfig = {
+  id: string;
+  subjectType: EntitySalarySubject;
+  subjectId: string;
+  baseSalary: number;
+  bonusPerConsultation: number;
+  bonusPerCaseClosed: number;
+  bonusPerWonCase: number;
+  isOnHold: boolean;
+  holdReason: string | null;
+  updatedById: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type EntitySalaryPreview = {
+  cycle: { cycleMonth: number; cycleYear: number };
+  config: EntitySalaryConfig | null;
+  performance: {
+    consultationCount: number;
+    caseClosedCount: number;
+    caseWonCount: number;
+    cycleStart: string;
+    cycleEnd: string;
+  };
+  breakdown: {
+    consultationBonus: number;
+    caseClosedBonus: number;
+    caseWonBonus: number;
+    adminBonus: number;
+    adminDeduction: number;
+    netPayable: number;
+  };
+  alreadyPaid: boolean;
+  existingPayout: any | null;
+};
+
+export const entitySalaryApi = {
+  getConfig: (subject: EntitySalarySubject, id: string) =>
+    api.get(`/admin/${entitySalarySegment(subject)}/${encodeURIComponent(id)}/salary`),
+
+  // Update any subset of base + bonus rates in one call. Reason is
+  // optional but recorded in the audit log when present.
+  setConfig: (
+    subject: EntitySalarySubject,
+    id: string,
+    data: Partial<{
+      baseSalary: number;
+      bonusPerConsultation: number;
+      bonusPerCaseClosed: number;
+      bonusPerWonCase: number;
+      reason: string;
+    }>,
+  ) => api.put(`/admin/${entitySalarySegment(subject)}/${encodeURIComponent(id)}/salary`, data),
+
+  hold: (subject: EntitySalarySubject, id: string, data: { reason: string }) =>
+    api.post(`/admin/${entitySalarySegment(subject)}/${encodeURIComponent(id)}/salary/hold`, data),
+
+  release: (subject: EntitySalarySubject, id: string, data?: { reason?: string }) =>
+    api.post(`/admin/${entitySalarySegment(subject)}/${encodeURIComponent(id)}/salary/release`, data ?? {}),
+
+  // Live cycle preview — counts performance and computes the net payable
+  // right now without writing anything. Safe to call on screen open.
+  preview: (
+    subject: EntitySalarySubject,
+    id: string,
+    params?: { cycleMonth?: number; cycleYear?: number },
+  ) => api.get(`/admin/${entitySalarySegment(subject)}/${encodeURIComponent(id)}/salary/preview`, { params }),
+
+  pay: (
+    subject: EntitySalarySubject,
+    id: string,
+    data?: {
+      cycleMonth?: number;
+      cycleYear?: number;
+      bonusAmount?: number;
+      deductionAmount?: number;
+      notes?: string;
+      providerPayoutId?: string;
+    },
+  ) => api.post(`/admin/${entitySalarySegment(subject)}/${encodeURIComponent(id)}/salary/pay`, data ?? {}),
+
+  // Append-only history of config changes (base + bonus + hold edits).
+  adjustmentHistory: (subject: EntitySalarySubject, id: string, limit?: number) =>
+    api.get(
+      `/admin/${entitySalarySegment(subject)}/${encodeURIComponent(id)}/salary/history`,
+      { params: limit ? { limit } : {} },
+    ),
+
+  // Snapshot of every cycle paid (one row per cycle).
+  payoutHistory: (subject: EntitySalarySubject, id: string, limit?: number) =>
+    api.get(
+      `/admin/${entitySalarySegment(subject)}/${encodeURIComponent(id)}/salary/payouts`,
+      { params: limit ? { limit } : {} },
+    ),
+
+  // Cycle queues — every payable subject for the current month, with the
+  // live performance breakdown attached so the screen renders without
+  // making N preview calls.
+  payableLawyers: (params?: { cycleMonth?: number; cycleYear?: number }) =>
+    api.get('/admin/lawyer-salary-cycles/current', { params }),
+
+  payableOrganizations: (params?: { cycleMonth?: number; cycleYear?: number }) =>
+    api.get('/admin/org-salary-cycles/current', { params }),
+
+  // Read a subject's bank accounts (super-admin only). Returns same shape
+  // as the user-facing /bank-accounts endpoint so the UI can render them
+  // with the existing components. Used in the salary detail screen so the
+  // super admin sees where to wire money for off-platform settlements.
+  bankAccounts: (subject: EntitySalarySubject, id: string) =>
+    api.get(`/admin/${entitySalarySegment(subject)}/${encodeURIComponent(id)}/bank-accounts`),
+};
+
+// ─── Self-view of own performance-based salary (lawyer / org head) ──
+// Returns the same payload shape the super admin sees in the detail
+// screen, plus the lawyer / org's own bank accounts (via the /me/salary
+// endpoint, which bundles them) so they can verify where their money
+// will land before the next payout cycle.
+//
+// Use these from LawyerSalaryScreen + OrgSalaryScreen.
+export const selfSalaryApi = {
+  getMyLawyerSalary: () => api.get('/lawyers/me/salary'),
+  getMyOrganizationSalary: () => api.get('/organizations/me/salary'),
 };
 
 // ─── User control (SUPER_ADMIN only) ───────────────────────

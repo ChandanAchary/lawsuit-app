@@ -19,6 +19,33 @@ const TABS = [
   { key: 'history',     label: 'Payout history' },
 ];
 
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+const cycleMonthName = (m: number) => MONTH_NAMES[(Math.max(1, Math.min(12, m)) - 1)] || '—';
+
+const actionTitle = (a: 'BASE' | 'HOLD' | 'RELEASE' | 'PAY') => ({
+  BASE: 'Set base salary',
+  HOLD: 'Hold payouts',
+  RELEASE: 'Release hold',
+  PAY: 'Record this month’s payout',
+}[a]);
+
+const actionHelp = (a: 'BASE' | 'HOLD' | 'RELEASE' | 'PAY') => ({
+  BASE: 'The monthly base salary in rupees. Setting this puts the court admin into the payable cycle. Existing payouts already made for this cycle aren’t affected.',
+  HOLD: 'Pauses future payouts. The base salary stays set; the court admin won’t appear in the cycle list until released. Hold reason is required and goes into the audit log.',
+  RELEASE: 'Resumes payouts. The court admin will reappear in the next payable cycle.',
+  PAY: 'Records a payout from the platform wallet to this court admin’s wallet for the current cycle. Idempotent per (court admin, month) — running it twice in the same cycle will fail server-side.',
+}[a]);
+
+const previewNet = (base: unknown, bonusStr: string, deductStr: string): number => {
+  const baseN = Number(base) || 0;
+  const bonusN = Number(bonusStr) || 0;
+  const deductN = Number(deductStr) || 0;
+  return Math.max(0, baseN + bonusN - deductN);
+};
+
 // One screen for the super-admin court-admin operations surface — performance
 // metrics (Section 5), current salary cycle, and payout history. The salary
 // detail modal lets the super admin set the base salary, hold/release, and
@@ -158,27 +185,29 @@ export const SuperAdminCourtAdminOpsScreen: React.FC<{ navigation: any }> = ({ n
     </TouchableOpacity>
   );
 
-  const renderCycleItem = ({ item }: { item: any }) => (
-    <TouchableOpacity style={styles.card} onPress={() => openDetail(item.courtAdminId || item.id, item.name)}>
-      <View style={[styles.iconBg, { backgroundColor: item.salaryStatus === 'HELD' ? '#FEE2E2' : '#D1FAE5' }]}>
-        <Ionicons
-          name={item.salaryStatus === 'HELD' ? 'pause-circle' : 'cash'}
-          size={20}
-          color={item.salaryStatus === 'HELD' ? '#B91C1C' : '#047857'}
-        />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.name} numberOfLines={1}>{item.name || '—'}</Text>
-        <Text style={styles.sub}>
-          ₹{Number(item.baseSalary || 0).toLocaleString('en-IN')} / month · {item.salaryStatus || 'ACTIVE'}
-        </Text>
-        {item.cycleMonth ? (
-          <Text style={styles.sub}>Cycle {item.cycleMonth}/{item.cycleYear}</Text>
-        ) : null}
-      </View>
-      <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
-    </TouchableOpacity>
-  );
+  // Cycle response shape from /admin/salary-cycles/current:
+  //   { cycle: { cycleMonth, cycleYear }, items: [{ courtAdmin, baseSalary,
+  //     bonusAmount, deductionAmount, netPayable }] }
+  // The court-admin's name lives on item.courtAdmin.name, not item.name.
+  const renderCycleItem = ({ item }: { item: any }) => {
+    const ca = item.courtAdmin || {};
+    const net = Number(item.netPayable ?? item.baseSalary ?? 0);
+    return (
+      <TouchableOpacity style={styles.card} onPress={() => openDetail(ca.id || item.courtAdminId, ca.name)}>
+        <View style={[styles.iconBg, { backgroundColor: '#D1FAE5' }]}>
+          <Ionicons name="cash" size={20} color="#047857" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.name} numberOfLines={1}>{ca.name || '—'}</Text>
+          <Text style={styles.sub} numberOfLines={1}>{ca.email || ''}</Text>
+          <Text style={styles.amount}>
+            ₹{net.toLocaleString('en-IN')} <Text style={styles.amountSuffix}>payable this cycle</Text>
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
+      </TouchableOpacity>
+    );
+  };
 
   const renderHistory = ({ item }: { item: any }) => (
     <View style={styles.card}>
@@ -221,17 +250,22 @@ export const SuperAdminCourtAdminOpsScreen: React.FC<{ navigation: any }> = ({ n
           renderItem={renderCycleItem}
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(false); }} colors={[COLORS.primary]} />}
-          ListEmptyComponent={<EmptyState icon="🗓️" title="No payable cycle" message="Nothing to pay this cycle." />}
+          ListEmptyComponent={<EmptyState icon="🗓️" title="Nobody payable this cycle" message="Either nobody has a base salary set, all are on hold, or everyone payable has already been paid for this month." />}
           ListHeaderComponent={cycle ? (
             <View style={styles.summaryCard}>
-              <Text style={styles.summaryLabel}>Cycle</Text>
-              <Text style={styles.summaryValue}>{cycle.cycleMonth || '—'}/{cycle.cycleYear || '—'}</Text>
-              {cycle.totalPayable != null ? (
-                <>
-                  <Text style={styles.summaryLabel}>Total payable</Text>
-                  <Text style={styles.summaryValue}>₹{Number(cycle.totalPayable).toLocaleString('en-IN')}</Text>
-                </>
-              ) : null}
+              <Text style={styles.summaryLabel}>CURRENT CYCLE</Text>
+              <Text style={styles.summaryValue}>
+                {cycle.cycle?.cycleMonth ? cycleMonthName(cycle.cycle.cycleMonth) : (cycle.cycleMonth ? cycleMonthName(cycle.cycleMonth) : '—')}
+                {' '}
+                {cycle.cycle?.cycleYear || cycle.cycleYear || ''}
+              </Text>
+              <Text style={styles.summaryLabel}>TOTAL PAYABLE</Text>
+              <Text style={styles.summaryValue}>
+                ₹{(cycle.items || cycle.payable || []).reduce((sum: number, it: any) => sum + Number(it.netPayable ?? it.baseSalary ?? 0), 0).toLocaleString('en-IN')}
+              </Text>
+              <Text style={styles.summaryHelp}>
+                One row per active court admin who has a base salary, isn't on hold, and hasn't been paid yet for this cycle. Tap a row to record their payout from the platform wallet.
+              </Text>
             </View>
           ) : null}
         />
@@ -255,23 +289,67 @@ export const SuperAdminCourtAdminOpsScreen: React.FC<{ navigation: any }> = ({ n
                 <Ionicons name="close" size={24} color={COLORS.text} />
               </TouchableOpacity>
             </View>
-            {detailLoading || !detailConfig ? <Loading /> : (
+            {detailLoading ? <Loading /> : (
               <ScrollView contentContainerStyle={styles.modalBody}>
-                <Text style={styles.summaryLabel}>BASE SALARY</Text>
-                <Text style={styles.summaryValue}>
-                  ₹{Number(detailConfig.baseSalary || 0).toLocaleString('en-IN')} <Text style={styles.month}>/ month</Text>
-                </Text>
-                <View style={[styles.statusPill, { backgroundColor: detailConfig.status === 'HELD' ? '#FEE2E2' : '#D1FAE5' }]}>
-                  <Text style={[styles.statusPillText, { color: detailConfig.status === 'HELD' ? '#B91C1C' : '#047857' }]}>
-                    {detailConfig.status || 'ACTIVE'}
+                {/* Explainer — surfaces the model so super admins know what
+                    each action means without reading docs. The salary system
+                    is intentionally manual: super admin sets a monthly base,
+                    optionally holds payouts, and presses "Record payout"
+                    once a month per court admin. */}
+                <View style={styles.explainer}>
+                  <Ionicons name="information-circle-outline" size={16} color={COLORS.primary} />
+                  <Text style={styles.explainerText}>
+                    Set a monthly base salary, then run one payout per court admin per cycle.
+                    Hold pauses payouts without losing the base. Money flows from the platform wallet
+                    to the court admin's wallet.
                   </Text>
                 </View>
 
+                {!detailConfig ? (
+                  <View style={styles.emptyConfig}>
+                    <Ionicons name="cash-outline" size={28} color={COLORS.textMuted} />
+                    <Text style={styles.emptyConfigTitle}>No salary set yet</Text>
+                    <Text style={styles.emptyConfigSub}>Set a base salary below to add this court admin to the payable cycle.</Text>
+                  </View>
+                ) : (
+                  <>
+                    <Text style={styles.summaryLabel}>BASE SALARY</Text>
+                    <Text style={styles.summaryValue}>
+                      ₹{Number(detailConfig.baseSalary || 0).toLocaleString('en-IN')} <Text style={styles.month}>/ month</Text>
+                    </Text>
+                    <View style={[
+                      styles.statusPill,
+                      { backgroundColor: detailConfig.isOnHold ? '#FEE2E2' : '#D1FAE5' },
+                    ]}>
+                      <Ionicons
+                        name={detailConfig.isOnHold ? 'pause-circle' : 'checkmark-circle'}
+                        size={12}
+                        color={detailConfig.isOnHold ? '#B91C1C' : '#047857'}
+                      />
+                      <Text style={[
+                        styles.statusPillText,
+                        { color: detailConfig.isOnHold ? '#B91C1C' : '#047857' },
+                      ]}>
+                        {detailConfig.isOnHold ? 'PAYOUTS ON HOLD' : 'PAYOUTS ACTIVE'}
+                      </Text>
+                    </View>
+                    {detailConfig.isOnHold && detailConfig.holdReason ? (
+                      <View style={styles.holdNote}>
+                        <Text style={styles.holdNoteLabel}>HOLD REASON</Text>
+                        <Text style={styles.holdNoteText}>{detailConfig.holdReason}</Text>
+                      </View>
+                    ) : null}
+                  </>
+                )}
+
                 {actionPanel ? (
                   <View style={{ marginTop: SPACING.lg }}>
+                    <Text style={styles.actionTitle}>{actionTitle(actionPanel)}</Text>
+                    <Text style={styles.actionHelp}>{actionHelp(actionPanel)}</Text>
+
                     {actionPanel === 'BASE' && (
                       <>
-                        <Text style={styles.label}>BASE SALARY (₹/MONTH)</Text>
+                        <Text style={styles.label}>NEW BASE SALARY (₹ PER MONTH)</Text>
                         <TextInput
                           style={styles.input} value={baseInput} onChangeText={setBaseInput}
                           keyboardType="number-pad" placeholder="e.g. 50000"
@@ -284,13 +362,16 @@ export const SuperAdminCourtAdminOpsScreen: React.FC<{ navigation: any }> = ({ n
                         <Text style={styles.label}>BONUS (₹, OPTIONAL)</Text>
                         <TextInput
                           style={styles.input} value={bonusInput} onChangeText={setBonusInput}
-                          keyboardType="number-pad" placeholderTextColor={COLORS.textMuted}
+                          keyboardType="number-pad" placeholder="0" placeholderTextColor={COLORS.textMuted}
                         />
                         <Text style={styles.label}>DEDUCTION (₹, OPTIONAL)</Text>
                         <TextInput
                           style={styles.input} value={deductInput} onChangeText={setDeductInput}
-                          keyboardType="number-pad" placeholderTextColor={COLORS.textMuted}
+                          keyboardType="number-pad" placeholder="0" placeholderTextColor={COLORS.textMuted}
                         />
+                        <Text style={styles.payoutPreview}>
+                          Net payout: ₹{previewNet(detailConfig?.baseSalary, bonusInput, deductInput).toLocaleString('en-IN')}
+                        </Text>
                       </>
                     )}
                     <Text style={styles.label}>
@@ -304,8 +385,8 @@ export const SuperAdminCourtAdminOpsScreen: React.FC<{ navigation: any }> = ({ n
                     />
                     <Button
                       title={actionPanel === 'BASE' ? 'Save base salary'
-                        : actionPanel === 'HOLD' ? 'Hold salary'
-                        : actionPanel === 'RELEASE' ? 'Release salary'
+                        : actionPanel === 'HOLD' ? 'Hold payouts'
+                        : actionPanel === 'RELEASE' ? 'Release hold'
                         : 'Record payout'}
                       onPress={submitAction}
                       loading={submitting}
@@ -318,13 +399,40 @@ export const SuperAdminCourtAdminOpsScreen: React.FC<{ navigation: any }> = ({ n
                   </View>
                 ) : (
                   <View style={{ gap: SPACING.sm, marginTop: SPACING.lg }}>
-                    <ActionTile icon="cash-outline" label="Set base salary" onPress={() => setActionPanel('BASE')} styles={styles} COLORS={COLORS} />
-                    {detailConfig.status === 'HELD' ? (
-                      <ActionTile icon="play-circle-outline" label="Release hold" onPress={() => setActionPanel('RELEASE')} styles={styles} COLORS={COLORS} />
+                    <ActionTile
+                      icon="cash-outline"
+                      label="Set base salary"
+                      hint={detailConfig ? 'Edit the monthly base for this court admin' : 'Initialise this court admin’s salary'}
+                      onPress={() => setActionPanel('BASE')}
+                      styles={styles} COLORS={COLORS}
+                    />
+                    {detailConfig?.isOnHold ? (
+                      <ActionTile
+                        icon="play-circle-outline"
+                        label="Release hold"
+                        hint="Resume payouts — the court admin will reappear in the payable cycle"
+                        onPress={() => setActionPanel('RELEASE')}
+                        styles={styles} COLORS={COLORS}
+                      />
                     ) : (
-                      <ActionTile icon="pause-circle-outline" label="Hold salary" onPress={() => setActionPanel('HOLD')} styles={styles} COLORS={COLORS} tone="danger" />
+                      <ActionTile
+                        icon="pause-circle-outline"
+                        label="Hold payouts"
+                        hint="Pause future payouts without losing the base salary"
+                        onPress={() => setActionPanel('HOLD')}
+                        styles={styles} COLORS={COLORS}
+                        tone="danger"
+                        disabled={!detailConfig}
+                      />
                     )}
-                    <ActionTile icon="checkmark-done-outline" label="Record payout" onPress={() => setActionPanel('PAY')} styles={styles} COLORS={COLORS} />
+                    <ActionTile
+                      icon="checkmark-done-outline"
+                      label="Record payout"
+                      hint="Pay this month’s salary from the platform wallet — idempotent per cycle"
+                      onPress={() => setActionPanel('PAY')}
+                      styles={styles} COLORS={COLORS}
+                      disabled={!detailConfig || detailConfig.isOnHold}
+                    />
                   </View>
                 )}
 
@@ -359,13 +467,20 @@ const Stat = ({ label, value, styles }: any) => (
   </View>
 );
 
-const ActionTile = ({ icon, label, onPress, styles, COLORS, tone }: any) => {
-  const color = tone === 'danger' ? '#B91C1C' : COLORS.primary;
+const ActionTile = ({ icon, label, hint, onPress, styles, COLORS, tone, disabled }: any) => {
+  const color = disabled ? COLORS.textMuted : (tone === 'danger' ? '#B91C1C' : COLORS.primary);
   return (
-    <TouchableOpacity style={styles.actionTile} onPress={onPress}>
+    <TouchableOpacity
+      style={[styles.actionTile, disabled && styles.actionTileDisabled]}
+      onPress={disabled ? undefined : onPress}
+      activeOpacity={disabled ? 1 : 0.7}
+    >
       <Ionicons name={icon} size={20} color={color} />
-      <Text style={[styles.actionTileText, { color }]}>{label}</Text>
-      <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.actionTileText, { color }]}>{label}</Text>
+        {hint ? <Text style={styles.actionTileHint}>{hint}</Text> : null}
+      </View>
+      {!disabled && <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />}
     </TouchableOpacity>
   );
 };
@@ -410,15 +525,50 @@ const getStyles = (C: any) => StyleSheet.create({
   },
   modalTitle: { fontSize: FONT_SIZE.xl, fontWeight: '800', color: C.text, flex: 1 },
   modalBody: { padding: SPACING.xl },
-  statusPill: { alignSelf: 'flex-start', paddingHorizontal: SPACING.md, paddingVertical: 4, borderRadius: BORDER_RADIUS.full, marginTop: SPACING.xs },
+  statusPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    alignSelf: 'flex-start', paddingHorizontal: SPACING.md, paddingVertical: 4,
+    borderRadius: BORDER_RADIUS.full, marginTop: SPACING.xs,
+  },
   statusPillText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+
+  // Explainer card at the top of the salary modal so super admins can scan
+  // the model in two seconds.
+  explainer: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: SPACING.sm,
+    backgroundColor: C.primaryLight + '15',
+    borderRadius: BORDER_RADIUS.lg, padding: SPACING.md,
+    marginBottom: SPACING.lg,
+  },
+  explainerText: { flex: 1, fontSize: FONT_SIZE.xs, color: C.textSecondary, lineHeight: 16 },
+
+  emptyConfig: { alignItems: 'center', paddingVertical: SPACING.xl, gap: 4 },
+  emptyConfigTitle: { fontSize: FONT_SIZE.md, fontWeight: '800', color: C.text, marginTop: SPACING.sm },
+  emptyConfigSub: { fontSize: FONT_SIZE.xs, color: C.textMuted, textAlign: 'center', paddingHorizontal: SPACING.lg },
+
+  holdNote: {
+    backgroundColor: '#FEE2E2', borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.md, marginTop: SPACING.sm,
+  },
+  holdNoteLabel: { fontSize: FONT_SIZE.xs, fontWeight: '800', color: '#B91C1C', letterSpacing: 0.5 },
+  holdNoteText: { fontSize: FONT_SIZE.sm, color: '#991B1B', marginTop: 2 },
 
   actionTile: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
     backgroundColor: C.surfaceAlt, borderRadius: BORDER_RADIUS.lg,
     paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md,
   },
-  actionTileText: { flex: 1, fontSize: FONT_SIZE.md, fontWeight: '700' },
+  actionTileDisabled: { opacity: 0.45 },
+  actionTileText: { fontSize: FONT_SIZE.md, fontWeight: '700' },
+  actionTileHint: { fontSize: FONT_SIZE.xs, color: C.textMuted, marginTop: 2 },
+
+  actionTitle: { fontSize: FONT_SIZE.lg, fontWeight: '900', color: C.text },
+  actionHelp: { fontSize: FONT_SIZE.xs, color: C.textSecondary, marginTop: 4, marginBottom: SPACING.sm, lineHeight: 16 },
+  payoutPreview: {
+    fontSize: FONT_SIZE.sm, fontWeight: '800', color: C.primary,
+    marginTop: -SPACING.xs, marginBottom: SPACING.md,
+  },
+
   label: { fontSize: FONT_SIZE.xs, fontWeight: '700', color: C.textMuted, letterSpacing: 0.5, marginTop: SPACING.lg, marginBottom: SPACING.xs },
   input: {
     backgroundColor: C.surfaceAlt, borderRadius: BORDER_RADIUS.lg,
@@ -427,6 +577,11 @@ const getStyles = (C: any) => StyleSheet.create({
   },
   cancelBtn: { alignItems: 'center', marginTop: SPACING.md },
   cancelText: { fontSize: FONT_SIZE.sm, color: C.textMuted, fontWeight: '600' },
+
+  amount: { fontSize: FONT_SIZE.md, fontWeight: '800', color: C.primary, marginTop: 4 },
+  amountSuffix: { fontSize: FONT_SIZE.xs, fontWeight: '600', color: C.textMuted },
+
+  summaryHelp: { fontSize: FONT_SIZE.xs, color: C.textMuted, marginTop: SPACING.sm, lineHeight: 16 },
 
   empty: { fontSize: FONT_SIZE.sm, color: C.textMuted, fontStyle: 'italic' },
   histRow: {
