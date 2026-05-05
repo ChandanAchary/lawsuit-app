@@ -147,17 +147,14 @@ export const AdminEscrowLedgerScreen: React.FC<{ navigation: any }> = ({ navigat
       <TabBar tabs={TABS} active={tab} onSelect={setTab} />
 
       {tab === 'ledger' && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-          {BENEFICIARY_FILTERS.map((f) => (
-            <TouchableOpacity
-              key={f.key}
-              style={[styles.chip, beneficiaryFilter === f.key && styles.chipActive]}
-              onPress={() => setBeneficiaryFilter(f.key)}
-            >
-              <Text style={[styles.chipText, beneficiaryFilter === f.key && { color: '#FFFFFF' }]}>{f.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        // Secondary filter under the main TabBar — use the `filter` variant
+        // so it visually nests instead of competing with the page tabs.
+        <TabBar
+          variant="filter"
+          tabs={BENEFICIARY_FILTERS as { key: string; label: string }[]}
+          active={beneficiaryFilter}
+          onSelect={(k) => setBeneficiaryFilter(k as BeneficiaryType | 'ALL')}
+        />
       )}
 
       {loading ? <Loading /> : tab === 'ledger' ? (
@@ -267,14 +264,6 @@ const getStyles = (C: any) => StyleSheet.create({
   backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: C.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: FONT_SIZE.xxl, fontWeight: '900', color: C.text },
 
-  filterRow: { paddingHorizontal: SPACING.xl, paddingVertical: SPACING.sm, gap: SPACING.sm },
-  chip: {
-    paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.full, backgroundColor: C.surfaceAlt,
-    borderWidth: 1, borderColor: C.border, marginRight: SPACING.xs,
-  },
-  chipActive: { backgroundColor: C.primary, borderColor: C.primary },
-  chipText: { fontSize: FONT_SIZE.xs, fontWeight: '700', color: C.textSecondary },
 
   list: { padding: SPACING.xl, paddingBottom: 100 },
   card: { backgroundColor: C.white, borderRadius: BORDER_RADIUS.xl, padding: SPACING.lg, marginBottom: SPACING.md, ...SHADOWS.sm },

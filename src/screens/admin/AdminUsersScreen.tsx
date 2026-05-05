@@ -2,13 +2,13 @@ import { useThemeStore, useColors } from '../../stores/themeStore';
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Image, TextInput,
-  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { adminApi } from '../../services/api';
 import { User, UserRole } from '../../types';
 import { Loading, EmptyState } from '../../components/Common';
+import { TabBar } from '../../components/TabBar';
 
 // People tab — single entry point for browsing every controllable user role
 // across the platform. Tap a row to open AdminUserDetailScreen, which hosts
@@ -161,22 +161,10 @@ export const AdminUsersScreen: React.FC<{ navigation: any }> = ({ navigation }) 
         )}
       </View>
 
-      {/* Horizontal scrollable role tabs — fits 6 keys without crushing */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.tabRow}
-      >
-        {TABS.map((t) => (
-          <TouchableOpacity
-            key={t.key}
-            style={[styles.tabChip, tab === t.key && styles.tabChipActive]}
-            onPress={() => setTab(t.key)}
-          >
-            <Text style={[styles.tabText, tab === t.key && styles.tabTextActive]}>{t.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      {/* Shared TabBar — pill variant with built-in horizontal scroll. Same
+          look as AdminPaymentsScreen / AdminPayoutsScreen so the admin
+          section's filter chips feel consistent across screens. */}
+      <TabBar tabs={TABS} active={tab} onSelect={setTab} />
 
       {loading ? <Loading /> : (
         <FlatList
@@ -222,20 +210,6 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm,
   },
   searchInput: { flex: 1, fontSize: FONT_SIZE.sm, color: COLORS.text, padding: 0 },
-
-  tabRow: {
-    paddingHorizontal: SPACING.xl, paddingVertical: SPACING.md,
-    gap: SPACING.sm,
-  },
-  tabChip: {
-    paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.surfaceAlt, borderWidth: 1, borderColor: COLORS.border,
-    marginRight: SPACING.xs,
-  },
-  tabChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  tabText: { fontSize: FONT_SIZE.xs, fontWeight: '700', color: COLORS.textSecondary },
-  tabTextActive: { color: '#FFFFFF' },
 
   list: { padding: SPACING.xl, paddingBottom: 120 },
 

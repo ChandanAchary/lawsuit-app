@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { auditLogApi, AuditAction } from '../../services/api';
 import { Loading, EmptyState } from '../../components/Common';
+import { TabBar } from '../../components/TabBar';
 import { useColors, useThemeStore } from '../../stores/themeStore';
 import { formatDate, formatTime } from '../../utils/date';
 
@@ -96,21 +97,13 @@ export const SuperAdminAuditLogScreen: React.FC<{ navigation: any }> = ({ naviga
         <Text style={styles.headerTitle}>Audit Log</Text>
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filtersRow}
-      >
-        {ACTION_FILTERS.map((f) => (
-          <TouchableOpacity
-            key={f.key}
-            style={[styles.chip, filter === f.key && styles.chipActive]}
-            onPress={() => setFilter(f.key)}
-          >
-            <Text style={[styles.chipText, filter === f.key && { color: '#FFFFFF' }]}>{f.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      {/* Filter chips — match the admin section's standard pill style. */}
+      <TabBar
+        variant="filter"
+        tabs={ACTION_FILTERS as { key: string; label: string }[]}
+        active={filter}
+        onSelect={(k) => setFilter(k as AuditAction | 'ALL')}
+      />
 
       {loading ? <Loading /> : (
         <FlatList
@@ -179,15 +172,6 @@ const getStyles = (C: any) => StyleSheet.create({
   },
   backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: C.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: FONT_SIZE.xxl, fontWeight: '900', color: C.text },
-  filtersRow: { paddingHorizontal: SPACING.xl, paddingVertical: SPACING.md, gap: SPACING.sm },
-  chip: {
-    paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: C.surfaceAlt, borderWidth: 1, borderColor: C.border,
-    marginRight: SPACING.xs,
-  },
-  chipActive: { backgroundColor: C.primary, borderColor: C.primary },
-  chipText: { fontSize: FONT_SIZE.xs, fontWeight: '700', color: C.textSecondary },
   list: { padding: SPACING.xl, paddingBottom: 100 },
   card: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING.md,
