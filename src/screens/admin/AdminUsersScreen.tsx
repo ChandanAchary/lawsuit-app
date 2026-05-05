@@ -4,6 +4,7 @@ import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Image, TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { adminApi } from '../../services/api';
 import { User, UserRole } from '../../types';
@@ -76,6 +77,17 @@ export const AdminUsersScreen: React.FC<{ navigation: any }> = ({ navigation }) 
   }, [tab, search]);
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
+
+  // Refresh on focus so verification flips done elsewhere — court-admin
+  // approvals, super-admin KYC overrides, the Verify shortcut on the user
+  // detail screen — show up here without requiring a manual pull-to-refresh.
+  // Without this, the list would still render the stale UNVERIFIED badge
+  // until the user pulled the list down by hand.
+  useFocusEffect(
+    useCallback(() => {
+      fetchUsers(false);
+    }, [fetchUsers]),
+  );
 
   const renderItem = ({ item }: { item: any }) => {
     const role = String(item.role || '').toUpperCase();
