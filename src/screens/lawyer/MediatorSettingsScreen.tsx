@@ -27,7 +27,13 @@ export const MediatorSettingsScreen: React.FC<{ navigation: any }> = ({ navigati
     (async () => {
       try {
         const { data } = await usersApi.getLawyerInformation();
-        const info = data.data || data;
+        // Server returns `{ lawyer: {...} }` (matches AvailabilityScreen,
+        // EditLawyerProfileScreen, etc.). The previous `data.data || data`
+        // unwrap landed on the wrapper object, so info.isMediator was
+        // always undefined → the toggle reverted to OFF on every reload
+        // even though the save itself worked. Saving and navigating away
+        // hid this until the user reopened the screen.
+        const info = data?.lawyer || data?.data || data || {};
         setIsMediator(!!info?.isMediator);
         setBio(info?.mediatorBio || '');
         setFee(info?.mediationFee ? String(info.mediationFee) : '');
@@ -44,13 +50,29 @@ export const MediatorSettingsScreen: React.FC<{ navigation: any }> = ({ navigati
   const save = async () => {
     setSubmitting(true);
     try {
-      await mediationApi.updateMediatorProfile({
+      const { data } = await mediationApi.updateMediatorProfile({
         isMediator,
         mediatorBio: bio.trim() || undefined,
         mediationFee: fee.trim() ? Math.max(0, Math.floor(Number(fee))) : undefined,
         mediationSpecializations: specs,
       });
-      Alert.alert('Saved', 'Mediator settings updated');
+      // Server returns `{ data: <updated lawyer subset> }` — sync local
+      // state from it so the toggle reflects what actually persisted,
+      // not just what the user clicked. Belt-and-braces against any
+      // future server-side defaulting.
+      const persisted = (data as any)?.data || data;
+      if (persisted && typeof persisted.isMediator === 'boolean') {
+        setIsMediator(persisted.isMediator);
+        setBio(persisted.mediatorBio || '');
+        setFee(persisted.mediationFee ? String(persisted.mediationFee) : '');
+        setSpecs(persisted.mediationSpecializations || []);
+      }
+      Alert.alert(
+        'Saved',
+        isMediator
+          ? 'You are now listed as available for mediation.'
+          : 'You have been removed from the mediator directory.',
+      );
       navigation.goBack();
     } catch (err: any) {
       if (isEndpointMissing(err)) {
