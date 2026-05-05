@@ -61,6 +61,8 @@ import { SuperAdminCourtAdminApprovalsScreen } from '../screens/admin/SuperAdmin
 // People tab is a single drill-down flow instead of three parallel screens.
 import { SuperAdminPlatformConfigScreen } from '../screens/admin/SuperAdminPlatformConfigScreen';
 import { SuperAdminAuditLogScreen } from '../screens/admin/SuperAdminAuditLogScreen';
+import { SuperAdminEntitySalaryScreen } from '../screens/admin/SuperAdminEntitySalaryScreen';
+import { SuperAdminEntitySalaryCycleScreen } from '../screens/admin/SuperAdminEntitySalaryCycleScreen';
 import { SuperAdminCourtAdminOpsScreen } from '../screens/admin/SuperAdminCourtAdminOpsScreen';
 import { AdminUserDetailScreen } from '../screens/admin/AdminUserDetailScreen';
 import { AdminEscrowLedgerScreen } from '../screens/admin/AdminEscrowLedgerScreen';
@@ -96,6 +98,7 @@ import { ChatListScreen } from '../screens/shared/ChatListScreen';
 import { NotificationsScreen } from '../components/NotificationsScreen';
 import { ReferralScreen } from '../screens/shared/ReferralScreen';
 import { BankAccountsScreen } from '../screens/shared/BankAccountsScreen';
+import { MySalaryScreen } from '../screens/shared/MySalaryScreen';
 import { AboutScreen } from '../screens/shared/AboutScreen';
 import { HelpCenterScreen } from '../screens/shared/HelpCenterScreen';
 import { PrivacyTermsScreen } from '../screens/shared/PrivacyTermsScreen';
@@ -389,6 +392,7 @@ export const MainStack = () => {
       <Stack.Screen name="LexRates" component={LexRatesScreen} />
       <Stack.Screen name="ReferralProgram" component={ReferralScreen} />
       <Stack.Screen name="BankAccounts" component={BankAccountsScreen} />
+      <Stack.Screen name="MySalary" component={MySalaryScreen} />
       <Stack.Screen name="EditProfile" component={EditProfileScreen} />
       <Stack.Screen name="EditLawyerProfile" component={EditLawyerProfileScreen} />
       <Stack.Screen name="EditCourtAdminProfile" component={EditCourtAdminProfileScreen} />
@@ -423,6 +427,8 @@ export const MainStack = () => {
       <Stack.Screen name="SuperAdminCourtAdminOps" component={SuperAdminCourtAdminOpsScreen} />
       <Stack.Screen name="SuperAdminPlatformConfig" component={SuperAdminPlatformConfigScreen} />
       <Stack.Screen name="SuperAdminAuditLog" component={SuperAdminAuditLogScreen} />
+      <Stack.Screen name="SuperAdminEntitySalary" component={SuperAdminEntitySalaryScreen as any} />
+      <Stack.Screen name="SuperAdminEntitySalaryCycle" component={SuperAdminEntitySalaryCycleScreen} />
       <Stack.Screen name="AdminUserDetail" component={AdminUserDetailScreen as any} />
       <Stack.Screen name="AdminEscrowLedger" component={AdminEscrowLedgerScreen} />
       <Stack.Screen name="AdminReports" component={AdminReportsScreen} />

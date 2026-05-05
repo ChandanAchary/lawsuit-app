@@ -182,6 +182,18 @@ export const OrgProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) 
           <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
         </TouchableOpacity>
 
+        <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('MySalary')}>
+          <Ionicons name="cash-outline" size={20} color={COLORS.primary} />
+          <Text style={styles.menuText}>Salary analysis</Text>
+          <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('BankAccounts')}>
+          <Ionicons name="card-outline" size={20} color={COLORS.primary} />
+          <Text style={styles.menuText}>Bank & UPI Accounts</Text>
+          <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('Notifications')}>
           <Ionicons name="notifications-outline" size={20} color={COLORS.primary} />
           <Text style={styles.menuText}>Notifications</Text>

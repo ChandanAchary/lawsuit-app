@@ -239,6 +239,21 @@ export const AdminUserDetailScreen: React.FC<{ navigation: any; route: { params:
               {!isDeleted && (
                 <ActionRow icon="trash-outline" label="Soft delete account" tone="danger" onPress={() => startAction('SOFT_DELETE')} styles={styles} COLORS={COLORS} />
               )}
+              {/* Salary & performance — opens the dedicated screen for
+                  base salary, bonus rates, hold/release, and per-cycle payout. */}
+              {(role === 'LAWYER' || role === 'ORGANIZATION') && (
+                <ActionRow
+                  icon="cash-outline"
+                  label="Salary & performance"
+                  tone="primary"
+                  onPress={() => navigation.navigate('SuperAdminEntitySalary', {
+                    subject: role,
+                    subjectId: user.id,
+                    name: user.name || user.email,
+                  })}
+                  styles={styles} COLORS={COLORS}
+                />
+              )}
             </>
           )}
 

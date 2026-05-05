@@ -184,6 +184,13 @@ export const AdminDashboardScreen: React.FC<{ navigation: any }> = ({ navigation
             onPress={() => navigation.navigate('SuperAdminPlatformConfig')}
             styles={styles} COLORS={COLORS}
           />
+          <MenuItem
+            icon="cash-outline"
+            label="Compensation"
+            desc="Performance-based salaries for lawyers and organizations"
+            onPress={() => navigation.navigate('SuperAdminEntitySalaryCycle')}
+            styles={styles} COLORS={COLORS}
+          />
         </Section>
       )}
     </ScrollView>
