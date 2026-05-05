@@ -37,12 +37,14 @@ export const EditAdminProfileScreen: React.FC<{ navigation: any }> = ({ navigati
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
 
   useEffect(() => {
     if (authUser) {
       setName(authUser.name || '');
       setPhone(authUser.phone || '');
+      setEmail(authUser.email || '');
       setAvatarUrl((authUser as any).avatarUrl || authUser.avatar || '');
     }
   }, [authUser]);
@@ -121,16 +123,35 @@ export const EditAdminProfileScreen: React.FC<{ navigation: any }> = ({ navigati
       Alert.alert('Error', 'Phone is required.');
       return;
     }
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedEmail) {
+      Alert.alert('Error', 'Email is required.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      Alert.alert('Error', 'Enter a valid email address.');
+      return;
+    }
 
     setSaving(true);
     try {
-      const { data } = await usersApi.updateMe({ name: name.trim(), phone: phone.trim() });
+      const payload: Record<string, string> = {
+        name: name.trim(),
+        phone: phone.trim(),
+      };
+      // Only send email if it actually changed — saves a uniqueness round-trip
+      // and keeps the no-op case fast.
+      if (trimmedEmail !== (authUser?.email || '').toLowerCase()) {
+        payload.email = trimmedEmail;
+      }
+      const { data } = await usersApi.updateMe(payload);
       const updated = (data?.user || data) as any;
 
       setAuthUser({
         ...(authUser as any),
         name: updated?.name || name.trim(),
         phone: updated?.phone || phone.trim(),
+        email: updated?.email || trimmedEmail,
         avatar: updated?.avatarUrl || (authUser as any)?.avatar,
         avatarUrl: updated?.avatarUrl || (authUser as any)?.avatarUrl,
       } as any);
@@ -189,8 +210,11 @@ export const EditAdminProfileScreen: React.FC<{ navigation: any }> = ({ navigati
             />
             <Input
               label="Email"
-              value={authUser?.email || ''}
-              editable={false}
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
               icon={<Ionicons name="mail-outline" size={20} color={COLORS.textMuted} />}
             />
             <Input

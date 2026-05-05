@@ -16,6 +16,9 @@ const MAIN_TABS = [
   { key: 'withdrawals', label: 'Withdrawals' },
 ];
 
+// Wallet monitoring is read-only as of Phase 1: manual credit/debit endpoints
+// were removed server-side. The only money-out escape hatch left is reversing
+// an already-processed withdrawal in case of fraud.
 export const AdminWalletsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
   const COLORS = useColors();
@@ -27,11 +30,6 @@ export const AdminWalletsScreen: React.FC<{ navigation: any }> = ({ navigation }
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Credit/Debit modal
-  const [showAction, setShowAction] = useState<'credit' | 'debit' | null>(null);
-  const [actionUserId, setActionUserId] = useState('');
-  const [actionAmount, setActionAmount] = useState('');
-  const [actionReason, setActionReason] = useState('');
   const [reverseWithdrawalId, setReverseWithdrawalId] = useState<string | null>(null);
   const [reverseReason, setReverseReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -51,27 +49,6 @@ export const AdminWalletsScreen: React.FC<{ navigation: any }> = ({ navigation }
   }, [tab]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
-
-  const handleCreditDebit = async () => {
-    const amount = Number(actionAmount);
-    if (!actionUserId.trim()) return Alert.alert('Error', 'Enter a user ID');
-    if (!amount || amount < 1) return Alert.alert('Error', 'Enter a valid amount');
-    if (!actionReason.trim()) return Alert.alert('Error', 'Enter a reason');
-    setSubmitting(true);
-    try {
-      if (showAction === 'credit') {
-        await adminApi.creditWallet(actionUserId.trim(), amount, actionReason.trim());
-      } else {
-        await adminApi.debitWallet(actionUserId.trim(), amount, actionReason.trim());
-      }
-      Alert.alert('Success', `Wallet ${showAction}ed successfully`);
-      setShowAction(null);
-      setActionUserId(''); setActionAmount(''); setActionReason('');
-      fetchData(false);
-    } catch (err: any) {
-      Alert.alert('Error', formatErrorMessage(err) || `Failed to ${showAction} wallet`);
-    } finally { setSubmitting(false); }
-  };
 
   const handleReverseWithdrawal = (id: string) => {
     setReverseWithdrawalId(id);
@@ -143,15 +120,11 @@ export const AdminWalletsScreen: React.FC<{ navigation: any }> = ({ navigation }
       <TabBar tabs={MAIN_TABS} active={tab} onSelect={setTab} />
 
       {tab === 'wallets' && (
-        <View style={styles.actionRow}>
-          <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#D1FAE5' }]} onPress={() => setShowAction('credit')}>
-            <Ionicons name="add-circle" size={18} color="#10B981" />
-            <Text style={[styles.actionBtnText, { color: '#10B981' }]}>Credit</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#FEE2E2' }]} onPress={() => setShowAction('debit')}>
-            <Ionicons name="remove-circle" size={18} color="#EF4444" />
-            <Text style={[styles.actionBtnText, { color: '#EF4444' }]}>Debit</Text>
-          </TouchableOpacity>
+        <View style={styles.notice}>
+          <Ionicons name="information-circle-outline" size={16} color={COLORS.textSecondary} />
+          <Text style={styles.noticeText}>
+            Wallet balances are read-only here. Money in/out flows only through bookings, refunds, and payouts.
+          </Text>
         </View>
       )}
 
@@ -165,52 +138,6 @@ export const AdminWalletsScreen: React.FC<{ navigation: any }> = ({ navigation }
           ListEmptyComponent={<EmptyState icon="💰" title={tab === 'wallets' ? 'No Wallets' : 'No Withdrawals'} message="Nothing to show" />}
         />
       )}
-
-      {/* Credit/Debit Modal */}
-      <Modal visible={!!showAction} transparent animationType="slide" onRequestClose={() => setShowAction(null)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{showAction === 'credit' ? 'Credit Wallet' : 'Debit Wallet'}</Text>
-              <TouchableOpacity onPress={() => setShowAction(null)}>
-                <Ionicons name="close" size={24} color={COLORS.text} />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.modalBody}>
-              <TextInput
-                style={styles.input}
-                value={actionUserId}
-                onChangeText={setActionUserId}
-                placeholder="User ID"
-                placeholderTextColor={COLORS.textMuted}
-                autoCapitalize="none"
-              />
-              <TextInput
-                style={styles.input}
-                value={actionAmount}
-                onChangeText={setActionAmount}
-                placeholder="Amount (₹)"
-                placeholderTextColor={COLORS.textMuted}
-                keyboardType="number-pad"
-              />
-              <TextInput
-                style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
-                value={actionReason}
-                onChangeText={setActionReason}
-                placeholder="Reason"
-                placeholderTextColor={COLORS.textMuted}
-                multiline
-              />
-              <Button
-                title={showAction === 'credit' ? 'Credit Wallet' : 'Debit Wallet'}
-                onPress={handleCreditDebit}
-                loading={submitting}
-                size="lg"
-              />
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       <Modal visible={!!reverseWithdrawalId} transparent animationType="slide" onRequestClose={() => setReverseWithdrawalId(null)}>
         <View style={styles.modalOverlay}>
@@ -253,14 +180,12 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   },
   backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: FONT_SIZE.xxl, fontWeight: '900', color: COLORS.text },
-  actionRow: {
-    flexDirection: 'row', gap: SPACING.md, paddingHorizontal: SPACING.xl, paddingVertical: SPACING.md,
+  notice: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: SPACING.sm,
+    paddingHorizontal: SPACING.xl, paddingVertical: SPACING.md,
+    backgroundColor: COLORS.surfaceAlt,
   },
-  actionBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
-    paddingVertical: SPACING.sm, paddingHorizontal: SPACING.lg, borderRadius: BORDER_RADIUS.full,
-  },
-  actionBtnText: { fontSize: FONT_SIZE.sm, fontWeight: '700' },
+  noticeText: { flex: 1, fontSize: FONT_SIZE.xs, color: COLORS.textSecondary, lineHeight: 16 },
   list: { padding: SPACING.xl, paddingBottom: 100 },
   card: {
     backgroundColor: COLORS.white, borderRadius: BORDER_RADIUS.xl, padding: SPACING.xl,

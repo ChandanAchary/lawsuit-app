@@ -17,7 +17,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { useAuthStore } from '../../stores/authStore';
 import { useColors, useThemeStore } from '../../stores/themeStore';
-import { authApi } from '../../services/api';
+import { authApi, usersApi } from '../../services/api';
 
 export const AdminProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
@@ -31,22 +31,56 @@ export const AdminProfileScreen: React.FC<{ navigation: any }> = ({ navigation }
   const [refreshing, setRefreshing] = useState(false);
   const [showAvatarPreview, setShowAvatarPreview] = useState(false);
 
-  const refreshProfile = async () => {
+  // Defensive merge: only overwrite a current field if the fresh value is
+  // actually populated. Without this, a sparse server response (or one of
+  // /auth/me vs /users/me being thinner than the other for this role) would
+  // wipe out fields like name/email/phone/createdAt that came back rich on
+  // login and end up rendering "—" everywhere.
+  const mergeRich = useCallback((current: any, ...sources: any[]) => {
+    const out: any = { ...(current || {}) };
+    for (const s of sources) {
+      if (!s || typeof s !== 'object') continue;
+      for (const [k, v] of Object.entries(s)) {
+        if (v === undefined || v === null) continue;
+        if (typeof v === 'string' && v.trim() === '') continue;
+        out[k] = v;
+      }
+    }
+    return out;
+  }, []);
+
+  // Race both endpoints. /auth/me returns the role-discriminated entity from
+  // authService; /users/me walks the user lookup. They cover for each other
+  // if one returns a thin payload, and we never lose data we already had.
+  const refreshProfile = useCallback(async () => {
     setRefreshing(true);
     try {
-      const { data } = await authApi.getMe();
-      const fresh = (data?.user || data) as any;
-      if (fresh && user) setUser({ ...user, ...fresh });
-    } catch {}
-    finally {
+      const [authRes, userRes] = await Promise.allSettled([
+        authApi.getMe(),
+        usersApi.getMe(),
+      ]);
+      const fromAuth =
+        authRes.status === 'fulfilled' ? (authRes.value.data?.user || authRes.value.data) : null;
+      const fromUsers =
+        userRes.status === 'fulfilled' ? (userRes.value.data?.user || userRes.value.data) : null;
+
+      if (!fromAuth && !fromUsers) return;
+
+      // Always start from the latest store value (avoid stale closure) so
+      // anything EditAdminProfile just wrote is honoured.
+      const current = useAuthStore.getState().user;
+      setUser(mergeRich(current, fromUsers, fromAuth));
+    } catch {
+      /* network blip — keep what's already in the store */
+    } finally {
       setRefreshing(false);
     }
-  };
+  }, [setUser, mergeRich]);
 
   useFocusEffect(
     useCallback(() => {
       void refreshProfile();
-    }, []),
+    }, [refreshProfile]),
   );
 
   const handleLogout = () => {
