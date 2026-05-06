@@ -11,16 +11,14 @@ import { Button } from '../../components/Button';
 import { TabBar } from '../../components/TabBar';
 import { formatErrorMessage } from '../../utils/formatError';
 import { useAuthStore } from '../../stores/authStore';
-import { AdminTeamMember } from '../../types';
+import { AdminTeamMember, ADMIN_PERMISSION_OPTIONS, AdminPermissionKey } from '../../types';
 
 const TABS = [
   { key: 'all', label: 'All' },
-  { key: 'SUPER_ADMIN', label: 'Super Admins' },
+  { key: 'SUPER_ADMIN', label: 'Super Admin' },
   { key: 'ADMIN', label: 'Admins' },
   { key: 'inactive', label: 'Inactive' },
 ];
-
-type Level = 'SUPER_ADMIN' | 'ADMIN';
 
 export const AdminTeamScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
@@ -36,14 +34,14 @@ export const AdminTeamScreen: React.FC<{ navigation: any }> = ({ navigation }) =
   const [refreshing, setRefreshing] = useState(false);
 
   const [showCreate, setShowCreate] = useState(false);
-  const [createForm, setCreateForm] = useState<{ name: string; email: string; phone: string; level: Level }>(
-    { name: '', email: '', phone: '', level: 'ADMIN' },
+  const [createForm, setCreateForm] = useState<{ name: string; email: string; phone: string; permissions: AdminPermissionKey[] }>(
+    { name: '', email: '', phone: '', permissions: [] },
   );
   const [creating, setCreating] = useState(false);
 
   const [editing, setEditing] = useState<AdminTeamMember | null>(null);
-  const [editForm, setEditForm] = useState<{ name: string; phone: string; level: Level; isActive: boolean }>(
-    { name: '', phone: '', level: 'ADMIN', isActive: true },
+  const [editForm, setEditForm] = useState<{ name: string; phone: string; permissions: AdminPermissionKey[]; isActive: boolean }>(
+    { name: '', phone: '', permissions: [], isActive: true },
   );
   const [savingEdit, setSavingEdit] = useState(false);
 
@@ -54,7 +52,6 @@ export const AdminTeamScreen: React.FC<{ navigation: any }> = ({ navigation }) =
       if (tab === 'SUPER_ADMIN' || tab === 'ADMIN') params.level = tab;
       if (tab === 'inactive') params.isActive = false;
       else if (tab !== 'all') {
-        // Default the role-tabs to active-only; "all" intentionally returns both.
         params.isActive = true;
       }
       const { data } = await adminManagementApi.list(params);
@@ -62,7 +59,7 @@ export const AdminTeamScreen: React.FC<{ navigation: any }> = ({ navigation }) =
     } catch (err: any) {
       setAdmins([]);
       if (err?.response?.status === 403) {
-        Alert.alert('Forbidden', 'Only super admins can view the admin team.');
+        Alert.alert('Forbidden', 'Only the super admin can view the admin team.');
       }
     } finally {
       setLoading(false);
@@ -71,6 +68,10 @@ export const AdminTeamScreen: React.FC<{ navigation: any }> = ({ navigation }) =
   }, [tab]);
 
   useEffect(() => { fetchAdmins(); }, [fetchAdmins]);
+
+  const togglePermission = (set: AdminPermissionKey[], key: AdminPermissionKey): AdminPermissionKey[] => {
+    return set.includes(key) ? set.filter((k) => k !== key) : [...set, key];
+  };
 
   const handleCreate = async () => {
     const name = createForm.name.trim();
@@ -82,7 +83,12 @@ export const AdminTeamScreen: React.FC<{ navigation: any }> = ({ navigation }) =
 
     setCreating(true);
     try {
-      const { data } = await adminManagementApi.create({ name, email, phone, level: createForm.level });
+      const { data } = await adminManagementApi.create({
+        name,
+        email,
+        phone,
+        permissions: createForm.permissions,
+      });
       const delivered = data?.inviteEmail?.delivered;
       Alert.alert(
         'Admin Invited',
@@ -91,7 +97,7 @@ export const AdminTeamScreen: React.FC<{ navigation: any }> = ({ navigation }) =
           : `Admin created. Invitation email could NOT be delivered (${data?.inviteEmail?.error || 'unknown'}). Share the temp password manually.`,
       );
       setShowCreate(false);
-      setCreateForm({ name: '', email: '', phone: '', level: 'ADMIN' });
+      setCreateForm({ name: '', email: '', phone: '', permissions: [] });
       fetchAdmins(false);
     } catch (err: any) {
       Alert.alert('Error', formatErrorMessage(err) || 'Failed to invite admin');
@@ -105,7 +111,9 @@ export const AdminTeamScreen: React.FC<{ navigation: any }> = ({ navigation }) =
     setEditForm({
       name: admin.name,
       phone: admin.phone,
-      level: admin.level as Level,
+      permissions: ((admin.permissions ?? []) as AdminPermissionKey[]).filter(
+        (k) => ADMIN_PERMISSION_OPTIONS.some((o) => o.key === k),
+      ),
       isActive: admin.isActive,
     });
   };
@@ -119,12 +127,11 @@ export const AdminTeamScreen: React.FC<{ navigation: any }> = ({ navigation }) =
 
     setSavingEdit(true);
     try {
-      await adminManagementApi.update(editing.id, {
-        name,
-        phone,
-        level: editForm.level,
-        isActive: editForm.isActive,
-      });
+      // Permissions edit only applies to ADMIN-tier rows; super admin already
+      // has implicit access to everything and the server ignores the field.
+      const payload: any = { name, phone, isActive: editForm.isActive };
+      if (editing.level === 'ADMIN') payload.permissions = editForm.permissions;
+      await adminManagementApi.update(editing.id, payload);
       Alert.alert('Saved', 'Admin updated');
       setEditing(null);
       fetchAdmins(false);
@@ -148,7 +155,7 @@ export const AdminTeamScreen: React.FC<{ navigation: any }> = ({ navigation }) =
 
   const explainNoDelete = (admin: AdminTeamMember) => {
     if (admin.id === me?.id) return 'You cannot deactivate your own account.';
-    if (admin.level === 'SUPER_ADMIN') return 'Super admins are permanent and cannot be deleted.';
+    if (admin.level === 'SUPER_ADMIN') return 'The super admin is permanent and cannot be deleted.';
     if (admin.createdById && me?.id && admin.createdById !== me.id) {
       return 'Only the super admin who invited this admin can delete them.';
     }
@@ -191,6 +198,16 @@ export const AdminTeamScreen: React.FC<{ navigation: any }> = ({ navigation }) =
     }
   };
 
+  const renderPermissionSummary = (admin: AdminTeamMember) => {
+    if (admin.level === 'SUPER_ADMIN') return 'Full access';
+    const count = (admin.permissions ?? []).filter(
+      (k) => ADMIN_PERMISSION_OPTIONS.some((o) => o.key === k),
+    ).length;
+    if (count === 0) return 'No module access';
+    if (count === ADMIN_PERMISSION_OPTIONS.length) return 'All modules';
+    return `${count} of ${ADMIN_PERMISSION_OPTIONS.length} modules`;
+  };
+
   const renderAdmin = ({ item }: { item: AdminTeamMember }) => {
     const isSelf = item.id === me?.id;
     const isSuperRow = item.level === 'SUPER_ADMIN';
@@ -202,7 +219,7 @@ export const AdminTeamScreen: React.FC<{ navigation: any }> = ({ navigation }) =
         <View style={styles.cardRow}>
           <View style={[styles.iconBg, { backgroundColor: levelBg }]}>
             <Ionicons
-              name={item.level === 'SUPER_ADMIN' ? 'shield-checkmark' : 'person-circle'}
+              name={isSuperRow ? 'shield-checkmark' : 'person-circle'}
               size={22}
               color={levelFg}
             />
@@ -217,9 +234,14 @@ export const AdminTeamScreen: React.FC<{ navigation: any }> = ({ navigation }) =
           </View>
           <View style={[styles.badge, { backgroundColor: levelBg }]}>
             <Text style={[styles.badgeText, { color: levelFg }]}>
-              {item.level === 'SUPER_ADMIN' ? 'SUPER' : 'ADMIN'}
+              {isSuperRow ? 'SUPER' : 'ADMIN'}
             </Text>
           </View>
+        </View>
+
+        <View style={styles.permRow}>
+          <Ionicons name="key-outline" size={14} color={COLORS.textMuted} />
+          <Text style={styles.permRowText}>{renderPermissionSummary(item)}</Text>
         </View>
 
         <View style={styles.metaRow}>
@@ -286,6 +308,35 @@ export const AdminTeamScreen: React.FC<{ navigation: any }> = ({ navigation }) =
     );
   };
 
+  const renderPermissionPicker = (
+    selected: AdminPermissionKey[],
+    onToggle: (k: AdminPermissionKey) => void,
+    disabled = false,
+  ) => (
+    <View style={styles.permPicker}>
+      {ADMIN_PERMISSION_OPTIONS.map((opt) => {
+        const on = selected.includes(opt.key);
+        return (
+          <TouchableOpacity
+            key={opt.key}
+            style={[styles.permTile, on && styles.permTileActive, disabled && styles.permTileDisabled]}
+            onPress={() => !disabled && onToggle(opt.key)}
+            activeOpacity={0.75}
+            disabled={disabled}
+          >
+            <View style={[styles.permCheckbox, on && styles.permCheckboxOn]}>
+              {on && <Ionicons name="checkmark" size={14} color={COLORS.white} />}
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.permTileLabel}>{opt.label}</Text>
+              <Text style={styles.permTileDesc}>{opt.desc}</Text>
+            </View>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+
   if (!isSuper) {
     return (
       <View style={styles.container}>
@@ -297,8 +348,8 @@ export const AdminTeamScreen: React.FC<{ navigation: any }> = ({ navigation }) =
         </View>
         <EmptyState
           icon="🛡️"
-          title="Super Admins Only"
-          message="Only super admins can manage the admin team."
+          title="Super Admin Only"
+          message="Only the super admin can manage the admin team."
         />
       </View>
     );
@@ -379,20 +430,16 @@ export const AdminTeamScreen: React.FC<{ navigation: any }> = ({ navigation }) =
                 placeholderTextColor={COLORS.textMuted}
                 keyboardType="phone-pad"
               />
-              <Text style={styles.selectLabel}>Level</Text>
-              <View style={styles.levelRow}>
-                {(['ADMIN', 'SUPER_ADMIN'] as Level[]).map((lvl) => (
-                  <TouchableOpacity
-                    key={lvl}
-                    style={[styles.levelChip, createForm.level === lvl && styles.levelChipActive]}
-                    onPress={() => setCreateForm((p) => ({ ...p, level: lvl }))}
-                  >
-                    <Text style={[styles.levelChipText, createForm.level === lvl && styles.levelChipTextActive]}>
-                      {lvl === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin'}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+
+              <Text style={styles.selectLabel}>Module access</Text>
+              <Text style={styles.helperText}>
+                Pick the modules this admin should be able to use. You can change this later.
+              </Text>
+              {renderPermissionPicker(
+                createForm.permissions,
+                (k) => setCreateForm((p) => ({ ...p, permissions: togglePermission(p.permissions, k) })),
+              )}
+
               <Button title="Send Invitation" onPress={handleCreate} loading={creating} size="lg" />
             </ScrollView>
           </View>
@@ -427,41 +474,24 @@ export const AdminTeamScreen: React.FC<{ navigation: any }> = ({ navigation }) =
                   placeholderTextColor={COLORS.textMuted}
                   keyboardType="phone-pad"
                 />
-                <Text style={styles.selectLabel}>Level</Text>
-                <View style={styles.levelRow}>
-                  {(['ADMIN', 'SUPER_ADMIN'] as Level[]).map((lvl) => {
-                    // SUPER_ADMINs can't be demoted (they're permanent), and
-                    // you can't change your own level.
-                    const isSuperTarget = editing.level === 'SUPER_ADMIN';
-                    const tryingToDemoteSuper = isSuperTarget && lvl !== 'SUPER_ADMIN';
-                    const disabled =
-                      (editing.id === me?.id && lvl !== editing.level) || tryingToDemoteSuper;
-                    return (
-                      <TouchableOpacity
-                        key={lvl}
-                        disabled={disabled}
-                        style={[
-                          styles.levelChip,
-                          editForm.level === lvl && styles.levelChipActive,
-                          disabled && styles.levelChipDisabled,
-                        ]}
-                        onPress={() => setEditForm((p) => ({ ...p, level: lvl }))}
-                      >
-                        <Text style={[styles.levelChipText, editForm.level === lvl && styles.levelChipTextActive]}>
-                          {lvl === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin'}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-                {editing.level === 'SUPER_ADMIN' && (
+
+                <Text style={styles.selectLabel}>Module access</Text>
+                {editing.level === 'SUPER_ADMIN' ? (
                   <Text style={styles.helperText}>
-                    Super admins are permanent — they cannot be demoted or deactivated.
+                    The super admin holds full access to every module. Module access is not editable for this account.
                   </Text>
+                ) : (
+                  <>
+                    <Text style={styles.helperText}>
+                      Pick the modules this admin can use. Toggling a module off revokes access on their next request.
+                    </Text>
+                    {renderPermissionPicker(
+                      editForm.permissions,
+                      (k) => setEditForm((p) => ({ ...p, permissions: togglePermission(p.permissions, k) })),
+                    )}
+                  </>
                 )}
-                {editing.id === me?.id && editing.level !== 'SUPER_ADMIN' && (
-                  <Text style={styles.helperText}>You cannot change your own level or deactivate yourself.</Text>
-                )}
+
                 <Text style={styles.selectLabel}>Status</Text>
                 <View style={styles.levelRow}>
                   {[true, false].map((active) => {
@@ -486,6 +516,14 @@ export const AdminTeamScreen: React.FC<{ navigation: any }> = ({ navigation }) =
                     );
                   })}
                 </View>
+                {editing.level === 'SUPER_ADMIN' && (
+                  <Text style={styles.helperText}>
+                    The super admin is permanent and cannot be deactivated.
+                  </Text>
+                )}
+                {editing.id === me?.id && editing.level !== 'SUPER_ADMIN' && (
+                  <Text style={styles.helperText}>You cannot deactivate yourself.</Text>
+                )}
                 <Button title="Save Changes" onPress={handleSaveEdit} loading={savingEdit} size="lg" />
               </ScrollView>
             )}
@@ -528,6 +566,11 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   badge: { paddingHorizontal: SPACING.md, paddingVertical: 4, borderRadius: BORDER_RADIUS.full },
   badgeText: { fontSize: FONT_SIZE.xs, fontWeight: '800' },
 
+  permRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: SPACING.md,
+  },
+  permRowText: { fontSize: FONT_SIZE.xs, color: COLORS.textSecondary, fontWeight: '600' },
+
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm, marginTop: SPACING.md },
   metaPill: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
@@ -557,7 +600,7 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   modalContent: {
     backgroundColor: COLORS.white,
     borderTopLeftRadius: BORDER_RADIUS.xxl, borderTopRightRadius: BORDER_RADIUS.xxl,
-    maxHeight: '85%', paddingBottom: SPACING.xxl,
+    maxHeight: '90%', paddingBottom: SPACING.xxl,
   },
   modalHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
@@ -573,7 +616,7 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md,
     fontSize: FONT_SIZE.md, color: COLORS.text, marginBottom: SPACING.md,
   },
-  selectLabel: { fontSize: FONT_SIZE.sm, fontWeight: '600', color: COLORS.text, marginBottom: SPACING.sm },
+  selectLabel: { fontSize: FONT_SIZE.sm, fontWeight: '600', color: COLORS.text, marginTop: SPACING.sm, marginBottom: SPACING.xs },
   levelRow: { flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.lg },
   levelChip: {
     flex: 1,
@@ -585,5 +628,24 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   levelChipDisabled: { opacity: 0.4 },
   levelChipText: { fontSize: FONT_SIZE.sm, fontWeight: '700', color: COLORS.textSecondary },
   levelChipTextActive: { color: COLORS.white },
-  helperText: { fontSize: FONT_SIZE.xs, color: COLORS.textMuted, marginBottom: SPACING.md, marginTop: -SPACING.sm, fontStyle: 'italic' },
+  helperText: { fontSize: FONT_SIZE.xs, color: COLORS.textMuted, marginBottom: SPACING.md, lineHeight: 16 },
+
+  permPicker: { gap: SPACING.sm, marginBottom: SPACING.lg },
+  permTile: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.md,
+    paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.border,
+    backgroundColor: COLORS.white,
+  },
+  permTileActive: { borderColor: COLORS.primary, backgroundColor: COLORS.primaryLight + '10' },
+  permTileDisabled: { opacity: 0.5 },
+  permCheckbox: {
+    width: 22, height: 22, borderRadius: 6,
+    borderWidth: 1.5, borderColor: COLORS.border,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: COLORS.white,
+  },
+  permCheckboxOn: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  permTileLabel: { fontSize: FONT_SIZE.sm, fontWeight: '700', color: COLORS.text },
+  permTileDesc: { fontSize: FONT_SIZE.xs, color: COLORS.textMuted, marginTop: 2 },
 });

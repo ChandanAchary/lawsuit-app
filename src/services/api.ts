@@ -319,15 +319,6 @@ export const adminApi = {
   getUserById: (id: string) => api.get(`/admin/users/${encodeURIComponent(id)}`),
   toggleVerification: (id: string, isVerified: boolean) =>
     api.put(`/admin/users/${encodeURIComponent(id)}/verification`, { isVerified }),
-  getPayments: (params?: Record<string, unknown>) =>
-    api.get('/admin/payments', { params }),
-  // Wallet monitoring is read-only (Phase 1) — manual credit/debit endpoints
-  // were removed server-side; money in/out only flows through booking,
-  // refund, and payout. Withdrawal reverse is the only escape hatch.
-  getWallets: () => api.get('/admin/wallets'),
-  getWithdrawals: () => api.get('/admin/wallets/withdrawals'),
-  reverseWithdrawal: (id: string, reason: string) =>
-    api.put(`/admin/wallets/withdrawals/${encodeURIComponent(id)}/reverse`, { reason }),
   getNotVerifiedClients: () => api.get('/admin/not-verified-client'),
   getNotVerifiedLawyers: () => api.get('/admin/not-verified-lawyers'),
 
@@ -349,11 +340,19 @@ export const adminManagementApi = {
   list: (params?: { level?: 'SUPER_ADMIN' | 'ADMIN'; isActive?: boolean; page?: number; limit?: number }) =>
     api.get('/admin/admins', { params }),
   getById: (id: string) => api.get(`/admin/admins/${encodeURIComponent(id)}`),
-  create: (data: { name: string; email: string; phone: string; level: 'SUPER_ADMIN' | 'ADMIN' }) =>
+  // Every new admin is created at ADMIN level — the platform has exactly one
+  // SUPER_ADMIN (the seed) and the role is non-grantable from the API.
+  create: (data: { name: string; email: string; phone: string; permissions?: string[] }) =>
     api.post('/admin/admins', data),
   update: (
     id: string,
-    data: Partial<{ name: string; phone: string; avatarUrl: string | null; level: 'SUPER_ADMIN' | 'ADMIN'; isActive: boolean }>,
+    data: Partial<{
+      name: string;
+      phone: string;
+      avatarUrl: string | null;
+      permissions: string[];
+      isActive: boolean;
+    }>,
   ) => api.put(`/admin/admins/${encodeURIComponent(id)}`, data),
   delete: (id: string) => api.delete(`/admin/admins/${encodeURIComponent(id)}`),
 };
@@ -373,11 +372,6 @@ export const payoutsApi = {
     limit?: number;
   }) => api.get('/admin/payouts', { params }),
   summary: () => api.get('/admin/payouts/summary'),
-  escrowLedger: (beneficiaryType?: BeneficiaryType) =>
-    api.get('/admin/payouts/escrow-ledger', { params: beneficiaryType ? { beneficiaryType } : {} }),
-  history: (params?: { recipientUserId?: string; initiatedById?: string; page?: number; limit?: number }) =>
-    api.get('/admin/payouts/history', { params }),
-  reconcile: () => api.get('/admin/payouts/reconcile'),
   disburse: (paymentId: string, data?: { providerPayoutId?: string; notes?: string }) =>
     api.post(`/admin/payouts/${encodeURIComponent(paymentId)}/disburse`, data ?? {}),
   refund: (paymentId: string, data: { reason: string; partialAmount?: number }) =>

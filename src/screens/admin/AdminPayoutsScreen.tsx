@@ -311,14 +311,6 @@ export const AdminPayoutsScreen: React.FC<{ navigation: any }> = ({ navigation }
           <Ionicons name="arrow-back" size={22} color={COLORS.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Booking Payouts</Text>
-        <TouchableOpacity
-          onPress={() => navigation.navigate('AdminEscrowLedger')}
-          style={styles.ledgerBtn}
-          accessibilityLabel="Open ledger and history"
-        >
-          <Ionicons name="receipt-outline" size={18} color={COLORS.primary} />
-          <Text style={styles.ledgerBtnText}>Ledger</Text>
-        </TouchableOpacity>
       </View>
 
       {summary && (
@@ -502,13 +494,6 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   headerTitle: { flex: 1, fontSize: FONT_SIZE.xxl, fontWeight: '900', color: COLORS.text },
-  ledgerBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: SPACING.md, paddingVertical: SPACING.xs,
-    backgroundColor: COLORS.primaryLight + '20',
-    borderRadius: BORDER_RADIUS.full,
-  },
-  ledgerBtnText: { color: COLORS.primary, fontSize: FONT_SIZE.xs, fontWeight: '800' },
 
   summaryRow: {
     flexDirection: 'row', gap: SPACING.sm,

@@ -173,9 +173,6 @@ export const AdminUsersScreen: React.FC<{ navigation: any }> = ({ navigation }) 
         )}
       </View>
 
-      {/* Shared TabBar — pill variant with built-in horizontal scroll. Same
-          look as AdminPaymentsScreen / AdminPayoutsScreen so the admin
-          section's filter chips feel consistent across screens. */}
       <TabBar tabs={TABS} active={tab} onSelect={setTab} />
 
       {loading ? <Loading /> : (

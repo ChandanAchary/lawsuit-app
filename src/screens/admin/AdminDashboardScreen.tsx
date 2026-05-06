@@ -23,6 +23,11 @@ export const AdminDashboardScreen: React.FC<{ navigation: any }> = ({ navigation
 
   const user = useAuthStore((s) => s.user);
   const isSuper = user?.level === 'SUPER_ADMIN';
+  // Per-admin module access. Super admin holds implicit "all" so we bypass
+  // the check; everyone else only sees a tile if their permissions list
+  // contains the matching key. Mirrors the server-side requirePermission
+  // middleware so a non-super admin doesn't tap a tile and get a 403.
+  const canAccess = (key: string) => isSuper || (user?.permissions ?? []).includes(key);
 
   const [stats, setStats] = useState<any>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -93,15 +98,17 @@ export const AdminDashboardScreen: React.FC<{ navigation: any }> = ({ navigation
 
       {/* People */}
       <Section label="PEOPLE" styles={styles}>
-        <MenuItem
-          icon="people-outline"
-          label="All users"
-          desc={isSuper
-            ? 'Browse all roles · ban, KYC override, verify from each user'
-            : 'Verify and inspect clients & lawyers'}
-          onPress={() => navigation.navigate('AdminUsers')}
-          styles={styles} COLORS={COLORS}
-        />
+        {canAccess('USERS') && (
+          <MenuItem
+            icon="people-outline"
+            label="All users"
+            desc={isSuper
+              ? 'Browse all roles · ban, KYC override, verify from each user'
+              : 'Verify and inspect clients & lawyers'}
+            onPress={() => navigation.navigate('AdminUsers')}
+            styles={styles} COLORS={COLORS}
+          />
+        )}
       </Section>
 
       {/* Courts */}
@@ -115,20 +122,24 @@ export const AdminDashboardScreen: React.FC<{ navigation: any }> = ({ navigation
             styles={styles} COLORS={COLORS}
           />
         )}
-        <MenuItem
-          icon="business-outline"
-          label="Courts directory"
-          desc="Manage courts in the platform"
-          onPress={() => navigation.navigate('CourtManagement')}
-          styles={styles} COLORS={COLORS}
-        />
-        <MenuItem
-          icon="shield-outline"
-          label="Court admin team"
-          desc="Manage court admins"
-          onPress={() => navigation.navigate('CourtAdminManagement')}
-          styles={styles} COLORS={COLORS}
-        />
+        {canAccess('COURTS') && (
+          <MenuItem
+            icon="business-outline"
+            label="Courts directory"
+            desc="Manage courts in the platform"
+            onPress={() => navigation.navigate('CourtManagement')}
+            styles={styles} COLORS={COLORS}
+          />
+        )}
+        {canAccess('COURT_ADMIN_TEAM') && (
+          <MenuItem
+            icon="shield-outline"
+            label="Court admin team"
+            desc="Manage court admins"
+            onPress={() => navigation.navigate('CourtAdminManagement')}
+            styles={styles} COLORS={COLORS}
+          />
+        )}
         {isSuper && (
           <MenuItem
             icon="ribbon-outline"
@@ -142,20 +153,24 @@ export const AdminDashboardScreen: React.FC<{ navigation: any }> = ({ navigation
 
       {/* Content & moderation */}
       <Section label="CONTENT" styles={styles}>
-        <MenuItem
-          icon="alert-circle-outline"
-          label="User reports"
-          desc="Triage bug reports and issues from users"
-          onPress={() => navigation.navigate('AdminReports')}
-          styles={styles} COLORS={COLORS}
-        />
-        <MenuItem
-          icon="newspaper-outline"
-          label="Legal updates"
-          desc="Publish and edit legal news entries"
-          onPress={() => navigation.navigate('AdminLegalUpdates')}
-          styles={styles} COLORS={COLORS}
-        />
+        {canAccess('REPORTS') && (
+          <MenuItem
+            icon="alert-circle-outline"
+            label="User reports"
+            desc="Triage bug reports and issues from users"
+            onPress={() => navigation.navigate('AdminReports')}
+            styles={styles} COLORS={COLORS}
+          />
+        )}
+        {canAccess('LEGAL_UPDATES') && (
+          <MenuItem
+            icon="newspaper-outline"
+            label="Legal updates"
+            desc="Publish and edit legal news entries"
+            onPress={() => navigation.navigate('AdminLegalUpdates')}
+            styles={styles} COLORS={COLORS}
+          />
+        )}
         {isSuper && (
           <MenuItem
             icon="megaphone-outline"
@@ -201,6 +216,10 @@ const Section = ({ label, styles, children }: any) => {
   // Strip the divider on the last menu item so the rounded card doesn't
   // leave a stray hairline against its bottom edge.
   const items = React.Children.toArray(children).filter(Boolean);
+  // If a non-super admin has no permissions in this section, every child is
+  // gated out and the section card would be a labelled empty box. Skip the
+  // whole section instead.
+  if (items.length === 0) return null;
   const cloned = items.map((child: any, idx: number) =>
     React.isValidElement(child) && idx === items.length - 1
       ? React.cloneElement(child, { isLast: true } as any)
