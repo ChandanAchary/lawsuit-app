@@ -2,12 +2,14 @@ import {  useThemeStore , useColors } from '../../stores/themeStore';
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Alert, TextInput, Modal,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { courtAdminApi } from '../../services/api';
 import { Loading, EmptyState } from '../../components/Common';
 import { Button } from '../../components/Button';
+import { AddressFormPicker } from '../../components/AddressFormPicker';
 import { formatErrorMessage } from '../../utils/formatError';
 
 const COURT_TYPES = ['HIGH_COURT', 'DISTRICT_COURT', 'SUPREME_COURT'];
@@ -147,7 +149,7 @@ export const CourtManagementScreen: React.FC<{ navigation: any }> = ({ navigatio
                 <Ionicons name="close" size={24} color={COLORS.text} />
               </TouchableOpacity>
             </View>
-            <View style={styles.modalBody}>
+            <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled">
               <TextInput style={styles.input} value={formData.name} onChangeText={(v) => setFormData(p => ({ ...p, name: v }))} placeholder="Court Name *" placeholderTextColor={COLORS.textMuted} />
               <TextInput style={styles.input} value={formData.code} onChangeText={(v) => setFormData(p => ({ ...p, code: v }))} placeholder="Code (e.g., HC-DEL) *" placeholderTextColor={COLORS.textMuted} autoCapitalize="characters" />
               <View style={styles.typeRow}>
@@ -157,13 +159,31 @@ export const CourtManagementScreen: React.FC<{ navigation: any }> = ({ navigatio
                   </TouchableOpacity>
                 ))}
               </View>
-              <TextInput style={styles.input} value={formData.state} onChangeText={(v) => setFormData(p => ({ ...p, state: v }))} placeholder="State" placeholderTextColor={COLORS.textMuted} />
-              <TextInput style={styles.input} value={formData.district} onChangeText={(v) => setFormData(p => ({ ...p, district: v }))} placeholder="District" placeholderTextColor={COLORS.textMuted} />
-              <TextInput style={styles.input} value={formData.city} onChangeText={(v) => setFormData(p => ({ ...p, city: v }))} placeholder="City" placeholderTextColor={COLORS.textMuted} />
-              <TextInput style={styles.input} value={formData.pincode} onChangeText={(v) => setFormData(p => ({ ...p, pincode: v }))} placeholder="Pincode" placeholderTextColor={COLORS.textMuted} keyboardType="number-pad" maxLength={6} />
-              <TextInput style={styles.input} value={formData.address} onChangeText={(v) => setFormData(p => ({ ...p, address: v }))} placeholder="Address" placeholderTextColor={COLORS.textMuted} />
+
+              {/* Shared address picker — same flow used everywhere addresses
+                  are collected (state → district → pincode → place → text). */}
+              <AddressFormPicker
+                value={{
+                  state: formData.state,
+                  district: formData.district,
+                  pincode: formData.pincode,
+                  city: formData.city,
+                  address: formData.address,
+                }}
+                onChange={(next) => setFormData(p => ({
+                  ...p,
+                  state: next.state,
+                  district: next.district,
+                  pincode: next.pincode,
+                  city: next.city,
+                  address: next.address,
+                }))}
+                required={['state', 'district', 'pincode']}
+                labels={{ city: 'Court location', address: 'Court address' }}
+              />
+
               <Button title={editingCourt ? 'Update Court' : 'Create Court'} onPress={handleSave} loading={submitting} size="lg" />
-            </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
