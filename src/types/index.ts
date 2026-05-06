@@ -113,6 +113,25 @@ export enum AdminLevel {
 }
 
 // ─── Interfaces ─────────────────────────────────────────────
+// Module-access keys an ADMIN account can be granted. Mirrors
+// ADMIN_PERMISSION_KEYS in lawsuit-server/src/services/admin-management.service.ts.
+// SUPER_ADMIN holds implicit access to every surface — this list only
+// matters for ADMIN-tier accounts.
+export type AdminPermissionKey =
+  | 'USERS'
+  | 'COURTS'
+  | 'COURT_ADMIN_TEAM'
+  | 'REPORTS'
+  | 'LEGAL_UPDATES';
+
+export const ADMIN_PERMISSION_OPTIONS: { key: AdminPermissionKey; label: string; desc: string }[] = [
+  { key: 'USERS',            label: 'Users',             desc: 'Browse, verify, and manage platform users' },
+  { key: 'COURTS',           label: 'Courts directory',  desc: 'Add, edit, and remove courts' },
+  { key: 'COURT_ADMIN_TEAM', label: 'Court admin team',  desc: 'Onboard and manage court admins' },
+  { key: 'REPORTS',          label: 'User reports',      desc: 'Triage user-submitted bug reports' },
+  { key: 'LEGAL_UPDATES',    label: 'Legal updates',     desc: 'Publish and edit legal news entries' },
+];
+
 export interface User {
   id: string;
   name: string;
@@ -126,6 +145,11 @@ export interface User {
   isPhoneVerified?: boolean;
   // Admin-only: SUPER_ADMIN can manage the admin team via /admin/admins.
   level?: AdminLevel | string;
+  // Admin-only: per-module access keys the SUPER_ADMIN has granted to this
+  // ADMIN account. Empty / missing means no admin surfaces beyond the
+  // dashboard landing page. SUPER_ADMIN holds implicit access to all
+  // modules and ignores this field.
+  permissions?: string[];
   // True until LAWYER (org-onboarded) or ADMIN (super-admin-invited) rotates
   // their server-generated temp password via POST /auth/change-password.
   // While true, every endpoint except /auth/me, /auth/change-password,
@@ -144,6 +168,7 @@ export interface AdminTeamMember {
   phone: string;
   avatarUrl?: string | null;
   level: AdminLevel | 'SUPER_ADMIN' | 'ADMIN';
+  permissions: string[];
   isActive: boolean;
   mustChangePassword: boolean;
   passwordChangedAt?: string | null;

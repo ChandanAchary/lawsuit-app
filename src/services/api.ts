@@ -340,11 +340,19 @@ export const adminManagementApi = {
   list: (params?: { level?: 'SUPER_ADMIN' | 'ADMIN'; isActive?: boolean; page?: number; limit?: number }) =>
     api.get('/admin/admins', { params }),
   getById: (id: string) => api.get(`/admin/admins/${encodeURIComponent(id)}`),
-  create: (data: { name: string; email: string; phone: string; level: 'SUPER_ADMIN' | 'ADMIN' }) =>
+  // Every new admin is created at ADMIN level — the platform has exactly one
+  // SUPER_ADMIN (the seed) and the role is non-grantable from the API.
+  create: (data: { name: string; email: string; phone: string; permissions?: string[] }) =>
     api.post('/admin/admins', data),
   update: (
     id: string,
-    data: Partial<{ name: string; phone: string; avatarUrl: string | null; level: 'SUPER_ADMIN' | 'ADMIN'; isActive: boolean }>,
+    data: Partial<{
+      name: string;
+      phone: string;
+      avatarUrl: string | null;
+      permissions: string[];
+      isActive: boolean;
+    }>,
   ) => api.put(`/admin/admins/${encodeURIComponent(id)}`, data),
   delete: (id: string) => api.delete(`/admin/admins/${encodeURIComponent(id)}`),
 };
