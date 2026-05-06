@@ -83,24 +83,8 @@ export const AdminOperationsScreen: React.FC<{ navigation: any }> = ({ navigatio
         </View>
       )}
 
-      <Section label="MONEY FLOW" styles={styles}>
-        <Card
-          icon="card-outline"
-          tint="#3B82F6"
-          label="Payments"
-          desc="Browse all platform payments and refund completed ones"
-          onPress={() => navigation.navigate('AdminPayments')}
-          styles={styles} COLORS={COLORS}
-        />
-        <Card
-          icon="wallet-outline"
-          tint="#10B981"
-          label="Wallets"
-          desc="Read-only wallets and withdrawal reversals"
-          onPress={() => navigation.navigate('AdminWallets')}
-          styles={styles} COLORS={COLORS}
-        />
-        {isSuper && (
+      {isSuper && (
+        <Section label="MONEY FLOW" styles={styles}>
           <Card
             icon="cash-outline"
             tint="#8B5CF6"
@@ -109,18 +93,8 @@ export const AdminOperationsScreen: React.FC<{ navigation: any }> = ({ navigatio
             onPress={() => navigation.navigate('AdminPayouts')}
             styles={styles} COLORS={COLORS}
           />
-        )}
-        {isSuper && (
-          <Card
-            icon="receipt-outline"
-            tint="#0EA5E9"
-            label="Ledger & history"
-            desc="Escrow ledger, payout history, reconciliation"
-            onPress={() => navigation.navigate('AdminEscrowLedger')}
-            styles={styles} COLORS={COLORS}
-          />
-        )}
-      </Section>
+        </Section>
+      )}
 
       {isSuper && (
         <Section label="AUDIT" styles={styles}>
@@ -139,7 +113,7 @@ export const AdminOperationsScreen: React.FC<{ navigation: any }> = ({ navigatio
         <View style={styles.notice}>
           <Ionicons name="information-circle-outline" size={16} color={COLORS.textSecondary} />
           <Text style={styles.noticeText}>
-            Payouts, ledger, and audit log are super-admin surfaces.
+            Operations is a super-admin surface.
           </Text>
         </View>
       )}
