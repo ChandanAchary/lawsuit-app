@@ -47,8 +47,6 @@ import { LawyerVerificationRequestScreen } from '../screens/lawyer/LawyerVerific
 // Admin screens
 import { AdminDashboardScreen } from '../screens/admin/AdminDashboardScreen';
 import { AdminUsersScreen } from '../screens/admin/AdminUsersScreen';
-import { AdminPaymentsScreen } from '../screens/admin/AdminPaymentsScreen';
-import { AdminWalletsScreen } from '../screens/admin/AdminWalletsScreen';
 import { CourtManagementScreen } from '../screens/admin/CourtManagementScreen';
 import { CourtAdminManagementScreen } from '../screens/admin/CourtAdminManagementScreen';
 import { AdminTeamScreen } from '../screens/admin/AdminTeamScreen';
@@ -65,7 +63,6 @@ import { SuperAdminEntitySalaryScreen } from '../screens/admin/SuperAdminEntityS
 import { SuperAdminEntitySalaryCycleScreen } from '../screens/admin/SuperAdminEntitySalaryCycleScreen';
 import { SuperAdminCourtAdminOpsScreen } from '../screens/admin/SuperAdminCourtAdminOpsScreen';
 import { AdminUserDetailScreen } from '../screens/admin/AdminUserDetailScreen';
-import { AdminEscrowLedgerScreen } from '../screens/admin/AdminEscrowLedgerScreen';
 import { AdminReportsScreen } from '../screens/admin/AdminReportsScreen';
 import { AdminLegalUpdatesScreen } from '../screens/admin/AdminLegalUpdatesScreen';
 import { AdminAnnouncementsScreen } from '../screens/admin/AdminAnnouncementsScreen';
@@ -416,8 +413,6 @@ export const MainStack = () => {
       <Stack.Screen name="LegalUpdates" component={LegalUpdatesScreen} />
       <Stack.Screen name="ReportIssue" component={ReportIssueScreen} />
       {/* Admin-only screens */}
-      <Stack.Screen name="AdminPayments" component={AdminPaymentsScreen} />
-      <Stack.Screen name="AdminWallets" component={AdminWalletsScreen} />
       <Stack.Screen name="CourtManagement" component={CourtManagementScreen} />
       <Stack.Screen name="CourtAdminManagement" component={CourtAdminManagementScreen} />
       <Stack.Screen name="AdminTeam" component={AdminTeamScreen} />
@@ -430,7 +425,6 @@ export const MainStack = () => {
       <Stack.Screen name="SuperAdminEntitySalary" component={SuperAdminEntitySalaryScreen as any} />
       <Stack.Screen name="SuperAdminEntitySalaryCycle" component={SuperAdminEntitySalaryCycleScreen} />
       <Stack.Screen name="AdminUserDetail" component={AdminUserDetailScreen as any} />
-      <Stack.Screen name="AdminEscrowLedger" component={AdminEscrowLedgerScreen} />
       <Stack.Screen name="AdminReports" component={AdminReportsScreen} />
       <Stack.Screen name="AdminLegalUpdates" component={AdminLegalUpdatesScreen} />
       <Stack.Screen name="AdminAnnouncements" component={AdminAnnouncementsScreen} />

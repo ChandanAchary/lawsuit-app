@@ -319,15 +319,6 @@ export const adminApi = {
   getUserById: (id: string) => api.get(`/admin/users/${encodeURIComponent(id)}`),
   toggleVerification: (id: string, isVerified: boolean) =>
     api.put(`/admin/users/${encodeURIComponent(id)}/verification`, { isVerified }),
-  getPayments: (params?: Record<string, unknown>) =>
-    api.get('/admin/payments', { params }),
-  // Wallet monitoring is read-only (Phase 1) — manual credit/debit endpoints
-  // were removed server-side; money in/out only flows through booking,
-  // refund, and payout. Withdrawal reverse is the only escape hatch.
-  getWallets: () => api.get('/admin/wallets'),
-  getWithdrawals: () => api.get('/admin/wallets/withdrawals'),
-  reverseWithdrawal: (id: string, reason: string) =>
-    api.put(`/admin/wallets/withdrawals/${encodeURIComponent(id)}/reverse`, { reason }),
   getNotVerifiedClients: () => api.get('/admin/not-verified-client'),
   getNotVerifiedLawyers: () => api.get('/admin/not-verified-lawyers'),
 
@@ -373,11 +364,6 @@ export const payoutsApi = {
     limit?: number;
   }) => api.get('/admin/payouts', { params }),
   summary: () => api.get('/admin/payouts/summary'),
-  escrowLedger: (beneficiaryType?: BeneficiaryType) =>
-    api.get('/admin/payouts/escrow-ledger', { params: beneficiaryType ? { beneficiaryType } : {} }),
-  history: (params?: { recipientUserId?: string; initiatedById?: string; page?: number; limit?: number }) =>
-    api.get('/admin/payouts/history', { params }),
-  reconcile: () => api.get('/admin/payouts/reconcile'),
   disburse: (paymentId: string, data?: { providerPayoutId?: string; notes?: string }) =>
     api.post(`/admin/payouts/${encodeURIComponent(paymentId)}/disburse`, data ?? {}),
   refund: (paymentId: string, data: { reason: string; partialAmount?: number }) =>
