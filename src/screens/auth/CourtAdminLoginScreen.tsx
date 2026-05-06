@@ -44,6 +44,7 @@ export const CourtAdminLoginScreen: React.FC<{ navigation: any }> = ({ navigatio
           name: courtAdmin.name,
           email: courtAdmin.email,
           role: 'COURT_ADMIN' as any,
+          mustChangePassword: !!courtAdmin.mustChangePassword,
         };
         await storage.setUser(courtAdminUser as any);
         useAuthStore.setState({ user: courtAdminUser, token: data.accessToken, isAuthenticated: true, isLoading: false });
