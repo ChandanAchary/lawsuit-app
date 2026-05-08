@@ -5,7 +5,8 @@
       "Bash(echo \"exit=$?\")",
       "Bash(ls ../lawsuit-server/src/routes/)",
       "Bash(grep -n \"model OrgAppointmentRequest\" -A 50 ../lawsuit-server/prisma/schema.prisma)",
-      "Bash(echo \"EXIT=$?\")"
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(npx prisma *)"
     ]
   }
 }

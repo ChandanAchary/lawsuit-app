@@ -19,6 +19,9 @@ export const OrgRequestsScreen: React.FC<{ navigation: any }> = ({ navigation })
   const [lawyers, setLawyers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  // Docs per request — fetched alongside the requests list. Map by id so
+  // each card pulls its own (small) array without re-rendering the world.
+  const [docsByRequest, setDocsByRequest] = useState<Record<string, any[]>>({});
 
   // Assign Modal
   const [selectedReq, setSelectedReq] = useState<any>(null);
@@ -35,8 +38,24 @@ export const OrgRequestsScreen: React.FC<{ navigation: any }> = ({ navigation })
         organizationsApi.listOrgAppointmentRequests(),
         organizationsApi.listLawyers(),
       ]);
-      setRequests(reqRes.data.requests || reqRes.data.items || reqRes.data || []);
+      const reqs = reqRes.data.requests || reqRes.data.items || reqRes.data || [];
+      setRequests(reqs);
       setLawyers(lawRes.data.lawyers || lawRes.data.items || lawRes.data || []);
+
+      // Fan-out doc fetches in parallel. Errors are swallowed per-request so
+      // a single 4xx doesn't break the whole screen.
+      const arr = Array.isArray(reqs) ? reqs : [];
+      const docResults = await Promise.all(
+        arr.map((r: any) =>
+          organizationsApi
+            .listOrgRequestDocuments(r.id)
+            .then((d) => ({ id: r.id, items: d.data?.items || [] }))
+            .catch(() => ({ id: r.id, items: [] })),
+        ),
+      );
+      const map: Record<string, any[]> = {};
+      for (const r of docResults) map[r.id] = r.items;
+      setDocsByRequest(map);
     } catch {
       // ignore
     } finally {
@@ -77,6 +96,7 @@ export const OrgRequestsScreen: React.FC<{ navigation: any }> = ({ navigation })
   const renderRequest = ({ item }: { item: any }) => {
     const scheduled = item.scheduledAt ? new Date(item.scheduledAt) : null;
     const assignedLawyerName = item.assignedLawyer?.name || null;
+    const docs = docsByRequest[item.id] || [];
     return (
       <View style={styles.card}>
         <View style={styles.cardHeader}>
@@ -124,6 +144,41 @@ export const OrgRequestsScreen: React.FC<{ navigation: any }> = ({ navigation })
               <Text style={styles.notesLabel}>Case description</Text>
             </View>
             <Text style={styles.notesText}>{item.notes}</Text>
+          </View>
+        )}
+
+        {/* Supporting documents the client attached at booking. Each row
+            taps through to DocumentAiScreen for OCR / summary / Q&A — the
+            org head's primary triage tool when picking which lawyer to
+            assign. */}
+        {docs.length > 0 && (
+          <View style={styles.docsBlock}>
+            <View style={styles.docsHeader}>
+              <Ionicons name="folder-open-outline" size={14} color={COLORS.primary} />
+              <Text style={styles.docsLabel}>{docs.length} supporting document{docs.length === 1 ? '' : 's'}</Text>
+            </View>
+            {docs.map((d: any) => (
+              <TouchableOpacity
+                key={d.id}
+                style={styles.docRow}
+                activeOpacity={0.7}
+                onPress={() =>
+                  navigation.navigate('DocumentAi', {
+                    documentId: d.id,
+                    document: d,
+                    contextLabel: 'Booking doc',
+                  })
+                }
+              >
+                <Ionicons
+                  name={d.mimeType?.startsWith('image/') ? 'image-outline' : 'document-outline'}
+                  size={16}
+                  color={COLORS.primary}
+                />
+                <Text style={styles.docRowName} numberOfLines={1}>{d.filename}</Text>
+                <Ionicons name="flash-outline" size={14} color={COLORS.primary} />
+              </TouchableOpacity>
+            ))}
           </View>
         )}
 
@@ -286,6 +341,19 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     marginTop: SPACING.md,
   },
   assignedText: { fontSize: FONT_SIZE.sm, color: COLORS.success, fontWeight: '600' },
+
+  docsBlock: { marginTop: SPACING.md, gap: 6 },
+  docsHeader: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
+  docsLabel: {
+    fontSize: FONT_SIZE.xs - 1, fontWeight: '700',
+    color: COLORS.primary, letterSpacing: 0.5, textTransform: 'uppercase',
+  },
+  docRow: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
+    backgroundColor: COLORS.surfaceAlt, borderRadius: BORDER_RADIUS.lg,
+    paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm,
+  },
+  docRowName: { flex: 1, fontSize: FONT_SIZE.sm, color: COLORS.text, fontWeight: '600' },
   cardActions: { flexDirection: 'row', gap: SPACING.md, marginTop: SPACING.md, paddingTop: SPACING.md, borderTopWidth: 1, borderTopColor: COLORS.borderLight },
   actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.sm, paddingVertical: SPACING.md, borderRadius: BORDER_RADIUS.lg },
   actionText: { fontSize: FONT_SIZE.sm, fontWeight: '700' },

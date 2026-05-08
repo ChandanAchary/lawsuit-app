@@ -3,11 +3,12 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, Alert, Dimensions, Linking, TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { formatErrorMessage } from '../../utils/formatError';
 import { Lawyer, AvailabilitySlot } from '../../types';
-import { lawyersApi, appointmentsApi } from '../../services/api';
+import { lawyersApi, appointmentsApi, storageApi } from '../../services/api';
 import { useWalletStore } from '../../stores/walletStore';
 import { useAuthStore } from '../../stores/authStore';
 import { useThemeStore, useColors } from '../../stores/themeStore';
@@ -184,6 +185,77 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
   const [problemNotes, setProblemNotes] = useState('');
   const NOTES_MIN = 20;
   const NOTES_MAX = 500;
+
+  // Optional supporting documents the client wants the lawyer to review
+  // before accepting. We collect picks locally; bytes are uploaded to
+  // Cloudinary AFTER the booking POST succeeds (so we have an
+  // appointmentId to attach them to). PDF / image / DOCX accepted to
+  // match the server's OCR pipeline.
+  type PickedDoc = { uri: string; name: string; mimeType: string; size?: number };
+  const [pickedDocs, setPickedDocs] = useState<PickedDoc[]>([]);
+
+  const handlePickDocs = async () => {
+    try {
+      const pick = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'image/*', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+        copyToCacheDirectory: true,
+        multiple: true,
+      });
+      if (pick.canceled || !pick.assets?.length) return;
+      setPickedDocs((prev) => [
+        ...prev,
+        ...pick.assets.map((a) => ({
+          uri: a.uri,
+          name: a.name || 'attachment',
+          mimeType: a.mimeType || 'application/octet-stream',
+          size: a.size,
+        })),
+      ]);
+    } catch (err: any) {
+      Alert.alert('Could not pick files', formatErrorMessage(err) || 'Try again');
+    }
+  };
+
+  const removePickedDoc = (index: number) => {
+    setPickedDocs((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Cloudinary signed-upload + appointmentsApi.attachDocument loop. Best-
+  // effort — a failed attachment doesn't roll back the booking, but the
+  // user is warned. The lawyer can ask for missing docs via chat.
+  async function uploadDocsForAppointment(appointmentId: string) {
+    if (pickedDocs.length === 0) return { uploaded: 0, failed: 0 };
+    let uploaded = 0;
+    let failed = 0;
+    const { data: signData } = await storageApi.getCloudinarySignature('appointment-docs');
+    for (const doc of pickedDocs) {
+      try {
+        const formData = new FormData();
+        formData.append('file', { uri: doc.uri, type: doc.mimeType, name: doc.name } as any);
+        formData.append('timestamp', String(signData.timestamp));
+        formData.append('signature', signData.signature);
+        formData.append('api_key', signData.apiKey);
+        formData.append('folder', signData.folder);
+        const resourceType = doc.mimeType.startsWith('image/') ? 'image' : 'raw';
+        const uploadRes = await fetch(
+          `https://api.cloudinary.com/v1_1/${encodeURIComponent(signData.cloudName)}/${resourceType}/upload`,
+          { method: 'POST', body: formData },
+        );
+        const uploadData = await uploadRes.json();
+        if (!uploadData?.secure_url) throw new Error(uploadData?.error?.message || 'Upload failed');
+        await appointmentsApi.attachDocument(appointmentId, {
+          fileurl: uploadData.secure_url,
+          fileName: doc.name,
+          mimeType: doc.mimeType,
+          size: doc.size,
+        });
+        uploaded += 1;
+      } catch {
+        failed += 1;
+      }
+    }
+    return { uploaded, failed };
+  }
   const [reviews, setReviews] = useState<any[]>([]);
   const [showReviewSheet, setShowReviewSheet] = useState(false);
   const [rating, setRating] = useState(5);
@@ -511,9 +583,23 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
       const appointment = data.appointment || data.data || data;
       const appointmentId = appointment?.id || data?.id;
 
+      // Upload supporting documents (if any) before navigating away. The
+      // upload loop is best-effort; failures are reported in the success
+      // toast so the user knows to re-attach via chat or detail screen.
+      let docResult = { uploaded: 0, failed: 0 };
+      if (appointmentId && pickedDocs.length > 0) {
+        docResult = await uploadDocsForAppointment(appointmentId);
+      }
+
       if (paymentMethod === 'wallet') {
-        Alert.alert('Success', 'Appointment booked successfully!');
+        const docMsg = pickedDocs.length === 0
+          ? ''
+          : docResult.failed === 0
+            ? `\n${docResult.uploaded} document${docResult.uploaded === 1 ? '' : 's'} attached.`
+            : `\n${docResult.uploaded}/${pickedDocs.length} documents attached, ${docResult.failed} failed — you can retry from the appointment detail screen.`;
+        Alert.alert('Success', `Appointment booked successfully!${docMsg}`);
         setShowBooking(false);
+        setPickedDocs([]);
         safeGoBack(navigation, 'MainTabs');
       } else {
         // Razorpay payment flow
@@ -989,6 +1075,38 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
               : ''}
           </Text>
 
+          {/* Optional supporting documents — PDF, images, DOCX. Uploaded
+              after booking succeeds; the lawyer can run OCR + AI on them
+              from the appointment detail screen before accepting. */}
+          <Text style={styles.paymentTitle}>Supporting documents (optional)</Text>
+          <Text style={styles.notesHint}>
+            Attach contracts, court notices, photos, or anything that helps explain your case. The
+            lawyer can run OCR and AI summary on these from the appointment detail screen.
+          </Text>
+          {pickedDocs.length > 0 && (
+            <View style={styles.docList}>
+              {pickedDocs.map((doc, i) => (
+                <View key={`${doc.uri}-${i}`} style={styles.docItem}>
+                  <Ionicons
+                    name={doc.mimeType.startsWith('image/') ? 'image-outline' : 'document-outline'}
+                    size={18}
+                    color={COLORS.primary}
+                  />
+                  <Text style={styles.docName} numberOfLines={1}>{doc.name}</Text>
+                  <TouchableOpacity onPress={() => removePickedDoc(i)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Ionicons name="close-circle" size={18} color={COLORS.textMuted} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+          <TouchableOpacity style={styles.docPickBtn} onPress={handlePickDocs}>
+            <Ionicons name="attach" size={18} color={COLORS.primary} />
+            <Text style={styles.docPickText}>
+              {pickedDocs.length === 0 ? 'Attach documents' : 'Add more documents'}
+            </Text>
+          </TouchableOpacity>
+
           <Text style={styles.paymentTitle}>Payment Method</Text>
           <View style={styles.paymentOptions}>
             <TouchableOpacity
@@ -1336,6 +1454,21 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     textAlign: 'right', marginTop: SPACING.xs,
     marginBottom: SPACING.xl,
   },
+  docList: { gap: SPACING.sm, marginBottom: SPACING.md },
+  docItem: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
+    backgroundColor: COLORS.surfaceAlt, borderRadius: BORDER_RADIUS.lg,
+    paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm,
+  },
+  docName: { flex: 1, fontSize: FONT_SIZE.sm, color: COLORS.text },
+  docPickBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.sm,
+    backgroundColor: COLORS.primary + '0E', borderRadius: BORDER_RADIUS.lg,
+    paddingVertical: SPACING.md, marginBottom: SPACING.xl,
+    borderWidth: 1, borderColor: COLORS.primary + '30',
+    borderStyle: 'dashed' as any,
+  },
+  docPickText: { color: COLORS.primary, fontSize: FONT_SIZE.sm, fontWeight: '700' },
   // Professional details
   proDetailCard: {
     backgroundColor: COLORS.white,

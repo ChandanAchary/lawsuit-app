@@ -1,12 +1,14 @@
 import {  useThemeStore , useColors } from '../stores/themeStore';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, Platform, ActivityIndicator, Image, Keyboard,
+  View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, Platform, ActivityIndicator, Image, Keyboard, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../constants';
 import { ChatMessage, ChatParticipant } from '../types';
-import { chatApi } from '../services/api';
+import { chatApi, storageApi } from '../services/api';
+import { formatErrorMessage } from '../utils/formatError';
 import { socketService } from '../services/socket';
 import { useAuthStore } from '../stores/authStore';
 import { formatTime } from '../utils/date';
@@ -19,7 +21,13 @@ interface ChatTabProps {
   participants?: ChatParticipant[];
 }
 
+// Lazy-import to avoid circular module issues — ChatTab is mounted by both
+// ChatScreen (which has nav) and contexts that may not. We pull from the
+// React Navigation hook at render time.
+import { useNavigation } from '@react-navigation/native';
+
 export const ChatTab: React.FC<ChatTabProps> = ({ chatId, participants = [] }) => {
+  const navigation: any = useNavigation();
   const isDark = useThemeStore((s: any) => s.isDark);
   const COLORS = useColors();
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
@@ -27,6 +35,9 @@ export const ChatTab: React.FC<ChatTabProps> = ({ chatId, participants = [] }) =
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text, setText] = useState('');
+  // Upload-in-flight flag — disables both the attach button and the send
+  // button while a Cloudinary upload + sendMessage round-trip is happening.
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [page, setPage] = useState(1);
@@ -150,6 +161,90 @@ export const ChatTab: React.FC<ChatTabProps> = ({ chatId, participants = [] }) =
       typingTimer.current = setTimeout(() => socketService.stopTyping(chatId), 2000);
     } else {
       socketService.stopTyping(chatId);
+    }
+  };
+
+  // Upload a single file to Cloudinary, then post a chat message with the
+  // resulting URL. The server auto-creates a Document row linked to the
+  // new ChatMessage so the lawyer can OCR / summarize / Q&A it via the
+  // ⚡ button on the attachment row.
+  const handleAttach = async () => {
+    if (uploadingAttachment || sending) return;
+    try {
+      const pick = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'image/*', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (pick.canceled || !pick.assets?.[0]) return;
+      const asset = pick.assets[0];
+
+      setUploadingAttachment(true);
+      const { data: signData } = await storageApi.getCloudinarySignature('chat-attachments');
+
+      const formData = new FormData();
+      formData.append('file', {
+        uri: asset.uri,
+        type: asset.mimeType || 'application/octet-stream',
+        name: asset.name || 'attachment',
+      } as any);
+      formData.append('timestamp', String(signData.timestamp));
+      formData.append('signature', signData.signature);
+      formData.append('api_key', signData.apiKey);
+      formData.append('folder', signData.folder);
+
+      const resourceType = (asset.mimeType || '').startsWith('image/') ? 'image' : 'raw';
+      const uploadRes = await fetch(
+        `https://api.cloudinary.com/v1_1/${encodeURIComponent(signData.cloudName)}/${resourceType}/upload`,
+        { method: 'POST', body: formData },
+      );
+      const uploadData = await uploadRes.json();
+      if (!uploadData?.secure_url) throw new Error(uploadData?.error?.message || 'Cloudinary upload failed');
+
+      // Optimistic message with the doc inline so the user sees the
+      // attachment immediately. Server replaces it with the real row
+      // (carrying a stable Document id) on response.
+      const optimistic: ChatMessage = {
+        id: `temp-${Date.now()}`,
+        chatId,
+        senderId: currentUser?.id || '',
+        text: text.trim() || '',
+        createdAt: new Date().toISOString(),
+        // @ts-ignore — extending the local type for the optimistic case
+        documents: [{
+          id: `temp-doc-${Date.now()}`,
+          filename: asset.name || 'attachment',
+          mimeType: asset.mimeType || 'application/octet-stream',
+          url: uploadData.secure_url,
+        }],
+      };
+      setMessages((prev) => [...prev, optimistic]);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+      setText('');
+
+      const { data } = await chatApi.sendMessage(chatId, {
+        text: text.trim() || '',
+        attachments: [uploadData.secure_url],
+        attachmentMetas: [{
+          url: uploadData.secure_url,
+          filename: asset.name || 'attachment',
+          mimeType: asset.mimeType || 'application/octet-stream',
+          size: asset.size,
+        }],
+      });
+      const serverMsg: ChatMessage = data.message || data;
+      setMessages((prev) => {
+        const idx = prev.findIndex((m) => m.id === optimistic.id);
+        if (idx === -1) return prev;
+        const next = [...prev];
+        next[idx] = serverMsg;
+        return next;
+      });
+    } catch (err: any) {
+      Alert.alert('Upload failed', formatErrorMessage(err) || 'Could not send attachment');
+      setMessages((prev) => prev.filter((m) => !m.id.startsWith('temp-')));
+    } finally {
+      setUploadingAttachment(false);
     }
   };
 
@@ -294,7 +389,45 @@ export const ChatTab: React.FC<ChatTabProps> = ({ chatId, participants = [] }) =
             </View>
           )}
           <View style={[styles.msgBubble, isMine ? styles.myBubble : styles.otherBubble, isTemp && styles.tempBubble]}>
-            <Text style={[styles.msgText, isMine ? styles.myText : styles.otherText]}>{item.text}</Text>
+            {!!item.text && (
+              <Text style={[styles.msgText, isMine ? styles.myText : styles.otherText]}>{item.text}</Text>
+            )}
+            {/* Attachments — server auto-creates Document rows for any
+                URLs sent in the attachments[] array, so each attachment is
+                tappable and routes to the generic OCR / AI screen. */}
+            {Array.isArray((item as any).documents) && (item as any).documents.length > 0 && (
+              <View style={styles.attachList}>
+                {(item as any).documents.map((d: any) => (
+                  <TouchableOpacity
+                    key={d.id}
+                    style={styles.attachRow}
+                    activeOpacity={0.75}
+                    onPress={() => navigation.navigate('DocumentAi', {
+                      documentId: d.id,
+                      document: d,
+                      contextLabel: 'Chat attachment',
+                    })}
+                  >
+                    <Ionicons
+                      name={d.mimeType?.startsWith('image/') ? 'image-outline' : 'document-outline'}
+                      size={18}
+                      color={isMine ? '#FFFFFF' : COLORS.primary}
+                    />
+                    <Text
+                      style={[styles.attachName, { color: isMine ? '#FFFFFF' : COLORS.text }]}
+                      numberOfLines={1}
+                    >
+                      {d.filename}
+                    </Text>
+                    <Ionicons
+                      name="flash-outline"
+                      size={16}
+                      color={isMine ? 'rgba(255,255,255,0.85)' : COLORS.primary}
+                    />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
             <View style={styles.msgMeta}>
               <Text style={[styles.msgTime, isMine ? styles.myTime : styles.otherTime]}>
                 {formatTime(item.createdAt)}
@@ -376,6 +509,21 @@ export const ChatTab: React.FC<ChatTabProps> = ({ chatId, participants = [] }) =
           { paddingBottom: inputBottomInset },
         ]}
       >
+        {/* Attach — picks a PDF / image / DOCX, uploads to Cloudinary, then
+            sends a chat message with the URL. Server auto-creates a
+            Document so the recipient can run OCR via the ⚡ button. */}
+        <TouchableOpacity
+          style={styles.attachBtn}
+          onPress={handleAttach}
+          disabled={uploadingAttachment || sending}
+          activeOpacity={0.7}
+        >
+          {uploadingAttachment ? (
+            <ActivityIndicator size="small" color={COLORS.primary} />
+          ) : (
+            <Ionicons name="attach" size={22} color={COLORS.primary} />
+          )}
+        </TouchableOpacity>
         <TextInput
           style={styles.chatInput}
           value={text}
@@ -387,9 +535,9 @@ export const ChatTab: React.FC<ChatTabProps> = ({ chatId, participants = [] }) =
           maxLength={2000}
         />
         <TouchableOpacity
-          style={[styles.sendBtn, (!text.trim() || sending) && styles.sendBtnDisabled]}
+          style={[styles.sendBtn, (!text.trim() || sending || uploadingAttachment) && styles.sendBtnDisabled]}
           onPress={handleSend}
-          disabled={!text.trim() || sending}
+          disabled={!text.trim() || sending || uploadingAttachment}
         >
           {sending ? (
             <ActivityIndicator size="small" color={COLORS.white} />
@@ -450,6 +598,14 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   myText: { color: COLORS.white },
   otherText: { color: COLORS.text },
   msgMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: 3 },
+  attachList: { gap: 6, marginTop: 6 },
+  attachRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(0,0,0,0.07)',
+    borderRadius: 8,
+    paddingHorizontal: 8, paddingVertical: 6,
+  },
+  attachName: { flex: 1, fontSize: FONT_SIZE.xs, fontWeight: '600' },
   msgTime: { fontSize: 10 },
   myTime: { color: 'rgba(255,255,255,0.55)' },
   otherTime: { color: COLORS.textMuted },
@@ -491,6 +647,11 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     justifyContent: 'center',
   },
   sendBtnDisabled: { opacity: 0.4 },
+  attachBtn: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: COLORS.primary + '14',
+    alignItems: 'center', justifyContent: 'center',
+  },
   emptyChat: { alignItems: 'center', paddingVertical: SPACING.huge },
   emptyChatText: { color: COLORS.textMuted, fontSize: FONT_SIZE.md },
   // Call log styles

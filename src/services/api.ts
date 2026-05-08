@@ -190,6 +190,27 @@ export const appointmentsApi = {
   confirmRazorpay: (id: string, data: { appointmentId: string; razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) =>
     api.post(`/appointments/${encodeURIComponent(id)}/confirm-payment`, data),
   getAllAppointments: () => api.get('/appointments/getall'),
+
+  // Supporting documents attached to a consultation booking. Bytes are
+  // uploaded directly to Cloudinary; this method only persists the
+  // resulting URL + metadata so the lawyer can OCR / summarise them.
+  attachDocument: (
+    appointmentId: string,
+    data: { fileurl: string; fileName: string; mimeType: string; size?: number },
+  ) => api.post(`/appointments/${encodeURIComponent(appointmentId)}/documents`, data),
+  listDocuments: (appointmentId: string) =>
+    api.get(`/appointments/${encodeURIComponent(appointmentId)}/documents`),
+};
+
+// ─── Generic per-document OCR / AI API ─────────────────────
+// Works for any Document regardless of its parent (case / appointment /
+// chat message). Permission is enforced server-side by walking the
+// document's parent — see document-access.service.ts.
+export const documentsApi = {
+  extract: (documentId: string) => api.post(`/documents/${encodeURIComponent(documentId)}/extract`),
+  summarize: (documentId: string) => api.post(`/documents/${encodeURIComponent(documentId)}/summarize`),
+  ask: (documentId: string, question: string) =>
+    api.post(`/documents/${encodeURIComponent(documentId)}/ask`, { question }),
 };
 
 // ─── Cases API ──────────────────────────────────────────────
@@ -219,6 +240,8 @@ export const casesApi = {
   // (Use casesApi.uploadDocument above to persist a single uploaded
   //  document — the server endpoint accepts a flat body, not a
   //  { documents: [...] } array, so a multi-doc helper would mis-shape.)
+  // Case-scoped OCR/AI (legacy path — kept for the existing CaseDetail flow).
+  // New surfaces (appointment docs, chat attachments) use documentsApi below.
   extractText: (caseId: string, documentId: string) => api.post(`/cases/${encodeURIComponent(caseId)}/documents/${encodeURIComponent(documentId)}/extract`),
   summarize: (caseId: string, documentId: string) => api.post(`/cases/${encodeURIComponent(caseId)}/documents/${encodeURIComponent(documentId)}/summarize`),
   askQuestion: (caseId: string, documentId: string, question: string) => api.post(`/cases/${encodeURIComponent(caseId)}/documents/${encodeURIComponent(documentId)}/ask`, { question }),
@@ -271,8 +294,17 @@ export const chatApi = {
   getChats: () => api.get('/chat'),
   getMessages: (chatId: string, params?: Record<string, unknown>) =>
     api.get(`/chat/${encodeURIComponent(chatId)}/messages`, { params }),
-  sendMessage: (chatId: string, data: { text: string; attachments?: string[] }) =>
-    api.post(`/chat/${encodeURIComponent(chatId)}/messages`, data),
+  // text + attachments[] is the legacy contract; the optional
+  // attachmentMetas mirror lets the server auto-create Document rows with
+  // accurate mime + filename + size so OCR works without inference.
+  sendMessage: (
+    chatId: string,
+    data: {
+      text: string;
+      attachments?: string[];
+      attachmentMetas?: Array<{ url: string; filename?: string; mimeType?: string; size?: number }>;
+    },
+  ) => api.post(`/chat/${encodeURIComponent(chatId)}/messages`, data),
   getParticipants: (chatId: string) => api.get(`/chat/${encodeURIComponent(chatId)}/participants`),
 };
 
@@ -933,6 +965,22 @@ export const organizationsApi = {
     api.post(`/organizations/clients/me/requests/${encodeURIComponent(id)}/cancel`),
   createAppointmentRequest: (id: string, data: any) =>
     api.post(`/organizations/${encodeURIComponent(id)}/appointment-requests`, data),
+
+  // Documents on an OrgAppointmentRequest. Bytes are uploaded directly to
+  // Cloudinary; this only persists the URL + metadata. After the org
+  // assigns a lawyer, the server mirrors the orgRequestId docs onto the
+  // resulting Appointment so the assigned lawyer reaches them from
+  // AppointmentDetailScreen too.
+  attachRequestDocument: (
+    requestId: string,
+    data: { fileurl: string; fileName: string; mimeType: string; size?: number },
+  ) => api.post(`/organizations/clients/me/requests/${encodeURIComponent(requestId)}/documents`, data),
+  listClientRequestDocuments: (requestId: string) =>
+    api.get(`/organizations/clients/me/requests/${encodeURIComponent(requestId)}/documents`),
+  // Org-head read view — used by OrgRequestsScreen to render docs +
+  // run OCR / summary while choosing which lawyer to assign.
+  listOrgRequestDocuments: (requestId: string) =>
+    api.get(`/organizations/me/appointment-requests/${encodeURIComponent(requestId)}/documents`),
 };
 
 // ─── Legal Updates API ──────────────────────────────────────

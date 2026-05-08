@@ -5,9 +5,11 @@ import {
   KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
-import { organizationsApi } from '../../services/api';
+import { organizationsApi, storageApi } from '../../services/api';
 import { Button } from '../../components/Button';
+import { formatErrorMessage } from '../../utils/formatError';
 
 const DURATIONS = [15, 30, 45, 60, 90, 120];
 const MEETING_TYPES = [
@@ -30,6 +32,75 @@ export const OrgBookingScreen: React.FC<{ navigation: any; route: any }> = ({ na
   const [meetingType, setMeetingType] = useState('AUDIO_CALL');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // Optional supporting documents the client wants the org head to review
+  // before assigning a lawyer. Held locally; uploaded after the request
+  // POST returns the new requestId. PDF / image / DOCX accepted to match
+  // the server's OCR pipeline.
+  type PickedDoc = { uri: string; name: string; mimeType: string; size?: number };
+  const [pickedDocs, setPickedDocs] = useState<PickedDoc[]>([]);
+
+  const handlePickDocs = async () => {
+    try {
+      const pick = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'image/*', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+        copyToCacheDirectory: true,
+        multiple: true,
+      });
+      if (pick.canceled || !pick.assets?.length) return;
+      setPickedDocs((prev) => [
+        ...prev,
+        ...pick.assets.map((a) => ({
+          uri: a.uri,
+          name: a.name || 'attachment',
+          mimeType: a.mimeType || 'application/octet-stream',
+          size: a.size,
+        })),
+      ]);
+    } catch (err: any) {
+      Alert.alert('Could not pick files', formatErrorMessage(err) || 'Try again');
+    }
+  };
+
+  const removePickedDoc = (index: number) => {
+    setPickedDocs((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Best-effort upload loop after the request is created. Failures are
+  // reported in the success alert so the client knows to attach via chat
+  // or AppointmentDetailScreen later.
+  async function uploadDocsForRequest(requestId: string) {
+    if (pickedDocs.length === 0) return { uploaded: 0, failed: 0 };
+    let uploaded = 0;
+    let failed = 0;
+    const { data: signData } = await storageApi.getCloudinarySignature('org-request-docs');
+    for (const doc of pickedDocs) {
+      try {
+        const formData = new FormData();
+        formData.append('file', { uri: doc.uri, type: doc.mimeType, name: doc.name } as any);
+        formData.append('timestamp', String(signData.timestamp));
+        formData.append('signature', signData.signature);
+        formData.append('api_key', signData.apiKey);
+        formData.append('folder', signData.folder);
+        const resourceType = doc.mimeType.startsWith('image/') ? 'image' : 'raw';
+        const uploadRes = await fetch(
+          `https://api.cloudinary.com/v1_1/${encodeURIComponent(signData.cloudName)}/${resourceType}/upload`,
+          { method: 'POST', body: formData },
+        );
+        const uploadData = await uploadRes.json();
+        if (!uploadData?.secure_url) throw new Error(uploadData?.error?.message || 'Upload failed');
+        await organizationsApi.attachRequestDocument(requestId, {
+          fileurl: uploadData.secure_url,
+          fileName: doc.name,
+          mimeType: doc.mimeType,
+          size: doc.size,
+        });
+        uploaded += 1;
+      } catch {
+        failed += 1;
+      }
+    }
+    return { uploaded, failed };
+  }
 
   const handleBook = async () => {
     if (!date.trim()) return Alert.alert('Required', 'Please enter date');
@@ -57,15 +128,30 @@ export const OrgBookingScreen: React.FC<{ navigation: any; route: any }> = ({ na
 
     setSubmitting(true);
     try {
-      await organizationsApi.createAppointmentRequest(orgId, {
+      const { data } = await organizationsApi.createAppointmentRequest(orgId, {
         scheduledAt: scheduledAt.toISOString(),
         durationMins: duration,
         meetingType,
         notes: notes.trim() || undefined,
       });
+      // Server returns the created request — pull the id so we can attach
+      // any picked supporting docs in a best-effort follow-up loop.
+      const created = data?.request || data?.data || data;
+      const requestId = created?.id;
+
+      let docResult = { uploaded: 0, failed: 0 };
+      if (requestId && pickedDocs.length > 0) {
+        docResult = await uploadDocsForRequest(requestId);
+      }
+      const docMsg = pickedDocs.length === 0
+        ? ''
+        : docResult.failed === 0
+          ? `\n${docResult.uploaded} document${docResult.uploaded === 1 ? '' : 's'} attached.`
+          : `\n${docResult.uploaded}/${pickedDocs.length} attached, ${docResult.failed} failed — share the missing files via chat after assignment.`;
+
       Alert.alert(
         'Booking Submitted',
-        'Your appointment request has been submitted. The organization will assign a lawyer and confirm.',
+        `Your appointment request has been submitted. The organization will review your case and assign a lawyer.${docMsg}`,
         [{ text: 'OK', onPress: () => navigation.goBack() }],
       );
     } catch (err: any) {
@@ -190,6 +276,40 @@ export const OrgBookingScreen: React.FC<{ navigation: any; route: any }> = ({ na
           </Text>
         </View>
 
+        {/* Supporting documents — uploaded after the request is created.
+            The org head sees + OCRs these while choosing which lawyer to
+            assign. Carries over to the assigned Appointment automatically. */}
+        <Text style={styles.sectionTitle}>Supporting documents (optional)</Text>
+        <View style={styles.card}>
+          <Text style={styles.docHint}>
+            Attach contracts, court notices, photos, or anything that helps explain your case. The
+            organisation can run OCR + AI summary on these before assigning a lawyer.
+          </Text>
+          {pickedDocs.length > 0 && (
+            <View style={styles.docList}>
+              {pickedDocs.map((doc, i) => (
+                <View key={`${doc.uri}-${i}`} style={styles.docItem}>
+                  <Ionicons
+                    name={doc.mimeType.startsWith('image/') ? 'image-outline' : 'document-outline'}
+                    size={18}
+                    color={COLORS.primary}
+                  />
+                  <Text style={styles.docName} numberOfLines={1}>{doc.name}</Text>
+                  <TouchableOpacity onPress={() => removePickedDoc(i)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Ionicons name="close-circle" size={18} color={COLORS.textMuted} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+          <TouchableOpacity style={styles.docPickBtn} onPress={handlePickDocs}>
+            <Ionicons name="attach" size={18} color={COLORS.primary} />
+            <Text style={styles.docPickText}>
+              {pickedDocs.length === 0 ? 'Attach documents' : 'Add more documents'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         <Button title="Submit Booking Request" onPress={handleBook} loading={submitting} size="lg" style={{ marginTop: SPACING.lg }} />
       </ScrollView>
     </KeyboardAvoidingView>
@@ -262,4 +382,20 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     fontSize: FONT_SIZE.xs - 1, color: COLORS.textMuted,
     textAlign: 'right', marginTop: SPACING.xs,
   },
+  docHint: { fontSize: FONT_SIZE.xs, color: COLORS.textMuted, lineHeight: 17, marginBottom: SPACING.md },
+  docList: { gap: SPACING.sm, marginBottom: SPACING.md },
+  docItem: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
+    backgroundColor: COLORS.surfaceAlt, borderRadius: BORDER_RADIUS.lg,
+    paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm,
+  },
+  docName: { flex: 1, fontSize: FONT_SIZE.sm, color: COLORS.text },
+  docPickBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.sm,
+    backgroundColor: COLORS.primary + '0E', borderRadius: BORDER_RADIUS.lg,
+    paddingVertical: SPACING.md,
+    borderWidth: 1, borderColor: COLORS.primary + '30',
+    borderStyle: 'dashed' as any,
+  },
+  docPickText: { color: COLORS.primary, fontSize: FONT_SIZE.sm, fontWeight: '700' },
 });

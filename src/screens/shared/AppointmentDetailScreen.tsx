@@ -39,6 +39,61 @@ export const AppointmentDetailScreen: React.FC<Props> = ({ navigation, route }) 
   const [rescheduling, setRescheduling] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [uploadingAgreement, setUploadingAgreement] = useState(false);
+  const [supportDocs, setSupportDocs] = useState<any[]>([]);
+  const [uploadingSupport, setUploadingSupport] = useState(false);
+
+  const fetchSupportingDocs = useCallback(async () => {
+    try {
+      const { data } = await appointmentsApi.listDocuments(appointmentId);
+      setSupportDocs(data?.items || data?.documents || data || []);
+    } catch {
+      setSupportDocs([]);
+    }
+  }, [appointmentId]);
+
+  useEffect(() => { fetchSupportingDocs(); }, [fetchSupportingDocs]);
+
+  // Either party can attach more documents at any time (e.g. the client
+  // forgot a contract, the lawyer wants a counter-document attached for
+  // reference). Same Cloudinary signed-upload pattern as the booking
+  // sheet. After upload we re-pull the docs list so the OCR row appears.
+  const handleAttachSupportingDoc = async () => {
+    try {
+      const pick = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'image/*', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (pick.canceled || !pick.assets?.[0]) return;
+      const asset = pick.assets[0];
+      setUploadingSupport(true);
+      const { data: signData } = await storageApi.getCloudinarySignature('appointment-docs');
+      const formData = new FormData();
+      formData.append('file', { uri: asset.uri, type: asset.mimeType || 'application/octet-stream', name: asset.name || 'attachment' } as any);
+      formData.append('timestamp', String(signData.timestamp));
+      formData.append('signature', signData.signature);
+      formData.append('api_key', signData.apiKey);
+      formData.append('folder', signData.folder);
+      const resourceType = (asset.mimeType || '').startsWith('image/') ? 'image' : 'raw';
+      const uploadRes = await fetch(
+        `https://api.cloudinary.com/v1_1/${encodeURIComponent(signData.cloudName)}/${resourceType}/upload`,
+        { method: 'POST', body: formData },
+      );
+      const uploadData = await uploadRes.json();
+      if (!uploadData?.secure_url) throw new Error(uploadData?.error?.message || 'Cloudinary upload failed');
+      await appointmentsApi.attachDocument(appointmentId, {
+        fileurl: uploadData.secure_url,
+        fileName: asset.name || 'attachment',
+        mimeType: asset.mimeType || 'application/octet-stream',
+        size: asset.size,
+      });
+      await fetchSupportingDocs();
+    } catch (err: any) {
+      Alert.alert('Upload failed', formatErrorMessage(err) || 'Could not attach document');
+    } finally {
+      setUploadingSupport(false);
+    }
+  };
 
   const fetchAppointment = useCallback(async () => {
     try {
@@ -371,6 +426,77 @@ export const AppointmentDetailScreen: React.FC<Props> = ({ navigation, route }) 
           </View>
         )}
 
+        {/* Supporting documents — anything the client uploaded at booking
+            time, plus anything either party adds later. Tapping a row opens
+            the generic DocumentAiScreen which handles Extract / Summarize /
+            Ask AI. Lawyer typically uses this to triage the case before
+            accepting; the client can re-share files they forgot. */}
+        <View style={styles.card}>
+          <View style={styles.notesHeader}>
+            <Ionicons name="folder-open-outline" size={20} color={COLORS.primary} />
+            <Text style={styles.notesTitle}>Supporting Documents</Text>
+            <Text style={styles.docCount}>{supportDocs.length}</Text>
+          </View>
+          {supportDocs.length === 0 ? (
+            <Text style={styles.docEmpty}>
+              {isClient
+                ? 'No documents attached yet. Add contracts, court notices, or photos to help the lawyer understand your case.'
+                : 'No documents attached. Ask the client to share supporting files via chat or this screen.'}
+            </Text>
+          ) : (
+            <View style={styles.docsList}>
+              {supportDocs.map((d: any) => (
+                <TouchableOpacity
+                  key={d.id}
+                  style={styles.docRow}
+                  activeOpacity={0.7}
+                  onPress={() =>
+                    navigation.navigate('DocumentAi', {
+                      documentId: d.id,
+                      document: d,
+                      contextLabel: 'Appointment doc',
+                    })
+                  }
+                >
+                  <Ionicons
+                    name={d.mimeType?.startsWith('image/') ? 'image-outline' : 'document-text-outline'}
+                    size={20}
+                    color={COLORS.primary}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.docRowName} numberOfLines={1}>{d.filename}</Text>
+                    <Text style={styles.docRowMeta} numberOfLines={1}>
+                      {d.extractionStatus === 'COMPLETED'
+                        ? 'OCR ready · tap to view extracted text or summary'
+                        : d.extractionStatus === 'PROCESSING'
+                          ? 'Extracting…'
+                          : d.extractionStatus === 'FAILED'
+                            ? 'Extraction failed — tap to retry'
+                            : 'Tap to extract text + summarize with AI'}
+                    </Text>
+                  </View>
+                  <Ionicons name="flash-outline" size={18} color={COLORS.primary} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+          <TouchableOpacity
+            style={[styles.attachBtn, { marginTop: SPACING.sm }]}
+            onPress={handleAttachSupportingDoc}
+            disabled={uploadingSupport}
+            activeOpacity={0.85}
+          >
+            {uploadingSupport ? (
+              <ActivityIndicator color={COLORS.white} />
+            ) : (
+              <>
+                <Ionicons name="attach" size={18} color={COLORS.white} />
+                <Text style={styles.attachBtnText}>Attach a document</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+
         {/* Agreement — lawyer attaches the signed engagement letter; client
             sees the View link once attached. The lawyer can also replace an
             existing one (e.g., a re-signed addendum). */}
@@ -568,6 +694,25 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   },
   notesBadgeText: { fontSize: FONT_SIZE.xs - 2, fontWeight: '800', color: COLORS.white, letterSpacing: 0.5 },
   notesBody: { fontSize: FONT_SIZE.md, color: COLORS.text, lineHeight: 22 },
+
+  docCount: {
+    fontSize: FONT_SIZE.xs - 1, fontWeight: '800',
+    color: COLORS.primary,
+    backgroundColor: COLORS.primary + '18',
+    paddingHorizontal: 8, paddingVertical: 2,
+    borderRadius: BORDER_RADIUS.full,
+  },
+  docEmpty: {
+    fontSize: FONT_SIZE.sm, color: COLORS.textMuted, lineHeight: 19,
+  },
+  docsList: { gap: SPACING.sm },
+  docRow: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.md,
+    backgroundColor: COLORS.surfaceAlt, borderRadius: BORDER_RADIUS.lg,
+    paddingHorizontal: SPACING.md, paddingVertical: SPACING.md,
+  },
+  docRowName: { fontSize: FONT_SIZE.sm, fontWeight: '700', color: COLORS.text },
+  docRowMeta: { fontSize: FONT_SIZE.xs, color: COLORS.textMuted, marginTop: 2 },
 
 
   personRow: { flexDirection: 'row', alignItems: 'center' },
