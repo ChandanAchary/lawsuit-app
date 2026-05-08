@@ -3,14 +3,16 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList, Alert, ActivityIndicator, TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
 import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS, CASE_STATUS_COLORS } from '../../constants';
 import { Case, CaseStatus, Document as CaseDoc, TimelineEvent, Hearing } from '../../types';
-import { casesApi, chatApi } from '../../services/api';
+import { casesApi, chatApi, storageApi } from '../../services/api';
 import { formatDate, formatTime, formatDateTime } from '../../utils/date';
 import { StatusBadge, Loading, EmptyState } from '../../components/Common';
 import { ChatTab } from '../../components/ChatTab';
 import { Button } from '../../components/Button';
 import { safeGoBack } from '../../utils/navigation';
+import { formatErrorMessage } from '../../utils/formatError';
 
 interface CaseTask {
   id: string;
@@ -91,6 +93,64 @@ export const CaseDetailScreen: React.FC<{ navigation: any; route: any }> = ({ na
       const { data } = await casesApi.getDocuments(caseId);
       setDocuments(data.items || data.documents || []);
     } catch {}
+  };
+
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+
+  // Pick a file from device storage, push to Cloudinary via the server-signed
+  // payload, then save the resulting URL on the case so the OCR / AI flow on
+  // DocumentAiScreen can run against it.
+  const handleAddDocument = async () => {
+    try {
+      const pick = await DocumentPicker.getDocumentAsync({
+        // Server's OCR pipeline accepts PDF, common images, and DOCX. Restrict
+        // here so the user doesn't pick a .zip and hit a 400 later.
+        type: ['application/pdf', 'image/*', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (pick.canceled || !pick.assets?.[0]) return;
+      const asset = pick.assets[0];
+
+      setUploadingDoc(true);
+      const { data: signData } = await storageApi.getCloudinarySignature('case-documents');
+
+      const formData = new FormData();
+      formData.append('file', {
+        uri: asset.uri,
+        type: asset.mimeType || 'application/octet-stream',
+        name: asset.name || 'upload',
+      } as any);
+      formData.append('timestamp', String(signData.timestamp));
+      formData.append('signature', signData.signature);
+      formData.append('api_key', signData.apiKey);
+      formData.append('folder', signData.folder);
+
+      // Cloudinary's /image/upload endpoint rejects non-image bytes; for PDFs
+      // and DOCX we have to use the /raw/upload endpoint instead. Detect by
+      // mime so the same flow handles both branches.
+      const resourceType = (asset.mimeType || '').startsWith('image/') ? 'image' : 'raw';
+      const uploadRes = await fetch(
+        `https://api.cloudinary.com/v1_1/${encodeURIComponent(signData.cloudName)}/${resourceType}/upload`,
+        { method: 'POST', body: formData },
+      );
+      const uploadData = await uploadRes.json();
+      if (!uploadData?.secure_url) {
+        throw new Error(uploadData?.error?.message || 'Cloudinary upload failed');
+      }
+
+      await casesApi.uploadDocument(caseId, {
+        fileurl: uploadData.secure_url,
+        fileName: asset.name || 'upload',
+        mimeType: asset.mimeType || 'application/octet-stream',
+        size: asset.size,
+      });
+      await fetchDocuments();
+    } catch (err: any) {
+      Alert.alert('Upload failed', formatErrorMessage(err) || 'Could not upload document');
+    } finally {
+      setUploadingDoc(false);
+    }
   };
 
   const fetchTasks = async () => {
@@ -317,6 +377,25 @@ export const CaseDetailScreen: React.FC<{ navigation: any; route: any }> = ({ na
 
       {activeTab === 'documents' && (
         <ScrollView style={styles.tabContent} contentContainerStyle={styles.tabPadding}>
+          <TouchableOpacity
+            style={styles.uploadBtn}
+            onPress={handleAddDocument}
+            disabled={uploadingDoc}
+            activeOpacity={0.8}
+          >
+            {uploadingDoc ? (
+              <ActivityIndicator color={COLORS.white} />
+            ) : (
+              <>
+                <Ionicons name="cloud-upload-outline" size={20} color={COLORS.white} />
+                <Text style={styles.uploadBtnText}>Add Document</Text>
+              </>
+            )}
+          </TouchableOpacity>
+          <Text style={styles.uploadHint}>
+            PDF, image, or DOCX. Tap the ⚡ icon after upload to run OCR / AI.
+          </Text>
+
           {documents.length === 0 ? (
             <EmptyState icon="📄" title="No Documents" message="No documents uploaded yet" />
           ) : (
@@ -452,6 +531,17 @@ const styles = StyleSheet.create({
   taskStatusBtnText: { fontSize: FONT_SIZE.xs, color: COLORS.textSecondary, fontWeight: '600' },
   taskStatusBtnTextActive: { color: COLORS.white },
   chatContainer: { flex: 1 },
+  uploadBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.sm,
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.lg, borderRadius: BORDER_RADIUS.xl,
+    ...SHADOWS.sm,
+  },
+  uploadBtnText: { color: COLORS.white, fontSize: FONT_SIZE.md, fontWeight: '700' },
+  uploadHint: {
+    fontSize: FONT_SIZE.xs, color: COLORS.textMuted,
+    textAlign: 'center', marginTop: SPACING.sm, marginBottom: SPACING.lg,
+  },
   docRow: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING.md, backgroundColor: COLORS.white,
     borderRadius: BORDER_RADIUS.lg, padding: SPACING.lg, marginBottom: SPACING.md, ...SHADOWS.sm,

@@ -208,8 +208,12 @@ export const casesApi = {
   addHearing: (id: string, data: { date: string; court?: string; judge?: string; purpose?: string; notes?: string }) =>
     api.post(`/cases/${encodeURIComponent(id)}/hearings`, data),
   getDocuments: (id: string) => api.get(`/cases/${encodeURIComponent(id)}/documents`),
+  // Saves an already-uploaded file's metadata onto the case. The actual
+  // bytes are uploaded directly to Cloudinary via storageApi.getCloudinarySignature
+  // first; this call only persists the resulting URL + filename + mime so
+  // the server can later run OCR / AI on it.
   uploadDocument: (id: string, data: { fileurl: string; fileName: string; mimeType: string; size?: number }) =>
-    api.post(`/cases/${encodeURIComponent(id)}/documents`, data),
+    api.post(`/cases/${encodeURIComponent(id)}/saveDocuments`, data),
   getPresignedUrl: (caseId: string, fileName?: string, mimeType?: string) =>
     api.get(`/cases/${encodeURIComponent(caseId)}/getpresignedUrl`, { params: { fileName, mimeType } }),
   saveDocuments: (caseId: string, documents: { filename: string; url: string; mimeType: string; size?: number }[]) =>
