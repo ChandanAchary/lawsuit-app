@@ -74,35 +74,88 @@ export const OrgRequestsScreen: React.FC<{ navigation: any }> = ({ navigation })
     } finally { setSubmitting(false); }
   };
 
-  const renderRequest = ({ item }: { item: any }) => (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        <View style={styles.avatar}>
-          <Ionicons name="person" size={20} color={COLORS.primary} />
+  const renderRequest = ({ item }: { item: any }) => {
+    const scheduled = item.scheduledAt ? new Date(item.scheduledAt) : null;
+    const assignedLawyerName = item.assignedLawyer?.name || null;
+    return (
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View style={styles.avatar}>
+            <Ionicons name="person" size={20} color={COLORS.primary} />
+          </View>
+          <View style={styles.cardInfo}>
+            <Text style={styles.cardName}>{item.client?.name || 'Client'}</Text>
+            <Text style={styles.cardMeta}>Submitted {formatDate(item.createdAt)}</Text>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: item.status === 'PENDING' ? '#FEF3C7' : COLORS.surfaceAlt }]}>
+            <Text style={[styles.statusText, { color: item.status === 'PENDING' ? '#D97706' : COLORS.text }]}>{item.status}</Text>
+          </View>
         </View>
-        <View style={styles.cardInfo}>
-          <Text style={styles.cardName}>{item.client?.name || 'Client'}</Text>
-          <Text style={styles.cardMeta}>{formatDate(item.createdAt)}</Text>
+
+        {/* Schedule & meeting type at-a-glance */}
+        <View style={styles.metaRow}>
+          {scheduled && (
+            <View style={styles.metaItem}>
+              <Ionicons name="calendar-outline" size={14} color={COLORS.textSecondary} />
+              <Text style={styles.metaText}>{formatDate(item.scheduledAt)}</Text>
+            </View>
+          )}
+          {!!item.durationMins && (
+            <View style={styles.metaItem}>
+              <Ionicons name="timer-outline" size={14} color={COLORS.textSecondary} />
+              <Text style={styles.metaText}>{item.durationMins} min</Text>
+            </View>
+          )}
+          {!!item.meetingType && (
+            <View style={styles.metaItem}>
+              <Ionicons name="videocam-outline" size={14} color={COLORS.textSecondary} />
+              <Text style={styles.metaText}>{String(item.meetingType).replace('_', ' ')}</Text>
+            </View>
+          )}
         </View>
-        <View style={[styles.statusBadge, { backgroundColor: item.status === 'PENDING' ? '#FEF3C7' : COLORS.surfaceAlt }]}>
-          <Text style={[styles.statusText, { color: item.status === 'PENDING' ? '#D97706' : COLORS.text }]}>{item.status}</Text>
-        </View>
+
+        {/* Case description — what the client wrote on the booking sheet.
+            Surfaced before the Assign / Reject buttons so the org head reads
+            the issue before picking a lawyer. */}
+        {!!item.notes && (
+          <View style={styles.notesBlock}>
+            <View style={styles.notesHeader}>
+              <Ionicons name="document-text-outline" size={14} color={COLORS.primary} />
+              <Text style={styles.notesLabel}>Case description</Text>
+            </View>
+            <Text style={styles.notesText}>{item.notes}</Text>
+          </View>
+        )}
+
+        {/* If already assigned, show which lawyer handled it. The server
+            keeps the request row even after assignment so the org has an
+            audit trail of routing decisions. */}
+        {assignedLawyerName && (
+          <View style={styles.assignedRow}>
+            <Ionicons name="person-add" size={14} color={COLORS.success} />
+            <Text style={styles.assignedText}>Assigned to {assignedLawyerName}</Text>
+          </View>
+        )}
+
+        {item.rejectionReason && (
+          <Text style={styles.reasonText}>Rejection reason: {item.rejectionReason}</Text>
+        )}
+
+        {item.status === 'PENDING' && (
+          <View style={styles.cardActions}>
+            <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#D1FAE5' }]} onPress={() => { setSelectedReq(item); setActionType('ASSIGN'); }}>
+              <Ionicons name="person-add" size={18} color="#10B981" />
+              <Text style={[styles.actionText, { color: '#10B981' }]}>Assign Lawyer</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#FEE2E2' }]} onPress={() => { setSelectedReq(item); setActionType('REJECT'); }}>
+              <Ionicons name="close" size={18} color="#EF4444" />
+              <Text style={[styles.actionText, { color: '#EF4444' }]}>Reject</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
-      {item.reason && <Text style={styles.reasonText}>Reason: {item.reason}</Text>}
-      {item.status === 'PENDING' && (
-        <View style={styles.cardActions}>
-          <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#D1FAE5' }]} onPress={() => { setSelectedReq(item); setActionType('ASSIGN'); }}>
-            <Ionicons name="person-add" size={18} color="#10B981" />
-            <Text style={[styles.actionText, { color: '#10B981' }]}>Assign Lawyer</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#FEE2E2' }]} onPress={() => { setSelectedReq(item); setActionType('REJECT'); }}>
-            <Ionicons name="close" size={18} color="#EF4444" />
-            <Text style={[styles.actionText, { color: '#EF4444' }]}>Reject</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
-  );
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -204,6 +257,35 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: BORDER_RADIUS.full },
   statusText: { fontSize: FONT_SIZE.xs, fontWeight: '700' },
   reasonText: { fontSize: FONT_SIZE.sm, color: COLORS.textSecondary, marginTop: SPACING.md, fontStyle: 'italic' },
+
+  metaRow: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.lg,
+    marginTop: SPACING.md, paddingTop: SPACING.md,
+    borderTopWidth: 1, borderTopColor: COLORS.borderLight,
+  },
+  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  metaText: { fontSize: FONT_SIZE.sm, color: COLORS.textSecondary },
+
+  notesBlock: {
+    marginTop: SPACING.md,
+    padding: SPACING.md,
+    backgroundColor: COLORS.primary + '08',
+    borderRadius: BORDER_RADIUS.lg,
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.primary,
+  },
+  notesHeader: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
+  notesLabel: {
+    fontSize: FONT_SIZE.xs - 1, fontWeight: '700',
+    color: COLORS.primary, letterSpacing: 0.5, textTransform: 'uppercase',
+  },
+  notesText: { fontSize: FONT_SIZE.sm, color: COLORS.text, lineHeight: 19 },
+
+  assignedRow: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
+    marginTop: SPACING.md,
+  },
+  assignedText: { fontSize: FONT_SIZE.sm, color: COLORS.success, fontWeight: '600' },
   cardActions: { flexDirection: 'row', gap: SPACING.md, marginTop: SPACING.md, paddingTop: SPACING.md, borderTopWidth: 1, borderTopColor: COLORS.borderLight },
   actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.sm, paddingVertical: SPACING.md, borderRadius: BORDER_RADIUS.lg },
   actionText: { fontSize: FONT_SIZE.sm, fontWeight: '700' },

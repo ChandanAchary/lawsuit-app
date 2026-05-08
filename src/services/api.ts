@@ -216,8 +216,9 @@ export const casesApi = {
     api.post(`/cases/${encodeURIComponent(id)}/saveDocuments`, data),
   getPresignedUrl: (caseId: string, fileName?: string, mimeType?: string) =>
     api.get(`/cases/${encodeURIComponent(caseId)}/getpresignedUrl`, { params: { fileName, mimeType } }),
-  saveDocuments: (caseId: string, documents: { filename: string; url: string; mimeType: string; size?: number }[]) =>
-    api.post(`/cases/${encodeURIComponent(caseId)}/saveDocuments`, { documents }),
+  // (Use casesApi.uploadDocument above to persist a single uploaded
+  //  document — the server endpoint accepts a flat body, not a
+  //  { documents: [...] } array, so a multi-doc helper would mis-shape.)
   extractText: (caseId: string, documentId: string) => api.post(`/cases/${encodeURIComponent(caseId)}/documents/${encodeURIComponent(documentId)}/extract`),
   summarize: (caseId: string, documentId: string) => api.post(`/cases/${encodeURIComponent(caseId)}/documents/${encodeURIComponent(documentId)}/summarize`),
   askQuestion: (caseId: string, documentId: string, question: string) => api.post(`/cases/${encodeURIComponent(caseId)}/documents/${encodeURIComponent(documentId)}/ask`, { question }),
@@ -487,6 +488,11 @@ export type EntitySalaryPreview = {
   };
   alreadyPaid: boolean;
   existingPayout: any | null;
+  // Populated by the server when the LAWYER subject belongs to an
+  // organisation. The super-admin salary screen uses this to switch into
+  // read-only "Managed by [Org Name]" mode and route writes through the
+  // org-side surface (orgLawyerSalaryApi) instead.
+  lawyerOrganization?: { id: string; name: string } | null;
 };
 
 export const entitySalaryApi = {
@@ -563,6 +569,50 @@ export const entitySalaryApi = {
   // super admin sees where to wire money for off-platform settlements.
   bankAccounts: (subject: EntitySalarySubject, id: string) =>
     api.get(`/admin/${entitySalarySegment(subject)}/${encodeURIComponent(id)}/bank-accounts`),
+};
+
+// ─── Org-managed lawyer salary (ORGANIZATION role) ─────────────────
+// The org head manages performance-based salary for lawyers in their
+// organisation. The platform-admin surface refuses writes for org-affiliated
+// lawyers (server-side guard), so this is the only legitimate write path.
+// Same payload shapes as entitySalaryApi so the FE can reuse the salary
+// management screen with just the API set swapped.
+export const orgLawyerSalaryApi = {
+  getConfig: (lawyerId: string) =>
+    api.get(`/organizations/me/lawyers/${encodeURIComponent(lawyerId)}/salary`),
+  setConfig: (
+    lawyerId: string,
+    data: Partial<{
+      baseSalary: number;
+      bonusPerConsultation: number;
+      bonusPerCaseClosed: number;
+      bonusPerWonCase: number;
+      reason: string;
+    }>,
+  ) => api.put(`/organizations/me/lawyers/${encodeURIComponent(lawyerId)}/salary`, data),
+  hold: (lawyerId: string, data: { reason: string }) =>
+    api.post(`/organizations/me/lawyers/${encodeURIComponent(lawyerId)}/salary/hold`, data),
+  release: (lawyerId: string, data?: { reason?: string }) =>
+    api.post(`/organizations/me/lawyers/${encodeURIComponent(lawyerId)}/salary/release`, data ?? {}),
+  preview: (lawyerId: string, params?: { cycleMonth?: number; cycleYear?: number }) =>
+    api.get(`/organizations/me/lawyers/${encodeURIComponent(lawyerId)}/salary/preview`, { params }),
+  pay: (
+    lawyerId: string,
+    data?: {
+      cycleMonth?: number;
+      cycleYear?: number;
+      bonusAmount?: number;
+      deductionAmount?: number;
+      notes?: string;
+      providerPayoutId?: string;
+    },
+  ) => api.post(`/organizations/me/lawyers/${encodeURIComponent(lawyerId)}/salary/pay`, data ?? {}),
+  adjustmentHistory: (lawyerId: string, limit?: number) =>
+    api.get(`/organizations/me/lawyers/${encodeURIComponent(lawyerId)}/salary/history`, { params: limit ? { limit } : {} }),
+  payoutHistory: (lawyerId: string, limit?: number) =>
+    api.get(`/organizations/me/lawyers/${encodeURIComponent(lawyerId)}/salary/payouts`, { params: limit ? { limit } : {} }),
+  bankAccounts: (lawyerId: string) =>
+    api.get(`/organizations/me/lawyers/${encodeURIComponent(lawyerId)}/bank-accounts`),
 };
 
 // ─── Self-view of own performance-based salary (lawyer / org head) ──
@@ -667,6 +717,21 @@ export const storageApi = {
     api.get('/storage/sign', { params: { folder } }),
 };
 
+// ─── eKYC API (CLIENT only) ─────────────────────────────────
+// Aadhaar identity verification through Surepass. Two-step OTP:
+//   1. POST initiate(aadhaar) → server hits Surepass, OTP delivered to
+//      the Aadhaar-linked phone, returns { id, status, expiresAt, provider }.
+//   2. POST submitOtp(submissionId, otp) → on success the Client row gets
+//      ekycVerified=true + aadhaarName/last4/dob/gender mirrored.
+// Server enforces aggressive rate limits (5 inits/hr, 10 OTPs/15min).
+export const ekycApi = {
+  getStatus: () => api.get('/ekyc/status'),
+  initiateAadhaar: (aadhaar: string) =>
+    api.post('/ekyc/aadhaar/initiate', { aadhaar }),
+  submitOtp: (submissionId: string, otp: string) =>
+    api.post('/ekyc/aadhaar/submit-otp', { submissionId, otp }),
+};
+
 // ─── Reviews API ────────────────────────────────────────────
 export const reviewsApi = {
   getByLawyer: (lawyerId: string, params?: Record<string, unknown>) =>
@@ -724,6 +789,11 @@ export const dashboardApi = {
 };
 
 // ─── Video / Meetings API ───────────────────────────────────
+// Video sessions are appointment-bound on the server. The previous
+// /video/chat/:chatId/session* endpoints were never implemented server-side
+// and have been dropped from the mobile client too — VideoCallScreen now
+// surfaces a clear "needs an appointment" message when invoked from a chat
+// without an appointmentId.
 export const videoApi = {
   createMeeting: (data: { appointmentId: string; meetingType?: string }) =>
     api.post('/video/meeting', data),
@@ -731,12 +801,6 @@ export const videoApi = {
     api.get(`/video/meeting/${encodeURIComponent(appointmentId)}`),
   endMeeting: (appointmentId: string) =>
     api.post(`/video/meeting/${encodeURIComponent(appointmentId)}/end`),
-  createChatSession: (chatId: string) =>
-    api.post(`/video/chat/${encodeURIComponent(chatId)}/session`),
-  getChatSession: (chatId: string) =>
-    api.get(`/video/chat/${encodeURIComponent(chatId)}/session`),
-  endChatSession: (chatId: string) =>
-    api.post(`/video/chat/${encodeURIComponent(chatId)}/session/end`),
   getCallHistory: (params?: { page?: number; limit?: number }) =>
     api.get('/video/call-history', { params }),
 };

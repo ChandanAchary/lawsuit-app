@@ -130,7 +130,6 @@ export const VideoCallScreen: React.FC<{ navigation: any; route: any }> = ({ nav
     }
     webViewRef.current?.injectJavaScript("window.__handleNativeCmd && window.__handleNativeCmd({ type: 'end' }); true;");
     if (appointmentId) videoApi.endMeeting(appointmentId).catch(() => {});
-    if (chatId) videoApi.endChatSession(chatId).catch(() => {});
     stopTimer();
     setCallState('ended');
     setTimeout(() => safeGoBack(navigation, 'MainTabs'), 900);
@@ -191,24 +190,15 @@ export const VideoCallScreen: React.FC<{ navigation: any; route: any }> = ({ nav
           setMeetingToken(data.token || null);
           return;
         }
-        if (chatId) {
-          // Prefer create-session for compatibility with servers that only expose POST.
-          let data: any;
-          try {
-            const res = await videoApi.createChatSession(chatId);
-            data = res.data;
-          } catch (err: any) {
-            if (!isNotFoundRouteError(err)) throw err;
-            const res = await videoApi.getChatSession(chatId);
-            data = res.data;
-          }
-          if (!mounted) return;
-          setMeetingLink(data.meetingLink || null);
-          setMeetingToken(data.token || null);
-          return;
-        }
         if (!mounted) return;
-        setSessionError('Unable to start call: missing appointment or chat context.');
+        // Server only supports appointment-bound video sessions today; chat-
+        // initiated calls without an appointmentId can't bootstrap a meeting
+        // room. Surface a useful message instead of two failed network calls.
+        setSessionError(
+          chatId
+            ? 'Video calls from chat are not yet supported. Please book an appointment to start a video call.'
+            : 'Unable to start call: missing appointment context.',
+        );
       } catch (err: any) {
         if (!mounted) return;
         const raw = err?.response?.data?.error ?? err?.response?.data ?? err?.message ?? 'Failed to initialize call session.';

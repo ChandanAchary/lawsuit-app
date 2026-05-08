@@ -92,6 +92,15 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
             {role === 'CLIENT' && appointment.lawyer?.specialization?.[0] && (
               <Text style={styles.specialization}>{appointment.lawyer.specialization[0]}</Text>
             )}
+            {/* Lawyer-side: surface that this appointment was routed through
+                the org rather than booked directly by the client, so the
+                lawyer knows it's a delegated task from their organization. */}
+            {role === 'LAWYER' && (appointment as any).orgRequest && (
+              <View style={styles.orgPill}>
+                <Ionicons name="business-outline" size={10} color={COLORS.primary} />
+                <Text style={styles.orgPillText}>Org-assigned</Text>
+              </View>
+            )}
           </View>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: statusColor.bg }]}>
@@ -115,6 +124,27 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
           <Text style={styles.detailText}>{appointment.durationMins} min</Text>
         </View>
       </View>
+
+      {/* Case description preview — surfaced ABOVE Accept/Reject so the
+          lawyer always scans the client's problem statement before deciding.
+          Tap-through opens the appointment detail screen which renders the
+          full text. Hidden when the appointment has no notes. */}
+      {!!appointment.notes && (
+        <View style={styles.notesPreview}>
+          <View style={styles.notesHeader}>
+            <Ionicons name="document-text-outline" size={14} color={COLORS.primary} />
+            <Text style={styles.notesLabel}>Case description</Text>
+          </View>
+          <Text style={styles.notesText} numberOfLines={2}>
+            {appointment.notes}
+          </Text>
+          {onPress && (
+            <TouchableOpacity onPress={onPress} hitSlop={{ top: 8, bottom: 8 }}>
+              <Text style={styles.notesReadMore}>Read more →</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       {(isUpcoming || isAttended || effectiveStatus === AppointmentStatus.MISSED) && (
         <View style={styles.actions}>
@@ -259,6 +289,18 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     color: COLORS.textSecondary,
     marginTop: 2,
   },
+  orgPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    alignSelf: 'flex-start',
+    backgroundColor: COLORS.primary + '12',
+    paddingHorizontal: 6, paddingVertical: 2,
+    borderRadius: BORDER_RADIUS.full,
+    marginTop: 4,
+  },
+  orgPillText: {
+    fontSize: FONT_SIZE.xs - 2, fontWeight: '700',
+    color: COLORS.primary, letterSpacing: 0.3,
+  },
   statusBadge: {
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.xs,
@@ -285,8 +327,36 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     fontSize: FONT_SIZE.sm,
     color: COLORS.textSecondary,
   },
+  notesPreview: {
+    marginTop: SPACING.md,
+    paddingTop: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    paddingBottom: SPACING.md,
+    backgroundColor: COLORS.primary + '08',
+    borderRadius: BORDER_RADIUS.lg,
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.primary,
+  },
+  notesHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    marginBottom: 4,
+  },
+  notesLabel: {
+    fontSize: FONT_SIZE.xs - 1, fontWeight: '700',
+    color: COLORS.primary, letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  notesText: {
+    fontSize: FONT_SIZE.sm, color: COLORS.text,
+    lineHeight: 19,
+  },
+  notesReadMore: {
+    fontSize: FONT_SIZE.xs, fontWeight: '700',
+    color: COLORS.primary, marginTop: 4,
+  },
   actions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: SPACING.sm,
     marginTop: SPACING.md,
     paddingTop: SPACING.md,

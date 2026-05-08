@@ -360,49 +360,72 @@ export const SuperAdminEntitySalaryScreen: React.FC<{ navigation: any; route: { 
           )}
         </View>
 
-        {/* Actions */}
-        <Text style={[styles.sectionLabel, { marginHorizontal: SPACING.xs, marginTop: SPACING.lg }]}>ACTIONS</Text>
-        <View style={styles.actionsCard}>
-          <ActionTile
-            icon="cash-outline"
-            label={config ? 'Edit base + bonus rates' : 'Set base + bonus rates'}
-            hint={config
-              ? `Currently base ₹${(config.baseSalary ?? 0).toLocaleString('en-IN')} + per-occurrence bonuses`
-              : 'Initialise the salary so this subject becomes payable'}
-            onPress={openConfig}
-            styles={styles} COLORS={COLORS}
-          />
-          {isOnHold ? (
-            <ActionTile
-              icon="play-circle-outline"
-              label="Release hold"
-              hint="Resume payouts — the subject reappears in the next payable cycle"
-              onPress={openRelease}
-              styles={styles} COLORS={COLORS}
-            />
-          ) : (
-            <ActionTile
-              icon="pause-circle-outline"
-              label="Hold payouts"
-              hint="Pause future payouts without losing the salary configuration"
-              onPress={openHold}
-              styles={styles} COLORS={COLORS}
-              tone="danger"
-              disabled={!config}
-            />
-          )}
-          <ActionTile
-            icon="checkmark-done-outline"
-            label="Record payout"
-            hint={preview?.alreadyPaid
-              ? 'Already paid for this cycle'
-              : 'Pay this month’s salary from the platform wallet — idempotent per cycle'}
-            onPress={openPay}
-            styles={styles} COLORS={COLORS}
-            disabled={!config || isOnHold || preview?.alreadyPaid}
-            isLast
-          />
-        </View>
+        {/* Actions — hidden for org-affiliated lawyers. The platform admin
+            can still inspect every stat above (config, breakdown, history,
+            payouts), but writes are routed through the org head's surface
+            (orgLawyerSalaryApi). The server enforces the same guard, so
+            this is purely a UX nudge — the admin sees the right context
+            instead of getting a 403 mid-flow. */}
+        {preview?.lawyerOrganization ? (
+          <View style={styles.managedBanner}>
+            <Ionicons name="business" size={20} color={COLORS.primary} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.managedTitle}>
+                Managed by {preview.lawyerOrganization.name}
+              </Text>
+              <Text style={styles.managedBody}>
+                This lawyer is part of an organisation. Their salary is set, held, and paid by their
+                organisation — not from the platform wallet. You can still view the cycle preview,
+                history, and payouts here, but cannot edit them.
+              </Text>
+            </View>
+          </View>
+        ) : (
+          <>
+            <Text style={[styles.sectionLabel, { marginHorizontal: SPACING.xs, marginTop: SPACING.lg }]}>ACTIONS</Text>
+            <View style={styles.actionsCard}>
+              <ActionTile
+                icon="cash-outline"
+                label={config ? 'Edit base + bonus rates' : 'Set base + bonus rates'}
+                hint={config
+                  ? `Currently base ₹${(config.baseSalary ?? 0).toLocaleString('en-IN')} + per-occurrence bonuses`
+                  : 'Initialise the salary so this subject becomes payable'}
+                onPress={openConfig}
+                styles={styles} COLORS={COLORS}
+              />
+              {isOnHold ? (
+                <ActionTile
+                  icon="play-circle-outline"
+                  label="Release hold"
+                  hint="Resume payouts — the subject reappears in the next payable cycle"
+                  onPress={openRelease}
+                  styles={styles} COLORS={COLORS}
+                />
+              ) : (
+                <ActionTile
+                  icon="pause-circle-outline"
+                  label="Hold payouts"
+                  hint="Pause future payouts without losing the salary configuration"
+                  onPress={openHold}
+                  styles={styles} COLORS={COLORS}
+                  tone="danger"
+                  disabled={!config}
+                />
+              )}
+              <ActionTile
+                icon="checkmark-done-outline"
+                label="Record payout"
+                hint={preview?.alreadyPaid
+                  ? 'Already paid for this cycle'
+                  : 'Pay this month’s salary from the platform wallet — idempotent per cycle'}
+                onPress={openPay}
+                styles={styles} COLORS={COLORS}
+                disabled={!config || isOnHold || preview?.alreadyPaid}
+                isLast
+              />
+            </View>
+          </>
+        )}
 
         {/* Recent payouts */}
         <Text style={[styles.sectionLabel, { marginHorizontal: SPACING.xs, marginTop: SPACING.lg }]}>RECENT PAYOUTS</Text>
@@ -743,6 +766,18 @@ const getStyles = (C: any) => StyleSheet.create({
   emptyTitle: { fontSize: FONT_SIZE.md, fontWeight: '800', color: C.text, marginTop: SPACING.sm },
   emptySub: { fontSize: FONT_SIZE.sm, color: C.textMuted, marginTop: 4, textAlign: 'center', paddingHorizontal: SPACING.md },
   emptyMuted: { fontSize: FONT_SIZE.sm, color: C.textMuted, fontStyle: 'italic' },
+
+  managedBanner: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: SPACING.md,
+    backgroundColor: C.primary + '0E', borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.lg, marginTop: SPACING.lg,
+    borderLeftWidth: 4, borderLeftColor: C.primary,
+  },
+  managedTitle: { fontSize: FONT_SIZE.md, fontWeight: '800', color: C.text },
+  managedBody: {
+    fontSize: FONT_SIZE.sm, color: C.textSecondary,
+    lineHeight: 19, marginTop: 4,
+  },
 
   actionsCard: {
     backgroundColor: C.white, borderRadius: BORDER_RADIUS.xl,

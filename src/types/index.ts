@@ -7,6 +7,36 @@ export enum UserRole {
   ORGANIZATION = 'ORGANIZATION',
 }
 
+// Mirrors EkycStatus enum on the server (prisma/schema.prisma).
+export type EkycStatus = 'PENDING' | 'VERIFIED' | 'FAILED' | 'EXPIRED';
+
+export interface EkycSubmission {
+  id: string;
+  status: EkycStatus;
+  provider: string;
+  failureReason?: string | null;
+  expiresAt?: string | null;
+  completedAt?: string | null;
+  createdAt: string;
+}
+
+export interface EkycStatusResponse {
+  client: {
+    ekycVerified: boolean;
+    ekycVerifiedAt: string | null;
+    aadhaarLast4: string | null;
+    aadhaarName: string | null;
+  };
+  latestSubmission: EkycSubmission | null;
+}
+
+export interface EkycInitiateResponse {
+  id: string;
+  status: EkycStatus;
+  provider: string;
+  expiresAt?: string | null;
+}
+
 export enum AppointmentStatus {
   PENDING = 'PENDING',
   CONFIRMED = 'CONFIRMED',
@@ -150,6 +180,14 @@ export interface User {
   // dashboard landing page. SUPER_ADMIN holds implicit access to all
   // modules and ignores this field.
   permissions?: string[];
+  // Client-only: Aadhaar eKYC mirror fields. Set by /ekyc/aadhaar/submit-otp
+  // on successful Surepass verification. Used by ProfileScreen to render
+  // the "Identity verification" tile and lock auto-populated fields on
+  // EditProfileScreen.
+  ekycVerified?: boolean;
+  ekycVerifiedAt?: string | null;
+  aadhaarLast4?: string | null;
+  aadhaarName?: string | null;
   // True until LAWYER (org-onboarded) or ADMIN (super-admin-invited) rotates
   // their server-generated temp password via POST /auth/change-password.
   // While true, every endpoint except /auth/me, /auth/change-password,

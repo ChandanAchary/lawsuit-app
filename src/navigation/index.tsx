@@ -117,6 +117,8 @@ import { CallHistoryScreen } from '../screens/shared/CallHistoryScreen';
 import { DocumentAiScreen } from '../screens/shared/DocumentAiScreen';
 import { LegalUpdatesScreen } from '../screens/shared/LegalUpdatesScreen';
 import { ReportIssueScreen } from '../screens/shared/ReportIssueScreen';
+import { EkycStatusScreen } from '../screens/client/EkycStatusScreen';
+import { EkycAadhaarScreen } from '../screens/client/EkycAadhaarScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -412,6 +414,9 @@ export const MainStack = () => {
       <Stack.Screen name="DocumentAi" component={DocumentAiScreen} />
       <Stack.Screen name="LegalUpdates" component={LegalUpdatesScreen} />
       <Stack.Screen name="ReportIssue" component={ReportIssueScreen} />
+      {/* eKYC (Aadhaar identity verification — CLIENT only) */}
+      <Stack.Screen name="EkycStatus" component={EkycStatusScreen} />
+      <Stack.Screen name="EkycAadhaar" component={EkycAadhaarScreen} />
       {/* Admin-only screens */}
       <Stack.Screen name="CourtManagement" component={CourtManagementScreen} />
       <Stack.Screen name="CourtAdminManagement" component={CourtAdminManagementScreen} />

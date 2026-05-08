@@ -1,8 +1,8 @@
 import { useThemeStore, useColors } from '../../stores/themeStore';
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, ActivityIndicator, Image, Alert, StatusBar, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Text, ActivityIndicator, Image, Alert, StatusBar, KeyboardAvoidingView, Platform, Modal, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { FONT_SIZE, SPACING, SHADOWS } from '../../constants';
+import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { ChatTab } from '../../components/ChatTab';
 import { chatApi } from '../../services/api';
 import { socketService } from '../../services/socket';
@@ -38,6 +38,7 @@ export const ChatScreen: React.FC<{ navigation: any; route: any }> = ({ navigati
   const [error, setError] = useState('');
   const [participants, setParticipants] = useState<ChatParticipant[]>([]);
   const [isOnline, setIsOnline] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
   const currentUser = useAuthStore((s: any) => s.user);
 
   const other: ChatParticipant | null = otherUser || null;
@@ -170,7 +171,13 @@ export const ChatScreen: React.FC<{ navigation: any; route: any }> = ({ navigati
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={COLORS.text} />
         </TouchableOpacity>
-        <View style={styles.avatarWrapper}>
+        {/* Tapping the avatar/name pair opens the participants sheet —
+            the standard messaging-app affordance for "chat info". */}
+        <TouchableOpacity
+          style={styles.avatarWrapper}
+          activeOpacity={0.8}
+          onPress={() => setShowInfo(true)}
+        >
           {displayAvatar ? (
             <Image source={{ uri: displayAvatar }} style={styles.headerAvatar} />
           ) : (
@@ -179,11 +186,15 @@ export const ChatScreen: React.FC<{ navigation: any; route: any }> = ({ navigati
             </View>
           )}
           {isOnline && <View style={styles.onlineDot} />}
-        </View>
-        <View style={styles.nameBlock}>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.nameBlock}
+          activeOpacity={0.8}
+          onPress={() => setShowInfo(true)}
+        >
           <Text style={styles.title} numberOfLines={1}>{displayName}</Text>
           {isOnline && <Text style={styles.onlineLabel}>Online</Text>}
-        </View>
+        </TouchableOpacity>
         <View style={styles.callButtons}>
           <TouchableOpacity style={styles.callBtn} onPress={() => initiateCall('video')}>
             <Ionicons name="videocam-outline" size={22} color={COLORS.text} />
@@ -209,6 +220,52 @@ export const ChatScreen: React.FC<{ navigation: any; route: any }> = ({ navigati
           <View style={styles.center}><Text style={styles.errorText}>Unable to start chat</Text></View>
         )}
       </KeyboardAvoidingView>
+
+      {/* Participants sheet — opened from the header. Shows everyone in the
+          chat thread (case-bound chats include both the client and the
+          assigned lawyer). Read-only for now; no admin-style add/remove yet. */}
+      <Modal visible={showInfo} transparent animationType="slide" onRequestClose={() => setShowInfo(false)}>
+        <View style={styles.infoOverlay}>
+          <View style={styles.infoSheet}>
+            <View style={styles.infoHeader}>
+              <Text style={styles.infoTitle}>Chat Info</Text>
+              <TouchableOpacity onPress={() => setShowInfo(false)}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView contentContainerStyle={styles.infoBody}>
+              <Text style={styles.infoSectionLabel}>
+                {participants.length} participant{participants.length === 1 ? '' : 's'}
+              </Text>
+              {participants.length === 0 ? (
+                <Text style={styles.infoEmpty}>No participants found.</Text>
+              ) : (
+                participants.map((p: any) => {
+                  const pid = getParticipantId(p);
+                  const pname = getParticipantName(p) || 'Unknown';
+                  const pavatar = getParticipantAvatar(p);
+                  const isMe = currentUser?.id && pid === currentUser.id;
+                  return (
+                    <View key={pid} style={styles.infoRow}>
+                      {pavatar ? (
+                        <Image source={{ uri: pavatar }} style={styles.infoAvatar} />
+                      ) : (
+                        <View style={[styles.infoAvatar, styles.infoAvatarPH]}>
+                          <Ionicons name="person" size={18} color={COLORS.textMuted} />
+                        </View>
+                      )}
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.infoName}>{pname}{isMe ? ' (you)' : ''}</Text>
+                        {!!(p as any)?.email && <Text style={styles.infoSub}>{(p as any).email}</Text>}
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -240,4 +297,31 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.xl },
   errorText: { fontSize: FONT_SIZE.md, color: COLORS.textSecondary, textAlign: 'center' },
+
+  infoOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  infoSheet: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: BORDER_RADIUS.xxl, borderTopRightRadius: BORDER_RADIUS.xxl,
+    maxHeight: '70%', paddingBottom: SPACING.xxl,
+  },
+  infoHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: SPACING.xl, paddingVertical: SPACING.lg,
+    borderBottomWidth: 1, borderBottomColor: COLORS.borderLight,
+  },
+  infoTitle: { fontSize: FONT_SIZE.xl, fontWeight: '800', color: COLORS.text },
+  infoBody: { padding: SPACING.xl },
+  infoSectionLabel: {
+    fontSize: FONT_SIZE.xs, fontWeight: '700', color: COLORS.textMuted,
+    letterSpacing: 1, marginBottom: SPACING.md,
+  },
+  infoEmpty: { fontSize: FONT_SIZE.sm, color: COLORS.textMuted, fontStyle: 'italic' },
+  infoRow: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.md,
+    paddingVertical: SPACING.md, borderBottomWidth: 1, borderBottomColor: COLORS.borderLight,
+  },
+  infoAvatar: { width: 42, height: 42, borderRadius: 21 },
+  infoAvatarPH: { backgroundColor: COLORS.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
+  infoName: { fontSize: FONT_SIZE.md, fontWeight: '700', color: COLORS.text },
+  infoSub: { fontSize: FONT_SIZE.xs, color: COLORS.textMuted, marginTop: 2 },
 });

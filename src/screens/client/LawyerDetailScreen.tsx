@@ -178,6 +178,12 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
   const [availabilityWindow, setAvailabilityWindow] = useState<{ start: string; end: string } | null>(null);
   const [showSlotDatePicker, setShowSlotDatePicker] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'razorpay'>('wallet');
+  // Free-text problem description sent as `notes` on the booking. Lawyers
+  // see this on the queue card + appointment detail before accepting, so a
+  // 20-char floor keeps blank descriptions out of the queue.
+  const [problemNotes, setProblemNotes] = useState('');
+  const NOTES_MIN = 20;
+  const NOTES_MAX = 500;
   const [reviews, setReviews] = useState<any[]>([]);
   const [showReviewSheet, setShowReviewSheet] = useState(false);
   const [rating, setRating] = useState(5);
@@ -481,6 +487,14 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
 
   const handleBook = async () => {
     if (!selectedSlot || !lawyer) return;
+    const trimmedNotes = problemNotes.trim();
+    if (trimmedNotes.length < NOTES_MIN) {
+      Alert.alert(
+        'Describe your case',
+        `Please write at least ${NOTES_MIN} characters about the legal issue. The lawyer needs this context to accept the consultation.`,
+      );
+      return;
+    }
     setBooking(true);
     try {
       const scheduledAt = normalizeScheduledAt(selectedSlot, selectedDate);
@@ -488,7 +502,12 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
         Alert.alert('Invalid Slot', 'Please select a valid time slot.');
         return;
       }
-      const { data } = await appointmentsApi.book({ lawyerId: lawyer.id, scheduledAt, paymentMethod });
+      const { data } = await appointmentsApi.book({
+        lawyerId: lawyer.id,
+        scheduledAt,
+        paymentMethod,
+        notes: trimmedNotes,
+      });
       const appointment = data.appointment || data.data || data;
       const appointmentId = appointment?.id || data?.id;
 
@@ -943,6 +962,33 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
             <Text style={styles.confirmValue}>₹{lawyer.fee?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
           </View>
 
+          <Text style={styles.paymentTitle}>What's your case about?</Text>
+          <Text style={styles.notesHint}>
+            Briefly describe your legal issue. This helps the lawyer understand your case before
+            accepting the consultation.
+          </Text>
+          <TextInput
+            style={styles.notesInput}
+            value={problemNotes}
+            onChangeText={(t) => setProblemNotes(t.slice(0, NOTES_MAX))}
+            placeholder="e.g. I'm dealing with a property dispute over inherited land in Pune. The other party..."
+            placeholderTextColor={COLORS.textMuted}
+            multiline
+            textAlignVertical="top"
+            maxLength={NOTES_MAX}
+          />
+          <Text
+            style={[
+              styles.notesCounter,
+              problemNotes.trim().length < NOTES_MIN && { color: COLORS.error },
+            ]}
+          >
+            {problemNotes.length} / {NOTES_MAX}
+            {problemNotes.trim().length < NOTES_MIN
+              ? ` · ${NOTES_MIN - problemNotes.trim().length} more required`
+              : ''}
+          </Text>
+
           <Text style={styles.paymentTitle}>Payment Method</Text>
           <View style={styles.paymentOptions}>
             <TouchableOpacity
@@ -965,7 +1011,13 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
             </TouchableOpacity>
           </View>
 
-          <Button title="Confirm & Pay" onPress={handleBook} loading={booking} size="lg" />
+          <Button
+            title="Confirm & Pay"
+            onPress={handleBook}
+            loading={booking}
+            size="lg"
+            disabled={problemNotes.trim().length < NOTES_MIN}
+          />
         </View>
       </BottomSheet>
 
@@ -1269,6 +1321,21 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   paymentOptionActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   paymentText: { fontSize: FONT_SIZE.sm, fontWeight: '600', color: COLORS.textSecondary },
   paymentTextActive: { color: COLORS.white },
+  notesHint: {
+    fontSize: FONT_SIZE.xs, color: COLORS.textMuted,
+    marginBottom: SPACING.sm, lineHeight: 17,
+  },
+  notesInput: {
+    backgroundColor: COLORS.surfaceAlt, borderRadius: BORDER_RADIUS.lg,
+    paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md,
+    fontSize: FONT_SIZE.sm, color: COLORS.text,
+    minHeight: 110, lineHeight: 20,
+  },
+  notesCounter: {
+    fontSize: FONT_SIZE.xs - 1, color: COLORS.textMuted,
+    textAlign: 'right', marginTop: SPACING.xs,
+    marginBottom: SPACING.xl,
+  },
   // Professional details
   proDetailCard: {
     backgroundColor: COLORS.white,

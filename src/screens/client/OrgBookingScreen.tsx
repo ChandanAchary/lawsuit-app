@@ -34,6 +34,15 @@ export const OrgBookingScreen: React.FC<{ navigation: any; route: any }> = ({ na
   const handleBook = async () => {
     if (!date.trim()) return Alert.alert('Required', 'Please enter date');
     if (!time.trim()) return Alert.alert('Required', 'Please enter time');
+    // Mirror the lawyer-direct booking flow — the org assigner needs at
+    // least a paragraph of context to pick the right lawyer for the case.
+    const trimmedNotes = notes.trim();
+    if (trimmedNotes.length < 20) {
+      return Alert.alert(
+        'Describe your case',
+        'Please write at least 20 characters about the legal issue. The organization needs this context to assign the right lawyer.',
+      );
+    }
 
     // Parse date and time
     const dateMatch = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -153,19 +162,32 @@ export const OrgBookingScreen: React.FC<{ navigation: any; route: any }> = ({ na
           ))}
         </View>
 
-        {/* Notes */}
-        <Text style={styles.sectionTitle}>Notes (Optional)</Text>
+        {/* Notes — required so the org assigner has enough context to route
+            the request to the right specialist. */}
+        <Text style={styles.sectionTitle}>What's your case about?</Text>
         <View style={styles.card}>
           <TextInput
             style={styles.notesInput}
-            placeholder="Describe your legal issue or topic..."
+            placeholder="Describe the legal issue. Include parties involved, jurisdiction, what you've already tried, and what outcome you're hoping for."
             value={notes}
-            onChangeText={setNotes}
+            onChangeText={(t) => setNotes(t.slice(0, 500))}
             multiline
-            numberOfLines={4}
+            numberOfLines={5}
             placeholderTextColor={COLORS.textMuted}
             textAlignVertical="top"
+            maxLength={500}
           />
+          <Text
+            style={[
+              styles.notesCounter,
+              notes.trim().length < 20 && { color: COLORS.error },
+            ]}
+          >
+            {notes.length} / 500
+            {notes.trim().length < 20
+              ? ` · ${20 - notes.trim().length} more required`
+              : ''}
+          </Text>
         </View>
 
         <Button title="Submit Booking Request" onPress={handleBook} loading={submitting} size="lg" style={{ marginTop: SPACING.lg }} />
@@ -232,8 +254,12 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   meetingLabel: { fontSize: FONT_SIZE.xs, fontWeight: '700', color: COLORS.textSecondary, textAlign: 'center' },
   meetingLabelActive: { color: COLORS.primary },
   notesInput: {
-    fontSize: FONT_SIZE.md, color: COLORS.text, minHeight: 80,
+    fontSize: FONT_SIZE.md, color: COLORS.text, minHeight: 110,
     backgroundColor: COLORS.surfaceAlt, borderRadius: BORDER_RADIUS.lg,
     paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md,
+  },
+  notesCounter: {
+    fontSize: FONT_SIZE.xs - 1, color: COLORS.textMuted,
+    textAlign: 'right', marginTop: SPACING.xs,
   },
 });
