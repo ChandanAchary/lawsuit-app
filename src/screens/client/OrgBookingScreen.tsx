@@ -1,15 +1,22 @@
 import { useThemeStore, useColors } from '../../stores/themeStore';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert,
   KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { format } from 'date-fns';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { organizationsApi, storageApi } from '../../services/api';
 import { Button } from '../../components/Button';
 import { formatErrorMessage } from '../../utils/formatError';
+import { RazorpayCheckout } from '../../components/RazorpayCheckout';
+import { RazorpayOrderOptions, RazorpayPaymentResult } from '../../utils/razorpay';
+import { useAuthStore } from '../../stores/authStore';
+import { useWalletStore } from '../../stores/walletStore';
+import { safeGoBack } from '../../utils/navigation';
 
 const DURATIONS = [15, 30, 45, 60, 90, 120];
 const MEETING_TYPES = [
@@ -26,12 +33,56 @@ export const OrgBookingScreen: React.FC<{ navigation: any; route: any }> = ({ na
   const orgId = route.params?.orgId;
   const orgName = route.params?.orgName || 'Organization';
 
-  const [date, setDate] = useState('');
-  const [time, setTime] = useState('');
+  // Single Date holds both the calendar day and the wall-clock time. Two
+  // pickers (date + time mode) update different fields on the same Date.
+  // Initialised to "tomorrow at 10:00" — a future-bias keeps the form
+  // valid by default and matches how lawyers typically schedule.
+  const [scheduledAt, setScheduledAt] = useState<Date>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    d.setHours(10, 0, 0, 0);
+    return d;
+  });
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const [duration, setDuration] = useState(30);
   const [meetingType, setMeetingType] = useState('AUDIO_CALL');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Pull the org's consultation fee on mount so the booking sheet can show
+  // the price up front and we can validate the amount the server returns
+  // matches what the client agreed to. consultationFee is in PAISE.
+  const [orgFeePaise, setOrgFeePaise] = useState<number | null>(null);
+  useEffect(() => {
+    if (!orgId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await organizationsApi.getPublicById(orgId);
+        const org = data?.organization || data?.data || data;
+        if (!cancelled && typeof org?.consultationFee === 'number') {
+          setOrgFeePaise(org.consultationFee);
+        }
+      } catch {
+        // Non-fatal — server still validates fee at request time.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [orgId]);
+  const feeRupees = orgFeePaise != null ? Math.max(1, Math.round(orgFeePaise / 100)) : null;
+
+  // Pay-at-booking-time. Default razorpay matches the lawyer-direct flow.
+  // Wallet is only offered when the client's balance is enough.
+  const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'razorpay'>('razorpay');
+  const walletBalance = useWalletStore((s) => s.balance);
+  const user = useAuthStore((s) => s.user);
+
+  // Razorpay checkout state — populated after server returns the order id.
+  const [showRazorpay, setShowRazorpay] = useState(false);
+  const [razorpayOrder, setRazorpayOrder] = useState<RazorpayOrderOptions | null>(null);
+  const [pendingRequestId, setPendingRequestId] = useState<string | null>(null);
+  const [pendingDocs, setPendingDocs] = useState<{ requestId: string } | null>(null);
   // Optional supporting documents the client wants the org head to review
   // before assigning a lawyer. Held locally; uploaded after the request
   // POST returns the new requestId. PDF / image / DOCX accepted to match
@@ -103,8 +154,6 @@ export const OrgBookingScreen: React.FC<{ navigation: any; route: any }> = ({ na
   }
 
   const handleBook = async () => {
-    if (!date.trim()) return Alert.alert('Required', 'Please enter date');
-    if (!time.trim()) return Alert.alert('Required', 'Please enter time');
     // Mirror the lawyer-direct booking flow — the org assigner needs at
     // least a paragraph of context to pick the right lawyer for the case.
     const trimmedNotes = notes.trim();
@@ -115,30 +164,41 @@ export const OrgBookingScreen: React.FC<{ navigation: any; route: any }> = ({ na
       );
     }
 
-    // Parse date and time
-    const dateMatch = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (!dateMatch) return Alert.alert('Invalid Date', 'Use format YYYY-MM-DD');
+    // Date/time come from the picker so they're always valid. Just check
+    // it's in the future — the picker's minimumDate handles "today" but a
+    // user could still pick today + a past time.
+    if (scheduledAt.getTime() <= Date.now()) {
+      return Alert.alert('Invalid time', 'Please pick a future date and time.');
+    }
 
-    const timeMatch = time.match(/^(\d{1,2}):(\d{2})$/);
-    if (!timeMatch) return Alert.alert('Invalid Time', 'Use format HH:MM (24-hour)');
-
-    const scheduledAt = new Date(`${date}T${time.padStart(5, '0')}:00`);
-    if (isNaN(scheduledAt.getTime())) return Alert.alert('Invalid', 'Invalid date or time');
-    if (scheduledAt <= new Date()) return Alert.alert('Invalid', 'Please select a future date and time');
+    // Wallet shortcut — block if the client doesn't have enough balance
+    // before we hit the server, so the failure surfaces with a useful
+    // message instead of a server-side wallet-debit error.
+    if (paymentMethod === 'wallet' && feeRupees != null && walletBalance < feeRupees) {
+      return Alert.alert(
+        'Insufficient wallet balance',
+        `You need ₹${feeRupees.toLocaleString('en-IN')} in your wallet to pay this way. Top up or pay online with Razorpay.`,
+      );
+    }
 
     setSubmitting(true);
     try {
       const { data } = await organizationsApi.createAppointmentRequest(orgId, {
         scheduledAt: scheduledAt.toISOString(),
         durationMins: duration,
-        meetingType,
+        meetingType: meetingType as any,
         notes: notes.trim() || undefined,
+        paymentMethod,
       });
-      // Server returns the created request — pull the id so we can attach
-      // any picked supporting docs in a best-effort follow-up loop.
+      // Server returns { request, payment, paidVia } — different
+      // post-conditions per payment path.
       const created = data?.request || data?.data || data;
       const requestId = created?.id;
+      const payment = data?.payment;
+      const paidVia: 'wallet' | 'razorpay' = data?.paidVia || paymentMethod;
 
+      // Always upload picked docs first (regardless of payment path) so
+      // the org head can read them while triaging.
       let docResult = { uploaded: 0, failed: 0 };
       if (requestId && pickedDocs.length > 0) {
         docResult = await uploadDocsForRequest(requestId);
@@ -149,15 +209,72 @@ export const OrgBookingScreen: React.FC<{ navigation: any; route: any }> = ({ na
           ? `\n${docResult.uploaded} document${docResult.uploaded === 1 ? '' : 's'} attached.`
           : `\n${docResult.uploaded}/${pickedDocs.length} attached, ${docResult.failed} failed — share the missing files via chat after assignment.`;
 
-      Alert.alert(
-        'Booking Submitted',
-        `Your appointment request has been submitted. The organization will review your case and assign a lawyer.${docMsg}`,
-        [{ text: 'OK', onPress: () => navigation.goBack() }],
-      );
+      if (paidVia === 'wallet') {
+        Alert.alert(
+          'Booking Submitted',
+          `Payment of ₹${(payment?.amount ?? feeRupees ?? 0).toLocaleString('en-IN')} taken from your wallet. The organisation will assign a lawyer to your request.${docMsg}`,
+          [{ text: 'OK', onPress: () => navigation.goBack() }],
+        );
+        return;
+      }
+
+      // Razorpay path — open the in-app checkout. The post-success
+      // handler calls /confirm-payment to verify the signature.
+      const orderId =
+        payment?.providerOrderId ||
+        payment?.razorpayOrderId ||
+        payment?.metadata?.providerOrder?.id;
+      if (!orderId) {
+        Alert.alert(
+          'Payment unavailable',
+          'Could not create a payment order. Please try again or pay from wallet.',
+        );
+        return;
+      }
+      const amountRupees = Number(payment?.amount ?? feeRupees ?? 0);
+      setPendingRequestId(requestId);
+      setRazorpayOrder({
+        orderId,
+        amount: Math.round(amountRupees * 100),
+        name: 'NyayaX',
+        description: `Consultation with ${orgName}`,
+        prefillEmail: user?.email || '',
+        prefillPhone: user?.phone || '',
+        prefillName: user?.name || '',
+      });
+      setPendingDocs(docResult.failed > 0 || docResult.uploaded > 0 ? { requestId } : null);
+      setShowRazorpay(true);
     } catch (err: any) {
       Alert.alert('Error', err?.response?.data?.error || 'Failed to submit booking request');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleRazorpaySuccess = async (result: RazorpayPaymentResult) => {
+    setShowRazorpay(false);
+    if (!pendingRequestId) {
+      Alert.alert('Error', 'Missing request reference for payment confirmation.');
+      return;
+    }
+    try {
+      await organizationsApi.confirmRequestPayment(pendingRequestId, {
+        razorpay_order_id: result.razorpay_order_id,
+        razorpay_payment_id: result.razorpay_payment_id,
+        razorpay_signature: result.razorpay_signature,
+      });
+      setPendingRequestId(null);
+      setRazorpayOrder(null);
+      Alert.alert(
+        'Booking Confirmed',
+        'Payment received. The organisation will assign a lawyer to your request.',
+        [{ text: 'OK', onPress: () => safeGoBack(navigation, 'MainTabs') }],
+      );
+    } catch (err: any) {
+      Alert.alert(
+        'Payment verification failed',
+        formatErrorMessage(err) || 'Payment was received but server verification failed. Contact support.',
+      );
     }
   };
 
@@ -180,40 +297,67 @@ export const OrgBookingScreen: React.FC<{ navigation: any; route: any }> = ({ na
           <Text style={styles.orgDesc}>An available lawyer from this organization will be assigned to you.</Text>
         </View>
 
-        {/* Date & Time */}
+        {/* Date & Time — native pickers. Tapping the date pill opens the
+            calendar; tapping the time pill opens the clock. Both update
+            different parts of the same `scheduledAt` Date, so the form
+            always carries a fully-formed timestamp. */}
         <Text style={styles.sectionTitle}>Date & Time</Text>
         <View style={styles.card}>
           <View style={styles.inputRow}>
-            <View style={styles.inputWrapper}>
-              <Text style={styles.inputLabel}>Date</Text>
-              <View style={styles.inputBox}>
-                <Ionicons name="calendar-outline" size={18} color={COLORS.textMuted} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="YYYY-MM-DD"
-                  value={date}
-                  onChangeText={setDate}
-                  keyboardType="numbers-and-punctuation"
-                  placeholderTextColor={COLORS.textMuted}
-                />
+            <TouchableOpacity
+              style={styles.pickerPill}
+              activeOpacity={0.75}
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Ionicons name="calendar-outline" size={18} color={COLORS.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.pickerLabel}>Date</Text>
+                <Text style={styles.pickerValue}>{format(scheduledAt, 'EEE, dd MMM yyyy')}</Text>
               </View>
-            </View>
-            <View style={styles.inputWrapper}>
-              <Text style={styles.inputLabel}>Time (24h)</Text>
-              <View style={styles.inputBox}>
-                <Ionicons name="time-outline" size={18} color={COLORS.textMuted} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="HH:MM"
-                  value={time}
-                  onChangeText={setTime}
-                  keyboardType="numbers-and-punctuation"
-                  placeholderTextColor={COLORS.textMuted}
-                />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.pickerPill}
+              activeOpacity={0.75}
+              onPress={() => setShowTimePicker(true)}
+            >
+              <Ionicons name="time-outline" size={18} color={COLORS.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.pickerLabel}>Time</Text>
+                <Text style={styles.pickerValue}>{format(scheduledAt, 'hh:mm a')}</Text>
               </View>
-            </View>
+            </TouchableOpacity>
           </View>
         </View>
+        {showDatePicker && (
+          <DateTimePicker
+            value={scheduledAt}
+            mode="date"
+            minimumDate={new Date()}
+            onChange={(_, picked) => {
+              setShowDatePicker(false);
+              if (!picked) return;
+              // Preserve the existing time component when the user changes
+              // the day, so we don't reset to midnight on every date pick.
+              const next = new Date(picked);
+              next.setHours(scheduledAt.getHours(), scheduledAt.getMinutes(), 0, 0);
+              setScheduledAt(next);
+            }}
+          />
+        )}
+        {showTimePicker && (
+          <DateTimePicker
+            value={scheduledAt}
+            mode="time"
+            minuteInterval={15}
+            onChange={(_, picked) => {
+              setShowTimePicker(false);
+              if (!picked) return;
+              const next = new Date(scheduledAt);
+              next.setHours(picked.getHours(), picked.getMinutes(), 0, 0);
+              setScheduledAt(next);
+            }}
+          />
+        )}
 
         {/* Duration */}
         <Text style={styles.sectionTitle}>Duration (minutes)</Text>
@@ -310,8 +454,92 @@ export const OrgBookingScreen: React.FC<{ navigation: any; route: any }> = ({ na
           </TouchableOpacity>
         </View>
 
-        <Button title="Submit Booking Request" onPress={handleBook} loading={submitting} size="lg" style={{ marginTop: SPACING.lg }} />
+        {/* Fee + Payment method — payment is taken at booking time, like
+            the direct lawyer flow. The org head only assigns a lawyer
+            after the booking is paid. */}
+        <Text style={styles.sectionTitle}>Consultation fee</Text>
+        <View style={styles.feeCard}>
+          {feeRupees != null ? (
+            <>
+              <Text style={styles.feeAmount}>₹{feeRupees.toLocaleString('en-IN')}</Text>
+              <Text style={styles.feeHint}>
+                Set by {orgName}. Charged now to confirm the booking; the organisation will assign
+                a lawyer once payment is received.
+              </Text>
+            </>
+          ) : (
+            <Text style={styles.feeHint}>Loading consultation fee…</Text>
+          )}
+        </View>
+
+        <Text style={styles.sectionTitle}>Payment method</Text>
+        <View style={styles.payRow}>
+          <TouchableOpacity
+            style={[styles.payOpt, paymentMethod === 'wallet' && styles.payOptActive]}
+            onPress={() => setPaymentMethod('wallet')}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name="wallet"
+              size={22}
+              color={paymentMethod === 'wallet' ? COLORS.white : COLORS.primary}
+            />
+            <Text style={[styles.payOptText, paymentMethod === 'wallet' && styles.payOptTextActive]}>
+              Wallet (₹{walletBalance.toLocaleString('en-IN')})
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.payOpt, paymentMethod === 'razorpay' && styles.payOptActive]}
+            onPress={() => setPaymentMethod('razorpay')}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name="card"
+              size={22}
+              color={paymentMethod === 'razorpay' ? COLORS.white : COLORS.primary}
+            />
+            <Text style={[styles.payOptText, paymentMethod === 'razorpay' && styles.payOptTextActive]}>
+              Razorpay
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <Button
+          title={
+            feeRupees != null
+              ? `Pay ₹${feeRupees.toLocaleString('en-IN')} & Submit`
+              : 'Submit Booking Request'
+          }
+          onPress={handleBook}
+          loading={submitting}
+          size="lg"
+          disabled={feeRupees == null}
+          style={{ marginTop: SPACING.lg }}
+        />
       </ScrollView>
+
+      {/* Razorpay checkout — only mounts when an order exists. On success
+          we call confirmRequestPayment which verifies the signature and
+          marks the payment COMPLETED + escrow HELD on the server. */}
+      {razorpayOrder && (
+        <RazorpayCheckout
+          visible={showRazorpay}
+          orderOptions={razorpayOrder}
+          onSuccess={handleRazorpaySuccess}
+          onCancel={() => {
+            setShowRazorpay(false);
+            Alert.alert(
+              'Payment cancelled',
+              'Your request has been submitted but is unpaid. Pay later from your appointment requests list to confirm.',
+              [{ text: 'OK', onPress: () => navigation.goBack() }],
+            );
+          }}
+          onError={(err) => {
+            setShowRazorpay(false);
+            Alert.alert('Payment failed', err.description || 'Please try again.');
+          }}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 };
@@ -343,14 +571,14 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     ...SHADOWS.sm, marginBottom: SPACING.md,
   },
   inputRow: { flexDirection: 'row', gap: SPACING.md },
-  inputWrapper: { flex: 1 },
-  inputLabel: { fontSize: FONT_SIZE.xs, fontWeight: '600', color: COLORS.text, marginBottom: SPACING.xs },
-  inputBox: {
+  pickerPill: {
+    flex: 1,
     flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
     backgroundColor: COLORS.surfaceAlt, borderRadius: BORDER_RADIUS.lg,
-    paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md, paddingVertical: SPACING.md,
   },
-  input: { flex: 1, fontSize: FONT_SIZE.md, color: COLORS.text },
+  pickerLabel: { fontSize: FONT_SIZE.xs - 1, fontWeight: '600', color: COLORS.textMuted, letterSpacing: 0.4, textTransform: 'uppercase' },
+  pickerValue: { fontSize: FONT_SIZE.md, fontWeight: '700', color: COLORS.text, marginTop: 2 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm, marginBottom: SPACING.md },
   durationChip: {
     paddingHorizontal: SPACING.lg, paddingVertical: SPACING.sm, borderRadius: BORDER_RADIUS.full,
@@ -398,4 +626,25 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     borderStyle: 'dashed' as any,
   },
   docPickText: { color: COLORS.primary, fontSize: FONT_SIZE.sm, fontWeight: '700' },
+
+  feeCard: {
+    backgroundColor: COLORS.primary + '0E',
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.xl,
+    borderLeftWidth: 4, borderLeftColor: COLORS.primary,
+    marginBottom: SPACING.md,
+  },
+  feeAmount: { fontSize: FONT_SIZE.xxxl, fontWeight: '900', color: COLORS.text },
+  feeHint: { fontSize: FONT_SIZE.xs, color: COLORS.textSecondary, lineHeight: 18, marginTop: 4 },
+
+  payRow: { flexDirection: 'row', gap: SPACING.md, marginBottom: SPACING.md },
+  payOpt: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.sm,
+    paddingVertical: SPACING.lg, paddingHorizontal: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.border,
+    backgroundColor: COLORS.white,
+  },
+  payOptActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  payOptText: { fontSize: FONT_SIZE.sm, fontWeight: '700', color: COLORS.text },
+  payOptTextActive: { color: COLORS.white },
 });

@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { format } from 'date-fns';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS, APPOINTMENT_STATUS_COLORS } from '../../constants';
 import { appointmentsApi, paymentsApi, storageApi } from '../../services/api';
@@ -34,8 +35,18 @@ export const AppointmentDetailScreen: React.FC<Props> = ({ navigation, route }) 
   const [loading, setLoading] = useState(!passedAppt);
   const [refreshing, setRefreshing] = useState(false);
   const [showReschedule, setShowReschedule] = useState(false);
-  const [rescheduleDate, setRescheduleDate] = useState('');
-  const [rescheduleTime, setRescheduleTime] = useState('');
+  // Reschedule uses a single Date for both day + time. Two pickers update
+  // different parts of it. Initialised to "tomorrow at 10:00" when the
+  // modal opens (see openReschedule below) so the user always lands on a
+  // valid future timestamp.
+  const [rescheduleAt, setRescheduleAt] = useState<Date>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    d.setHours(10, 0, 0, 0);
+    return d;
+  });
+  const [showRescheduleDate, setShowRescheduleDate] = useState(false);
+  const [showRescheduleTime, setShowRescheduleTime] = useState(false);
   const [rescheduling, setRescheduling] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [uploadingAgreement, setUploadingAgreement] = useState(false);
@@ -199,17 +210,15 @@ export const AppointmentDetailScreen: React.FC<Props> = ({ navigation, route }) 
 
   const submitReschedule = async () => {
     if (!appointment) return;
-    const dateRe = /^\d{4}-\d{2}-\d{2}$/;
-    const timeRe = /^\d{2}:\d{2}$/;
-    if (!dateRe.test(rescheduleDate)) return Alert.alert('Error', 'Date must be YYYY-MM-DD');
-    if (!timeRe.test(rescheduleTime)) return Alert.alert('Error', 'Time must be HH:MM (24-hr)');
-    const iso = new Date(`${rescheduleDate}T${rescheduleTime}:00`).toISOString();
-    if (new Date(iso).getTime() <= Date.now()) return Alert.alert('Error', 'Choose a future date/time');
+    if (rescheduleAt.getTime() <= Date.now()) {
+      return Alert.alert('Invalid time', 'Please pick a future date and time.');
+    }
+    const iso = rescheduleAt.toISOString();
     setRescheduling(true);
     try {
       await appointmentsApi.reschedule(appointment.id, iso);
       Alert.alert('Rescheduled', 'Appointment rescheduled');
-      setShowReschedule(false); setRescheduleDate(''); setRescheduleTime('');
+      setShowReschedule(false);
       fetchAppointment();
     } catch (err: any) {
       Alert.alert('Error', formatErrorMessage(err) || 'Failed to reschedule');
@@ -599,24 +608,52 @@ export const AppointmentDetailScreen: React.FC<Props> = ({ navigation, route }) 
                 </TouchableOpacity>
               </View>
               <View style={styles.rmBody}>
-                <Text style={styles.rmLabel}>New Date (YYYY-MM-DD)</Text>
-                <TextInput
-                  style={styles.rmInput}
-                  value={rescheduleDate}
-                  onChangeText={setRescheduleDate}
-                  placeholder="2026-05-20"
-                  placeholderTextColor={COLORS.textMuted}
-                  autoCapitalize="none"
-                />
-                <Text style={styles.rmLabel}>Time (HH:MM, 24-hr)</Text>
-                <TextInput
-                  style={styles.rmInput}
-                  value={rescheduleTime}
-                  onChangeText={setRescheduleTime}
-                  placeholder="14:30"
-                  placeholderTextColor={COLORS.textMuted}
-                  autoCapitalize="none"
-                />
+                <Text style={styles.rmLabel}>New Date</Text>
+                <TouchableOpacity
+                  style={styles.rmPickerPill}
+                  activeOpacity={0.75}
+                  onPress={() => setShowRescheduleDate(true)}
+                >
+                  <Ionicons name="calendar-outline" size={18} color={COLORS.primary} />
+                  <Text style={styles.rmPickerValue}>{format(rescheduleAt, 'EEE, dd MMM yyyy')}</Text>
+                </TouchableOpacity>
+                <Text style={styles.rmLabel}>New Time</Text>
+                <TouchableOpacity
+                  style={styles.rmPickerPill}
+                  activeOpacity={0.75}
+                  onPress={() => setShowRescheduleTime(true)}
+                >
+                  <Ionicons name="time-outline" size={18} color={COLORS.primary} />
+                  <Text style={styles.rmPickerValue}>{format(rescheduleAt, 'hh:mm a')}</Text>
+                </TouchableOpacity>
+                {showRescheduleDate && (
+                  <DateTimePicker
+                    value={rescheduleAt}
+                    mode="date"
+                    minimumDate={new Date()}
+                    onChange={(_, picked) => {
+                      setShowRescheduleDate(false);
+                      if (!picked) return;
+                      const next = new Date(picked);
+                      next.setHours(rescheduleAt.getHours(), rescheduleAt.getMinutes(), 0, 0);
+                      setRescheduleAt(next);
+                    }}
+                  />
+                )}
+                {showRescheduleTime && (
+                  <DateTimePicker
+                    value={rescheduleAt}
+                    mode="time"
+                    minuteInterval={15}
+                    onChange={(_, picked) => {
+                      setShowRescheduleTime(false);
+                      if (!picked) return;
+                      const next = new Date(rescheduleAt);
+                      next.setHours(picked.getHours(), picked.getMinutes(), 0, 0);
+                      setRescheduleAt(next);
+                    }}
+                  />
+                )}
                 <Button title="Confirm Reschedule" onPress={submitReschedule} loading={rescheduling} size="lg" />
               </View>
             </View>
@@ -754,4 +791,11 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   rmBody: { padding: SPACING.xl },
   rmLabel: { fontSize: FONT_SIZE.sm, color: COLORS.textSecondary, marginBottom: 4, marginTop: SPACING.sm },
   rmInput: { backgroundColor: COLORS.surfaceAlt, borderRadius: BORDER_RADIUS.lg, paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md, fontSize: FONT_SIZE.md, color: COLORS.text, marginBottom: SPACING.md },
+  rmPickerPill: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
+    backgroundColor: COLORS.surfaceAlt, borderRadius: BORDER_RADIUS.lg,
+    paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md,
+    marginBottom: SPACING.md,
+  },
+  rmPickerValue: { fontSize: FONT_SIZE.md, fontWeight: '700', color: COLORS.text },
 });

@@ -963,8 +963,26 @@ export const organizationsApi = {
   listClientAppointmentRequests: () => api.get('/organizations/clients/me/requests'),
   cancelClientAppointmentRequest: (id: string) =>
     api.post(`/organizations/clients/me/requests/${encodeURIComponent(id)}/cancel`),
-  createAppointmentRequest: (id: string, data: any) =>
-    api.post(`/organizations/${encodeURIComponent(id)}/appointment-requests`, data),
+  // Pay-at-booking-time: server returns { request, payment, paidVia }.
+  //   - paidVia: 'wallet'   → wallet was debited immediately, request is paid.
+  //   - paidVia: 'razorpay' → client must complete the Razorpay checkout
+  //                            and call confirmRequestPayment(...) below.
+  createAppointmentRequest: (
+    id: string,
+    data: {
+      scheduledAt: string;
+      durationMins?: number;
+      meetingType?: 'AUDIO_CALL' | 'VIDEO_CALL' | 'OFFICE_VISIT';
+      notes?: string;
+      paymentMethod?: 'wallet' | 'razorpay';
+    },
+  ) => api.post(`/organizations/${encodeURIComponent(id)}/appointment-requests`, data),
+  // Razorpay confirm hook for org-booking payments. Mirrors
+  // /appointments/:id/confirm-payment but scoped to OrgAppointmentRequest.
+  confirmRequestPayment: (
+    requestId: string,
+    data: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string },
+  ) => api.post(`/organizations/clients/me/requests/${encodeURIComponent(requestId)}/confirm-payment`, data),
 
   // Documents on an OrgAppointmentRequest. Bytes are uploaded directly to
   // Cloudinary; this only persists the URL + metadata. After the org

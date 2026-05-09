@@ -81,6 +81,7 @@ import { OrgProfileScreen } from '../screens/organization/OrgProfileScreen';
 import { OrgLawyersScreen } from '../screens/organization/OrgLawyersScreen';
 import { OrgLawyerSalaryScreen } from '../screens/organization/OrgLawyerSalaryScreen';
 import { OrgRequestsScreen } from '../screens/organization/OrgRequestsScreen';
+import { OrgRequestDetailScreen } from '../screens/organization/OrgRequestDetailScreen';
 import { EditOrgProfileScreen } from '../screens/organization/EditOrgProfileScreen';
 import { OrgVerificationRequestScreen } from '../screens/organization/OrgVerificationRequestScreen';
 
@@ -440,6 +441,7 @@ export const MainStack = () => {
       {/* Organization screens */}
       <Stack.Screen name="OrgDashboard" component={OrgDashboardScreen} />
       <Stack.Screen name="OrgRequests" component={OrgRequestsScreen} />
+      <Stack.Screen name="OrgRequestDetail" component={OrgRequestDetailScreen as any} />
       <Stack.Screen name="OrgLawyers" component={OrgLawyersScreen} />
       <Stack.Screen name="OrgLawyerSalary" component={OrgLawyerSalaryScreen as any} />
       <Stack.Screen name="OrgProfile" component={OrgProfileScreen} />
