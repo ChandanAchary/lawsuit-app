@@ -139,6 +139,20 @@ export const AdminProfileScreen: React.FC<{ navigation: any }> = ({ navigation }
         <InfoRow icon="calendar-outline" label="Joined" value={joinedDate} styles={styles} COLORS={COLORS} />
       </View>
 
+      {/* Money — same balance + transactions surface clients/lawyers see,
+          but for the super admin this IS the platform wallet (every booking
+          payment lands here, every disbursement / salary payout flows out
+          from here). Bank Accounts is where to register destination
+          accounts for top-ups and withdrawals. */}
+      <View style={styles.sectionHeaderRow}>
+        <Text style={styles.sectionLabel}>MONEY</Text>
+        <View style={{ width: 28 }} />
+      </View>
+      <View style={styles.card}>
+        <MenuItem icon="wallet-outline" label="Platform Wallet" onPress={() => navigation.navigate('Wallet')} styles={styles} COLORS={COLORS} />
+        <MenuItem icon="card-outline" label="Bank & UPI Accounts" onPress={() => navigation.navigate('BankAccounts')} styles={styles} COLORS={COLORS} />
+      </View>
+
       <View style={styles.sectionHeaderRow}>
         <Text style={styles.sectionLabel}>OPTIONS</Text>
         <View style={{ width: 28 }} />

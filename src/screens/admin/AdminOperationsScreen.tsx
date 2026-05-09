@@ -86,6 +86,17 @@ export const AdminOperationsScreen: React.FC<{ navigation: any }> = ({ navigatio
       {isSuper && (
         <Section label="MONEY FLOW" styles={styles}>
           <Card
+            icon="wallet-outline"
+            tint="#10B981"
+            label="Platform wallet"
+            desc="Balance, transactions, top-up and withdraw to bank"
+            onPress={() => navigation.navigate('Wallet')}
+            styles={styles} COLORS={COLORS}
+          />
+          {/* Bank & UPI accounts intentionally omitted here — it lives on
+              the Profile screen now to avoid duplicating an account-setup
+              surface alongside money-flow operations. */}
+          <Card
             icon="cash-outline"
             tint="#8B5CF6"
             label="Booking payouts"

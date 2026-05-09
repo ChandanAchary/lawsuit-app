@@ -17,22 +17,32 @@ import { EmptyState, Loading } from '../../components/Common';
 import { RazorpayCheckout } from '../../components/RazorpayCheckout';
 import { RazorpayOrderOptions, RazorpayPaymentResult } from '../../utils/razorpay';
 import { useAuthStore } from '../../stores/authStore';
-import { appointmentsApi, paymentsApi } from '../../services/api';
+import { appointmentsApi, paymentsApi, bankAccountApi } from '../../services/api';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const QUICK_AMOUNTS = [500, 1000, 2000, 5000];
 
+// Tabs: All / Credits / Debits / Withdrawals. Withdrawals is its own tab so
+// money-leaving-via-bank events surface separately from regular debits
+// (booking deductions, transfers etc.) — matches the convention used by
+// every consumer banking app and helps super admins audit cash-out flow.
 const TX_TABS = [
   { key: 'all', label: 'All' },
   { key: TransactionType.CREDIT, label: 'Credits' },
   { key: TransactionType.DEBIT, label: 'Debits' },
+  { key: TransactionType.WITHDRAWAL, label: 'Withdrawals' },
 ];
 
 const getTxType = (tx: WalletTransaction): string => String(tx.type || '').trim().toUpperCase();
 
+// Money-in: regular CREDITs and REFUNDs, plus TRANSFER rows that are clearly
+// the receiving side of a transfer (description includes "received").
 const CREDIT_TYPES = new Set([TransactionType.CREDIT, TransactionType.REFUND]);
-const DEBIT_TYPES = new Set([TransactionType.DEBIT, TransactionType.WITHDRAWAL, TransactionType.PAYMENT]);
+// Money-out via a regular debit (booking deduction, sent transfer). Note
+// that WITHDRAWAL is intentionally NOT in this set anymore — it has its
+// own tab, and the two should not double-count.
+const DEBIT_TYPES = new Set([TransactionType.DEBIT, TransactionType.PAYMENT]);
 
 const isCreditTransaction = (tx: WalletTransaction): boolean => {
   const type = getTxType(tx);
@@ -44,6 +54,9 @@ const isCreditTransaction = (tx: WalletTransaction): boolean => {
   return false;
 };
 
+const isWithdrawalTransaction = (tx: WalletTransaction): boolean =>
+  getTxType(tx) === TransactionType.WITHDRAWAL;
+
 const isDebitTransaction = (tx: WalletTransaction): boolean => {
   const type = getTxType(tx);
   const description = String(tx.description || '').toLowerCase();
@@ -52,6 +65,32 @@ const isDebitTransaction = (tx: WalletTransaction): boolean => {
     return description.includes('sent') || description.includes('debited');
   }
   return false;
+};
+
+interface BankAccountLite {
+  id: string;
+  type?: 'BANK' | 'UPI';
+  accountHolderName?: string;
+  accountNumber?: string;
+  ifscCode?: string;
+  bankName?: string;
+  upiId?: string;
+  label?: string;
+  isDefault?: boolean;
+}
+
+const maskAccountNumber = (n?: string) => {
+  if (!n) return '';
+  const trimmed = n.replace(/\s+/g, '');
+  if (trimmed.length <= 4) return trimmed;
+  return `••••${trimmed.slice(-4)}`;
+};
+
+const bankAccountLabel = (a: BankAccountLite): string => {
+  if (a.type === 'UPI' && a.upiId) return a.upiId;
+  const bank = a.bankName || 'Bank';
+  const tail = maskAccountNumber(a.accountNumber);
+  return tail ? `${bank} · ${tail}` : bank;
 };
 
 const toSourceLabel = (provider?: string): string | null => {
@@ -85,6 +124,13 @@ export const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const [submitting, setSubmitting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [sourceByReference, setSourceByReference] = useState<Record<string, string>>({});
+  // Bank-account picker for the Withdraw flow. We fetch on demand so the
+  // user always sees the freshest list (e.g. they just added an account on
+  // the BankAccounts screen and came back). Default account, if any, is
+  // pre-selected.
+  const [bankAccounts, setBankAccounts] = useState<BankAccountLite[]>([]);
+  const [bankAccountsLoading, setBankAccountsLoading] = useState(false);
+  const [selectedBankAccountId, setSelectedBankAccountId] = useState<string | null>(null);
   // Razorpay state
   const [showRazorpay, setShowRazorpay] = useState(false);
   const [razorpayOrder, setRazorpayOrder] = useState<RazorpayOrderOptions | null>(null);
@@ -153,6 +199,7 @@ export const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const filteredTransactions = React.useMemo(() => {
     if (txTab === 'all') return transactions;
     if (txTab === TransactionType.CREDIT) return transactions.filter(isCreditTransaction);
+    if (txTab === TransactionType.WITHDRAWAL) return transactions.filter(isWithdrawalTransaction);
     return transactions.filter(isDebitTransaction);
   }, [transactions, txTab]);
 
@@ -205,13 +252,59 @@ export const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     }
   };
 
+  // Open the Withdraw sheet. We pre-load the saved bank/UPI accounts so the
+  // user can pick a destination before submitting. If they have none, we
+  // bounce them to the BankAccounts screen instead of letting them try a
+  // withdrawal that has nowhere to land.
+  const openWithdrawSheet = useCallback(async () => {
+    setAmount('');
+    setBankAccountsLoading(true);
+    setShowWithdraw(true);
+    try {
+      const { data } = await bankAccountApi.getAll();
+      // Server wraps the array in `{ data: [...] }` (matches the
+      // BankAccountsScreen unwrap). We try a few well-known keys, then
+      // hard-fall back to an empty array — never assign the wrapper
+      // object itself to `list`, otherwise list.find / list.map blow up.
+      const raw = (data as any)?.data
+        ?? (data as any)?.bankAccounts
+        ?? (data as any)?.accounts
+        ?? (data as any)?.items
+        ?? data;
+      const list: BankAccountLite[] = Array.isArray(raw) ? raw : [];
+      setBankAccounts(list);
+      // Pre-select the default account, falling back to the first one.
+      const def = list.find((a) => a.isDefault) || list[0];
+      setSelectedBankAccountId(def?.id ?? null);
+      if (!list.length) {
+        setShowWithdraw(false);
+        Alert.alert(
+          'No bank account',
+          'Add a bank account or UPI ID before withdrawing.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Add account', onPress: () => navigation.navigate('BankAccounts') },
+          ],
+        );
+      }
+    } catch (err: any) {
+      setShowWithdraw(false);
+      setBankAccounts([]);
+      setSelectedBankAccountId(null);
+      Alert.alert('Error', formatErrorMessage(err.response?.data || err) || 'Failed to load bank accounts');
+    } finally {
+      setBankAccountsLoading(false);
+    }
+  }, [navigation]);
+
   const handleWithdraw = async () => {
     const num = Number(amount);
     if (!num || num < 1) return Alert.alert('Invalid', 'Enter a valid amount');
     if (num > balance) return Alert.alert('Insufficient', 'Amount exceeds wallet balance');
+    if (!selectedBankAccountId) return Alert.alert('Select account', 'Pick a destination bank or UPI account.');
     setSubmitting(true);
     try {
-      await withdraw(num);
+      await withdraw(num, selectedBankAccountId);
       Alert.alert('Success', 'Withdrawal request submitted');
       setShowWithdraw(false);
       setAmount('');
@@ -272,22 +365,32 @@ export const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   };
 
   const renderTransaction = ({ item }: { item: WalletTransaction }) => {
-    const inferredCredit = isCreditTransaction(item);
-    const inferredDebit = isDebitTransaction(item);
-    const isCredit = inferredCredit && !inferredDebit;
+    // Money-in vs money-out is the only thing the row needs to communicate.
+    // We use the explicit + / - icon (matching the +₹ / -₹ amount) instead
+    // of up/down arrows because users found the arrow direction ambiguous —
+    // an "up" arrow next to a -₹ red figure read as a contradiction.
+    const credit = isCreditTransaction(item);
+    const debit = isDebitTransaction(item);
+    const withdrawal = isWithdrawalTransaction(item);
+    const isCredit = credit && !debit && !withdrawal;
     const absoluteAmount = Math.abs(Number(item.amount) || 0);
     const source = getTransactionSource(item);
+    const fallbackLabel = isCredit
+      ? 'Credit'
+      : withdrawal
+        ? 'Withdrawal'
+        : 'Debit';
     return (
       <View style={styles.txRow}>
         <View style={[styles.txIcon, { backgroundColor: isCredit ? '#e6f9f0' : '#fef1f1' }]}>
           <Ionicons
-            name={isCredit ? 'arrow-down' : 'arrow-up'}
-            size={18}
+            name={isCredit ? 'add' : 'remove'}
+            size={20}
             color={isCredit ? COLORS.success : COLORS.error}
           />
         </View>
         <View style={styles.txInfo}>
-          <Text style={styles.txDesc} numberOfLines={1}>{item.description || (isCredit ? 'Credit' : 'Debit')}</Text>
+          <Text style={styles.txDesc} numberOfLines={1}>{item.description || fallbackLabel}</Text>
           <Text style={styles.txDate}>{formatDate(item.createdAt)} · {formatTime(item.createdAt)}</Text>
           {source && <Text style={styles.txSource}>Via {source}</Text>}
         </View>
@@ -313,7 +416,7 @@ export const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             <Ionicons name="add-circle" size={22} color={COLORS.white} />
             <Text style={styles.actionText}>Add Money</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtn} onPress={() => { setAmount(''); setShowWithdraw(true); }}>
+          <TouchableOpacity style={styles.actionBtn} onPress={openWithdrawSheet}>
             <Ionicons name="download" size={22} color={COLORS.white} />
             <Text style={styles.actionText}>Withdraw</Text>
           </TouchableOpacity>
@@ -367,7 +470,9 @@ export const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         </View>
       </BottomSheet>
 
-      {/* Withdraw Modal */}
+      {/* Withdraw Modal — bank/UPI picker is mandatory.
+          The opener pre-fetches accounts; if the user has none, it bounces
+          to BankAccounts before the sheet ever shows. */}
       <BottomSheet visible={showWithdraw} onClose={() => setShowWithdraw(false)} title="Withdraw">
         <View style={styles.modalContent}>
           <View style={styles.amountInput}>
@@ -382,7 +487,80 @@ export const WalletScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             />
           </View>
           <Text style={styles.availNote}>Available: ₹{balance.toLocaleString('en-IN')}</Text>
-          <Button title="Withdraw" onPress={handleWithdraw} loading={submitting} size="lg" />
+
+          <Text style={styles.pickerLabel}>SEND TO</Text>
+          {bankAccountsLoading ? (
+            <View style={styles.pickerEmpty}>
+              <Text style={styles.pickerEmptyText}>Loading accounts…</Text>
+            </View>
+          ) : bankAccounts.length === 0 ? (
+            <TouchableOpacity
+              style={styles.pickerEmpty}
+              onPress={() => { setShowWithdraw(false); navigation.navigate('BankAccounts'); }}
+            >
+              <Ionicons name="add-circle-outline" size={18} color={COLORS.primary} />
+              <Text style={[styles.pickerEmptyText, { color: COLORS.primary }]}>
+                Add a bank or UPI account
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <ScrollView
+              style={{ maxHeight: 240 }}
+              contentContainerStyle={{ paddingBottom: SPACING.sm }}
+              showsVerticalScrollIndicator={false}
+            >
+              {bankAccounts.map((acc) => {
+                const active = selectedBankAccountId === acc.id;
+                return (
+                  <TouchableOpacity
+                    key={acc.id}
+                    style={[styles.bankRow, active && styles.bankRowActive]}
+                    onPress={() => setSelectedBankAccountId(acc.id)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.bankIcon, { backgroundColor: COLORS.primaryLight + '22' }]}>
+                      <Ionicons
+                        name={acc.type === 'UPI' ? 'phone-portrait-outline' : 'business-outline'}
+                        size={18}
+                        color={COLORS.primary}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.bankTitle} numberOfLines={1}>
+                        {acc.label || bankAccountLabel(acc)}
+                        {acc.isDefault ? '  ·  Default' : ''}
+                      </Text>
+                      <Text style={styles.bankSub} numberOfLines={1}>
+                        {acc.type === 'UPI'
+                          ? (acc.upiId || 'UPI')
+                          : `${acc.accountHolderName || 'Account'}${acc.ifscCode ? ` · ${acc.ifscCode}` : ''}`}
+                      </Text>
+                    </View>
+                    <Ionicons
+                      name={active ? 'radio-button-on' : 'radio-button-off'}
+                      size={20}
+                      color={active ? COLORS.primary : COLORS.textMuted}
+                    />
+                  </TouchableOpacity>
+                );
+              })}
+              <TouchableOpacity
+                style={styles.bankRowAdd}
+                onPress={() => { setShowWithdraw(false); navigation.navigate('BankAccounts'); }}
+              >
+                <Ionicons name="add" size={18} color={COLORS.primary} />
+                <Text style={styles.bankRowAddText}>Add another account</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          )}
+
+          <Button
+            title="Withdraw"
+            onPress={handleWithdraw}
+            loading={submitting}
+            size="lg"
+            disabled={bankAccounts.length === 0 || !selectedBankAccountId}
+          />
         </View>
       </BottomSheet>
 
@@ -498,4 +676,39 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     color: COLORS.text,
     marginBottom: SPACING.md,
   },
+
+  // Bank/UPI picker rows shown inside the Withdraw sheet
+  pickerLabel: {
+    fontSize: FONT_SIZE.xs, fontWeight: '800', color: COLORS.textMuted,
+    letterSpacing: 1, marginBottom: SPACING.sm,
+  },
+  pickerEmpty: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.sm,
+    paddingVertical: SPACING.lg, paddingHorizontal: SPACING.lg,
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1, borderColor: COLORS.borderLight, borderStyle: 'dashed',
+    marginBottom: SPACING.xl,
+  },
+  pickerEmptyText: { fontSize: FONT_SIZE.sm, color: COLORS.textMuted, fontWeight: '600' },
+  bankRow: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.md,
+    paddingVertical: SPACING.md, paddingHorizontal: SPACING.lg,
+    borderRadius: BORDER_RADIUS.lg,
+    backgroundColor: COLORS.surfaceAlt,
+    borderWidth: 1, borderColor: 'transparent',
+    marginBottom: SPACING.sm,
+  },
+  bankRowActive: { borderColor: COLORS.primary, backgroundColor: COLORS.primaryLight + '14' },
+  bankIcon: {
+    width: 36, height: 36, borderRadius: 18,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  bankTitle: { fontSize: FONT_SIZE.md, fontWeight: '700', color: COLORS.text },
+  bankSub: { fontSize: FONT_SIZE.xs, color: COLORS.textMuted, marginTop: 2 },
+  bankRowAdd: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.xs,
+    paddingVertical: SPACING.md,
+    marginBottom: SPACING.lg,
+  },
+  bankRowAddText: { fontSize: FONT_SIZE.sm, fontWeight: '700', color: COLORS.primary },
 });

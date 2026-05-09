@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Text,
   Platform,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
@@ -17,6 +18,24 @@ import {
   RazorpayOrderOptions,
   RazorpayPaymentResult,
 } from '../utils/razorpay';
+
+// Schemes the WebView itself can navigate. Anything else is a deep-link
+// into a native app (UPI/PSP, Razorpay's own intent links, mailto, tel,
+// etc.) and must be handed off to Linking.openURL — otherwise Android
+// throws net::ERR_UNKNOWN_URL_SCHEME and the checkout dies.
+const WEBVIEW_INLINE_SCHEMES = [
+  'http://',
+  'https://',
+  'about:',
+  'data:',
+  'blob:',
+  'file:',
+];
+
+const isWebviewNavigable = (url: string): boolean => {
+  const lower = (url || '').toLowerCase();
+  return WEBVIEW_INLINE_SCHEMES.some((s) => lower.startsWith(s));
+};
 
 interface RazorpayCheckoutProps {
   visible: boolean;
@@ -80,10 +99,59 @@ export const RazorpayCheckout: React.FC<RazorpayCheckoutProps> = ({
         </View>
         <WebView
           ref={webViewRef}
-          source={{ html }}
-          originWhitelist={['https://*', 'about:*']}
+          // baseUrl gives the inline HTML a proper https origin so external
+          // script loads (checkout.razorpay.com) don't hit cross-origin
+          // restrictions on Android.
+          source={{ html, baseUrl: 'https://razorpay-checkout.nyayax.local' }}
+          // '*' is required for inline HTML — the doc loads with no real
+          // origin, and the strict 'https://*' filter intermittently
+          // blocks the dynamic <script> tag we inject for checkout.js.
+          originWhitelist={['*']}
           javaScriptEnabled
           domStorageEnabled
+          // Some Razorpay payment methods (UPI deep links, bank pages)
+          // open via target="_blank" — keep them in the same WebView
+          // instead of swallowing them.
+          setSupportMultipleWindows={false}
+          // Android: keep cookies + third-party cookies for the checkout
+          // session to persist across redirects.
+          thirdPartyCookiesEnabled
+          sharedCookiesEnabled
+          // Critical for UPI / PSP deep links. Android's WebView cannot
+          // resolve `upi://`, `phonepe://`, `tez://`, `paytmmp://`,
+          // `intent://`, etc. — letting it try blows up with
+          // ERR_UNKNOWN_URL_SCHEME (the "Payment Failed" dialog the user
+          // saw). For those schemes, hand the URL to the OS via
+          // Linking.openURL so the right native app opens, and tell the
+          // WebView itself NOT to navigate.
+          onShouldStartLoadWithRequest={(request) => {
+            const url = request?.url || '';
+            if (isWebviewNavigable(url)) return true;
+            Linking.openURL(url).catch(() => {
+              onError?.({
+                description:
+                  'Could not open the payment app. If you don\'t have a UPI app installed, choose another method (card, netbanking, wallet).',
+              });
+            });
+            return false;
+          }}
+          // Surface load errors as a checkout error so the parent shows
+          // a useful Alert instead of just leaving the WebView blank.
+          // We translate the cryptic ERR_UNKNOWN_URL_SCHEME into a clear
+          // hint about UPI apps in case onShouldStartLoadWithRequest
+          // didn't catch a sub-frame navigation.
+          onError={(syntheticEvent) => {
+            const { description, code } = syntheticEvent?.nativeEvent || {};
+            const raw = String(description || '');
+            const friendly = /ERR_UNKNOWN_URL_SCHEME/i.test(raw)
+              ? 'Could not open the payment app. If you don\'t have a UPI app installed, choose another method (card, netbanking, wallet).'
+              : (raw || 'WebView failed to load');
+            onError?.({ code: String(code ?? ''), description: friendly });
+          }}
+          onHttpError={(syntheticEvent) => {
+            const { description, statusCode } = syntheticEvent?.nativeEvent || {};
+            onError?.({ code: String(statusCode ?? ''), description: description || `HTTP ${statusCode}` });
+          }}
           onMessage={handleMessage}
           style={styles.webview}
           startInLoadingState

@@ -52,6 +52,7 @@ import { CourtAdminManagementScreen } from '../screens/admin/CourtAdminManagemen
 import { AdminTeamScreen } from '../screens/admin/AdminTeamScreen';
 import { AdminPayoutsScreen } from '../screens/admin/AdminPayoutsScreen';
 import { AdminProfileScreen } from '../screens/admin/AdminProfileScreen';
+import { AdminPlatformScreen } from '../screens/admin/AdminPlatformScreen';
 import { EditAdminProfileScreen } from '../screens/admin/EditAdminProfileScreen';
 import { SuperAdminCourtAdminApprovalsScreen } from '../screens/admin/SuperAdminCourtAdminApprovalsScreen';
 // SuperAdminUserControlScreen and SuperAdminKycOverrideScreen were retired
@@ -262,7 +263,7 @@ const AdminTabs = () => {
             AdminDashboard: focused ? 'shield-checkmark' : 'shield-checkmark-outline',
             AdminUsers: focused ? 'people' : 'people-outline',
             AdminOperations: focused ? 'cash' : 'cash-outline',
-            AdminProfile: focused ? 'person' : 'person-outline',
+            AdminPlatform: focused ? 'grid' : 'grid-outline',
           };
           return <Ionicons name={icons[route.name] as any} size={22} color={color} />;
         },
@@ -271,7 +272,10 @@ const AdminTabs = () => {
       <Tab.Screen name="AdminDashboard" component={AdminDashboardScreen} options={{ title: 'Dashboard' }} />
       <Tab.Screen name="AdminUsers" component={AdminUsersScreen} options={{ title: 'Users' }} />
       <Tab.Screen name="AdminOperations" component={AdminOperationsScreen} options={{ title: 'Operations' }} />
-      <Tab.Screen name="AdminProfile" component={AdminProfileScreen} options={{ title: 'Profile' }} />
+      {/* Profile moved out of the tab bar; it's reachable from the
+          dashboard's top-right header button. The Platform tab now hosts
+          the People / Courts / Content / Platform menus. */}
+      <Tab.Screen name="AdminPlatform" component={AdminPlatformScreen} options={{ title: 'Platform' }} />
     </Tab.Navigator>
   );
 };
@@ -398,6 +402,10 @@ export const MainStack = () => {
       <Stack.Screen name="EditLawyerProfile" component={EditLawyerProfileScreen} />
       <Stack.Screen name="EditCourtAdminProfile" component={EditCourtAdminProfileScreen} />
       <Stack.Screen name="EditAdminProfile" component={EditAdminProfileScreen} />
+      {/* AdminProfile dropped from the AdminTabs bottom bar — keep it as a
+          Stack screen so the dashboard's top-right profile button can
+          push to it. */}
+      <Stack.Screen name="AdminProfile" component={AdminProfileScreen} />
       <Stack.Screen name="LawyerVerificationRequest" component={LawyerVerificationRequestScreen} />
       <Stack.Screen name="LawyerTemplates" component={LawyerTemplatesScreen} />
       <Stack.Screen name="ProSubscription" component={ProSubscriptionScreen} />

@@ -51,6 +51,13 @@ export const LawyerVerificationRequestScreen: React.FC<{ navigation: any }> = ({
   const COLORS = useColors();
   const styles = useMemo(() => getStyles(COLORS), [isDark]);
 
+  // The verification screen used to fetch by 6-digit pincode. That was too
+  // narrow — pincodes only cover a tiny slice of a district, so most
+  // lawyers saw an empty list. We now search by the lawyer's district
+  // (with state as a tie-breaker for districts that share a name across
+  // states). The lawyer's pincode is still kept around for the certificate.
+  const [district, setDistrict] = useState('');
+  const [stateName, setStateName] = useState('');
   const [pincode, setPincode] = useState('');
   const [items, setItems] = useState<CourtAdminItem[]>([]);
   const [selectedId, setSelectedId] = useState('');
@@ -164,15 +171,23 @@ export const LawyerVerificationRequestScreen: React.FC<{ navigation: any }> = ({
       const lawyer = data?.lawyer || {};
       setLawyerProfile(lawyer);
       const pin = String(lawyer?.pincode || '').trim();
+      const dist = String(lawyer?.district || '').trim();
+      const state = String(lawyer?.state || '').trim();
 
-      if (!/^\d{6}$/.test(pin)) {
-        setPincode('');
+      // Pincode is no longer used to drive the search, but we keep it for
+      // the certificate / "Lawyer location" badge so the PDF still shows
+      // a precise address line.
+      setPincode(/^\d{6}$/.test(pin) ? pin : '');
+      setDistrict(dist);
+      setStateName(state);
+
+      if (!dist) {
         setItems([]);
+        setSelectedId('');
         return;
       }
 
-      setPincode(pin);
-      const res = await courtAdminApi.getPublicAdminsByPincode(pin);
+      const res = await courtAdminApi.getPublicAdminsByDistrict(dist, state || undefined);
       const admins = res.data?.courtAdmins || [];
       setItems(Array.isArray(admins) ? admins : []);
       if (!admins.length) {
@@ -334,6 +349,7 @@ export const LawyerVerificationRequestScreen: React.FC<{ navigation: any }> = ({
               <div class="row"><div class="label">Approved By</div><div class="value">${escapeHtml(approvedBy)}</div></div>
               <div class="row"><div class="label">Court</div><div class="value">${escapeHtml(courtName)}</div></div>
               <div class="row"><div class="label">Certificate No.</div><div class="value">${escapeHtml(certificateNo)}</div></div>
+              <div class="row"><div class="label">Lawyer District</div><div class="value">${escapeHtml(district ? `${district}${stateName ? `, ${stateName}` : ''}` : 'N/A')}</div></div>
               <div class="row"><div class="label">Lawyer Pincode</div><div class="value">${escapeHtml(pincode || 'N/A')}</div></div>
 
               <div class="remarks">Remarks: ${escapeHtml(remarks)}</div>
@@ -428,7 +444,10 @@ export const LawyerVerificationRequestScreen: React.FC<{ navigation: any }> = ({
   };
 
   const isPrimaryDisabled = () => {
-    if (!pincode || !selectedId) return true;
+    // Gate on district instead of pincode now — without a district we have
+    // no list to choose from, regardless of whether the lawyer has set a
+    // pincode. Pincode is still used in the certificate footer below.
+    if (!district || !selectedId) return true;
     const status = getSelectedStatus();
     if (status === 'PENDING') return true;
     return submitting || downloading;
@@ -567,11 +586,15 @@ export const LawyerVerificationRequestScreen: React.FC<{ navigation: any }> = ({
       </View>
 
       <View style={styles.banner}>
-        <Text style={styles.bannerTitle}>Lawyer Pincode</Text>
-        <Text style={styles.bannerValue}>{pincode || 'Not Set'}</Text>
-        {!pincode && (
+        <Text style={styles.bannerTitle}>Searching Court Admins In</Text>
+        <Text style={styles.bannerValue}>
+          {district
+            ? `${district}${stateName ? `, ${stateName}` : ''}`
+            : 'District Not Set'}
+        </Text>
+        {!district && (
           <Text style={styles.bannerHint}>
-            Please complete your lawyer profile pincode to find nearest court admins.
+            Please complete your lawyer profile district to find court admins in your area.
           </Text>
         )}
       </View>
@@ -599,9 +622,9 @@ export const LawyerVerificationRequestScreen: React.FC<{ navigation: any }> = ({
               icon="🏛️"
               title="No Court Admins Found"
               message={
-                pincode
-                  ? 'No active court admin is mapped to your pincode yet.'
-                  : 'Set pincode in profile, then retry.'
+                district
+                  ? `No active court admin is registered for ${district}${stateName ? `, ${stateName}` : ''} yet.`
+                  : 'Set district in profile, then retry.'
               }
             />
           }

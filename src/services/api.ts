@@ -425,8 +425,12 @@ export const payoutsApi = {
 // Self-onboarded court admins land in PENDING_SUPER_ADMIN_APPROVAL with
 // isAuthorized=false. Their feature routes stay locked behind
 // requireCourtAdminAuthorized until an entry here flips them.
+export type CourtAdminApprovalStatus = 'PENDING_SUPER_ADMIN_APPROVAL' | 'APPROVED' | 'REJECTED';
+
 export const courtAdminApprovalApi = {
-  listPending: (params?: { page?: number; limit?: number }) =>
+  // verificationStatus drives the Pending / Approved / Rejected tabs on the
+  // super-admin approvals screen. Omit it for the legacy "pending only" call.
+  listPending: (params?: { page?: number; limit?: number; verificationStatus?: CourtAdminApprovalStatus }) =>
     api.get('/admin/court-admins/pending', { params }),
   getDetail: (id: string) => api.get(`/admin/court-admins/${encodeURIComponent(id)}`),
   approve: (id: string, data?: { notes?: string }) =>
@@ -861,6 +865,10 @@ export const courtAdminApi = {
   }) => api.put('/court-admin/me/court', data),
   getPublicCourtsByPincode: (pincode: string) => api.get(`/court-admin/public/courts/by-pincode/${encodeURIComponent(pincode)}`),
   getPublicAdminsByPincode: (pincode: string) => api.get(`/court-admin/public/admins/by-pincode/${encodeURIComponent(pincode)}`),
+  // District-based search. State is optional but recommended — districts
+  // with the same name exist across states (e.g. Bilaspur in CG and HP).
+  getPublicAdminsByDistrict: (district: string, state?: string) =>
+    api.get('/court-admin/public/admins/by-district', { params: { district, state } }),
   createCourt: (data: Record<string, unknown>) => api.post('/court-admin/courts', data),
   getCourts: () => api.get('/court-admin/courts'),
   getCourtById: (id: string) => api.get(`/court-admin/courts/${encodeURIComponent(id)}`),
