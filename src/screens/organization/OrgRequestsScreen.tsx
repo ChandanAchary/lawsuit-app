@@ -71,16 +71,16 @@ export const OrgRequestsScreen: React.FC<{ navigation: any }> = ({ navigation })
     setSubmitting(true);
     try {
       if (actionType === 'ASSIGN') {
-        // Server defaults paymentMethod to 'razorpay' — the lawyer
-        // immediately receives the appointment as a task, and the client
-        // is notified separately to complete payment to confirm. Org head
-        // doesn't pick payment.
+        // Pure task assignment — the client paid at booking time. The
+        // lawyer gets the appointment dropped on their queue; the org head
+        // will receive notifications as the lawyer accepts / rejects /
+        // completes.
         await organizationsApi.assignAppointmentRequest(selectedReq.id, {
           lawyerId: selectedLawyerId,
         });
         Alert.alert(
           'Lawyer Assigned',
-          'The lawyer has been notified. The client will be asked to complete payment.',
+          'The lawyer has been notified. You\'ll get an update when they accept or decline.',
         );
       } else {
         await organizationsApi.rejectAppointmentRequest(selectedReq.id, { reason });

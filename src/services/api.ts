@@ -948,15 +948,14 @@ export const organizationsApi = {
   createLawyer: (data: any) => api.post('/organizations/me/lawyers', data),
   listLawyers: (params?: any) => api.get('/organizations/me/lawyers', { params }),
   listOrgAppointmentRequests: () => api.get('/organizations/me/appointment-requests'),
-  // Server contract (assignOrgAppointmentRequestSchema):
-  //   { lawyerId, paymentMethod: 'razorpay' | 'wallet' }   (paymentMethod defaults to 'razorpay')
-  // - razorpay: a Payment order is created; the client is notified to pay
-  //   online via the existing /appointments/confirm-payment flow.
-  // - wallet:   the client's wallet is debited immediately and the Appointment
-  //   row is materialised right then.
+  // Pure task assignment — the client paid at booking time, so the body
+  // only carries the lawyer id. Server materialises the appointment,
+  // repoints the existing pre-paid Payment to it, and notifies the lawyer
+  // (task), the client (confirmed), and the org head (will receive
+  // accept/reject/complete pings as the lawyer works the appointment).
   assignAppointmentRequest: (
     id: string,
-    data: { lawyerId: string; paymentMethod?: 'razorpay' | 'wallet' },
+    data: { lawyerId: string },
   ) => api.post(`/organizations/me/appointment-requests/${encodeURIComponent(id)}/assign`, data),
   rejectAppointmentRequest: (id: string, data: { reason?: string }) =>
     api.post(`/organizations/me/appointment-requests/${encodeURIComponent(id)}/reject`, data),
