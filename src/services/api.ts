@@ -754,18 +754,30 @@ export const storageApi = {
 };
 
 // ─── eKYC API (CLIENT only) ─────────────────────────────────
-// Aadhaar identity verification through Surepass. Two-step OTP:
-//   1. POST initiate(aadhaar) → server hits Surepass, OTP delivered to
+// Aadhaar identity verification through Sandbox.co.in. Two-step OTP:
+//   1. POST initiate(aadhaar) → server hits Sandbox, OTP delivered to
 //      the Aadhaar-linked phone, returns { id, status, expiresAt, provider }.
 //   2. POST submitOtp(submissionId, otp) → on success the Client row gets
 //      ekycVerified=true + aadhaarName/last4/dob/gender mirrored.
 // Server enforces aggressive rate limits (5 inits/hr, 10 OTPs/15min).
+// A temporary email-OTP fallback is exposed below as initiateEmailOtp /
+// submitEmailOtp while the Aadhaar provider key is unavailable.
 export const ekycApi = {
   getStatus: () => api.get('/ekyc/status'),
   initiateAadhaar: (aadhaar: string) =>
     api.post('/ekyc/aadhaar/initiate', { aadhaar }),
   submitOtp: (submissionId: string, otp: string) =>
     api.post('/ekyc/aadhaar/submit-otp', { submissionId, otp }),
+
+  // Temporary email-OTP fallback while the Aadhaar provider key isn't
+  // available. Server emails a 6-digit OTP to the registered address and
+  // flips ekycVerified=true with ekycVerifiedVia='EMAIL_OTP' on success.
+  // Initiate takes no body (server uses the registered email); response
+  // returns { id, expiresAt, sentToEmailMasked } so the FE can show the
+  // masked recipient on the OTP screen.
+  initiateEmailOtp: () => api.post('/ekyc/email-otp/initiate', {}),
+  submitEmailOtp: (submissionId: string, otp: string) =>
+    api.post('/ekyc/email-otp/submit', { submissionId, otp }),
 };
 
 // ─── Reviews API ────────────────────────────────────────────

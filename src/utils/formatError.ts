@@ -1,4 +1,5 @@
 import { Alert } from 'react-native';
+import { rewriteSandboxError } from './ekycProvider';
 
 function firstZodError(node: any): string | null {
   if (!node || typeof node !== 'object') return null;
@@ -28,7 +29,15 @@ function extractFromErrorPayload(payload: any): string | null {
   return null;
 }
 
+/** Extract a raw user-facing string from an unknown error shape, then run
+ *  Sandbox-specific rewrites so cryptic provider errors get turned into
+ *  copy that tells the user what to *do*. Anything not Sandbox-shaped
+ *  passes through unchanged. */
 export function formatErrorMessage(msg: any): string {
+  return applyRewrites(extractRawMessage(msg));
+}
+
+function extractRawMessage(msg: any): string {
   if (typeof msg === 'string') return msg;
   if (msg == null) return '';
 
@@ -65,6 +74,13 @@ export function formatErrorMessage(msg: any): string {
     }
   }
   return String(msg);
+}
+
+function applyRewrites(raw: string): string {
+  if (!raw) return raw;
+  // Sandbox-specific rewrites for the eKYC provider's known error patterns.
+  // Keep this list in ekycProvider.ts so the same logic ships in the web FE.
+  return rewriteSandboxError(raw);
 }
 
 export function alertError(title: string, err: unknown, fallback = 'Something went wrong'): void {

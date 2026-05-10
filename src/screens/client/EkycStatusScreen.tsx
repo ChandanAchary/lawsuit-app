@@ -10,6 +10,7 @@ import { useColors, useThemeStore } from '../../stores/themeStore';
 import { ekycApi } from '../../services/api';
 import { EkycStatusResponse } from '../../types';
 import { Button } from '../../components/Button';
+import { ekycProviderLabel, verifiedViaLabel } from '../../utils/ekycProvider';
 
 // Identity-verification landing for the CLIENT role. Pulls /ekyc/status and
 // renders one of four states:
@@ -81,27 +82,44 @@ export const EkycStatusScreen: React.FC<{ navigation: any }> = ({ navigation }) 
         {loading ? (
           <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: SPACING.xxxl }} />
         ) : verified ? (
-          <View style={[styles.card, styles.cardVerified]}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="checkmark-circle" size={28} color={COLORS.success} />
-              <Text style={[styles.cardTitle, { color: COLORS.success }]}>Identity Verified</Text>
-            </View>
-            <InfoRow label="Name" value={data?.client?.aadhaarName || '—'} styles={styles} />
-            <InfoRow
-              label="Aadhaar"
-              value={data?.client?.aadhaarLast4 ? `XXXX XXXX ${data.client.aadhaarLast4}` : '—'}
-              styles={styles}
-            />
-            <InfoRow
-              label="Verified on"
-              value={data?.client?.ekycVerifiedAt ? new Date(data.client.ekycVerifiedAt).toLocaleDateString('en-IN') : '—'}
-              styles={styles}
-            />
-            <Text style={styles.helperText}>
-              Your identity is locked to your Aadhaar profile. You cannot change name, date of birth, or
-              gender without contacting support.
-            </Text>
-          </View>
+          (() => {
+            // ekycVerifiedVia tells us which path cleared the verification:
+            // AADHAAR (via Sandbox.co.in) vs EMAIL_OTP (temporary fallback).
+            // Title + accent colour shift so the temporary state is obvious.
+            const via = data?.client?.ekycVerifiedVia ?? null;
+            const isTemp = via === 'EMAIL_OTP';
+            return (
+              <View style={[styles.card, isTemp ? styles.cardTemp : styles.cardVerified]}>
+                <View style={styles.cardHeader}>
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={28}
+                    color={isTemp ? COLORS.warning : COLORS.success}
+                  />
+                  <Text style={[styles.cardTitle, { color: isTemp ? COLORS.warning : COLORS.success }]}>
+                    {isTemp ? 'Identity Verified — Temporary' : 'Identity Verified'}
+                  </Text>
+                </View>
+                <InfoRow label="Name" value={data?.client?.aadhaarName || '—'} styles={styles} />
+                <InfoRow
+                  label="Aadhaar"
+                  value={data?.client?.aadhaarLast4 ? `XXXX XXXX ${data.client.aadhaarLast4}` : '—'}
+                  styles={styles}
+                />
+                <InfoRow
+                  label="Verified on"
+                  value={data?.client?.ekycVerifiedAt ? new Date(data.client.ekycVerifiedAt).toLocaleDateString('en-IN') : '—'}
+                  styles={styles}
+                />
+                <InfoRow label="Method" value={verifiedViaLabel(via)} styles={styles} />
+                <Text style={styles.helperText}>
+                  {isTemp
+                    ? 'You verified via the temporary email-OTP path. Once Aadhaar verification is back online we may ask you to upgrade.'
+                    : 'Your identity is locked to your Aadhaar profile. You cannot change name, date of birth, or gender without contacting support.'}
+                </Text>
+              </View>
+            );
+          })()
         ) : isPending ? (
           <View style={[styles.card, styles.cardPending]}>
             <View style={styles.cardHeader}>
@@ -150,6 +168,9 @@ export const EkycStatusScreen: React.FC<{ navigation: any }> = ({ navigation }) 
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.skipBtn}>
               <Text style={styles.skipText}>Skip for now — verify later</Text>
             </TouchableOpacity>
+            <Text style={styles.poweredByText}>
+              Powered by <Text style={styles.poweredByName}>{ekycProviderLabel('sandbox')}</Text>
+            </Text>
           </View>
         )}
       </ScrollView>
@@ -201,6 +222,9 @@ const getStyles = (C: any) => {
       ...SHADOWS.sm,
     },
     cardVerified: { borderLeftWidth: 4, borderLeftColor: C.success },
+    // Temporary email-OTP path uses the warning accent so the temp status
+    // is visible at a glance even though the user IS technically verified.
+    cardTemp: { borderLeftWidth: 4, borderLeftColor: C.warning },
     cardPending: { borderLeftWidth: 4, borderLeftColor: C.warning },
     cardFailed: { borderLeftWidth: 4, borderLeftColor: C.error },
     cardHeader: {
@@ -229,6 +253,13 @@ const getStyles = (C: any) => {
 
     skipBtn: { alignItems: 'center', marginTop: SPACING.lg },
     skipText: { color: C.textMuted, fontSize: FONT_SIZE.sm, fontWeight: '600' },
+    poweredByText: {
+      fontSize: FONT_SIZE.xs - 1,
+      color: C.textMuted,
+      marginTop: SPACING.lg,
+      textAlign: 'center',
+    },
+    poweredByName: { fontWeight: '700', color: C.textSecondary },
   });
   // Smuggle the primary color out of the StyleSheet so the Bullet helper can
   // match the icon tint without reaching back into useColors.

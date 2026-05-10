@@ -24,6 +24,10 @@ export interface EkycStatusResponse {
   client: {
     ekycVerified: boolean;
     ekycVerifiedAt: string | null;
+    // Which path cleared the eKYC. `EMAIL_OTP` is the temporary fallback
+    // we run while the Aadhaar provider API key is unavailable. UI shows
+    // a different badge so the temporary status stays visible.
+    ekycVerifiedVia: 'AADHAAR' | 'EMAIL_OTP' | null;
     aadhaarLast4: string | null;
     aadhaarName: string | null;
   };
@@ -181,11 +185,16 @@ export interface User {
   // modules and ignores this field.
   permissions?: string[];
   // Client-only: Aadhaar eKYC mirror fields. Set by /ekyc/aadhaar/submit-otp
-  // on successful Surepass verification. Used by ProfileScreen to render
-  // the "Identity verification" tile and lock auto-populated fields on
-  // EditProfileScreen.
+  // on successful Sandbox.co.in verification. Used by ProfileScreen to
+  // render the "Identity verification" tile and lock auto-populated fields
+  // on EditProfileScreen.
   ekycVerified?: boolean;
   ekycVerifiedAt?: string | null;
+  // Records which path the user cleared eKYC through. `EMAIL_OTP` is the
+  // temporary fallback used while the Aadhaar provider API key is
+  // unavailable; `AADHAAR` is the full Sandbox / UIDAI verification.
+  // UI keys off this to render a different badge for the temporary path.
+  ekycVerifiedVia?: 'AADHAAR' | 'EMAIL_OTP' | null;
   aadhaarLast4?: string | null;
   aadhaarName?: string | null;
   // True until LAWYER (org-onboarded) or ADMIN (super-admin-invited) rotates
