@@ -139,6 +139,15 @@ export const AdminUsersScreen: React.FC<{ navigation: any }> = ({ navigation }) 
             tone={isVerified ? 'ok' : 'warn'}
             styles={styles}
           />
+          {/* Org rows now ship `_count.lawyers` from /admin/users so we can
+              surface roster size at a glance, matching the web admin table. */}
+          {isOrg && typeof item._count?.lawyers === 'number' && (
+            <Flag
+              label={`${item._count.lawyers} LAWYER${item._count.lawyers === 1 ? '' : 'S'}`}
+              tone="muted"
+              styles={styles}
+            />
+          )}
           {isBanned && <Flag label="BANNED" tone="danger" styles={styles} />}
           {isDeleted && <Flag label="DELETED" tone="muted" styles={styles} />}
           {item.mustChangePassword && <Flag label="MUST CHANGE PW" tone="warn" styles={styles} />}

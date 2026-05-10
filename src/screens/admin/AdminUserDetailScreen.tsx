@@ -214,6 +214,69 @@ export const AdminUserDetailScreen: React.FC<{ navigation: any; route: { params:
           {user.banReason && <KV k="Ban reason" v={user.banReason} styles={styles} />}
         </Section>
 
+        {/* Lawyers under this firm — server includes up to 50 active lawyers
+            on the org detail response. The count comes from `_count.lawyers`. */}
+        {role === 'ORGANIZATION' && (
+          <Section
+            title={`Lawyers (${user._count?.lawyers ?? user.lawyers?.length ?? 0})`}
+            styles={styles}
+          >
+            {!user.lawyers || user.lawyers.length === 0 ? (
+              <Text style={styles.emptyHint}>No lawyers on the roster yet.</Text>
+            ) : (
+              <>
+                {user.lawyers.map((l: any) => (
+                  <TouchableOpacity
+                    key={l.id}
+                    style={styles.lawyerRow}
+                    onPress={() => navigation.navigate('AdminUserDetail', { userId: l.id, role: 'LAWYER' })}
+                  >
+                    {l.avatarUrl ? (
+                      <Image source={{ uri: l.avatarUrl }} style={styles.lawyerAvatar} />
+                    ) : (
+                      <View style={[styles.lawyerAvatar, styles.lawyerAvatarPH]}>
+                        <Text style={styles.lawyerAvatarText}>
+                          {(l.name || '?').charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <View style={styles.lawyerNameRow}>
+                        <Text style={styles.lawyerName} numberOfLines={1}>
+                          {l.name || 'Unnamed'}
+                        </Text>
+                        {l.isVerified && (
+                          <View style={[styles.tag, { backgroundColor: '#DBEAFE' }]}>
+                            <Text style={[styles.tagText, { color: '#1D4ED8' }]}>VERIFIED</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={styles.lawyerSub} numberOfLines={1}>
+                        {l.email || l.phone || '—'}
+                      </Text>
+                      {(l.specializations?.length || l.experienceYears != null) && (
+                        <Text style={styles.lawyerMeta} numberOfLines={1}>
+                          {(l.specializations || []).slice(0, 2).join(', ')}
+                          {l.experienceYears != null
+                            ? `${l.specializations?.length ? ' · ' : ''}${l.experienceYears} yrs`
+                            : ''}
+                        </Text>
+                      )}
+                    </View>
+                    <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} />
+                  </TouchableOpacity>
+                ))}
+                {(user._count?.lawyers ?? 0) > (user.lawyers?.length ?? 0) && (
+                  <Text style={styles.emptyHint}>
+                    Showing {user.lawyers.length} of {user._count.lawyers} — open the Lawyers screen
+                    for the full roster.
+                  </Text>
+                )}
+              </>
+            )}
+          </Section>
+        )}
+
         {/* Actions */}
         <Section title="Actions" styles={styles}>
           {/* Simple admin Verify shortcut — flips lawyer/client/org/court-admin
@@ -420,6 +483,20 @@ const getStyles = (C: any) => StyleSheet.create({
     paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md,
     fontSize: FONT_SIZE.md, color: C.text, marginBottom: SPACING.md,
   },
+
+  // Lawyers-under-firm section (rendered only when role === 'ORGANIZATION')
+  emptyHint: { fontSize: FONT_SIZE.sm, color: C.textMuted, paddingVertical: SPACING.sm, fontStyle: 'italic' },
+  lawyerRow: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.md,
+    paddingVertical: SPACING.md, borderBottomWidth: 1, borderBottomColor: C.borderLight,
+  },
+  lawyerAvatar: { width: 40, height: 40, borderRadius: 20 },
+  lawyerAvatarPH: { backgroundColor: C.primaryLight + '30', alignItems: 'center', justifyContent: 'center' },
+  lawyerAvatarText: { fontSize: FONT_SIZE.md, fontWeight: '800', color: C.primary },
+  lawyerNameRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs, flexWrap: 'wrap' },
+  lawyerName: { fontSize: FONT_SIZE.md, fontWeight: '700', color: C.text },
+  lawyerSub: { fontSize: FONT_SIZE.sm, color: C.textSecondary, marginTop: 2 },
+  lawyerMeta: { fontSize: FONT_SIZE.xs, color: C.textMuted, marginTop: 2 },
 });
 
 export default AdminUserDetailScreen;
