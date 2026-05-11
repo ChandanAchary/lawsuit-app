@@ -64,6 +64,7 @@ import { SuperAdminEntitySalaryScreen } from '../screens/admin/SuperAdminEntityS
 import { SuperAdminEntitySalaryCycleScreen } from '../screens/admin/SuperAdminEntitySalaryCycleScreen';
 import { SuperAdminCourtAdminOpsScreen } from '../screens/admin/SuperAdminCourtAdminOpsScreen';
 import { AdminUserDetailScreen } from '../screens/admin/AdminUserDetailScreen';
+import { AdminPerformanceLogScreen } from '../screens/admin/AdminPerformanceLogScreen';
 import { AdminReportsScreen } from '../screens/admin/AdminReportsScreen';
 import { AdminLegalUpdatesScreen } from '../screens/admin/AdminLegalUpdatesScreen';
 import { AdminAnnouncementsScreen } from '../screens/admin/AdminAnnouncementsScreen';
@@ -440,6 +441,7 @@ export const MainStack = () => {
       <Stack.Screen name="SuperAdminEntitySalary" component={SuperAdminEntitySalaryScreen as any} />
       <Stack.Screen name="SuperAdminEntitySalaryCycle" component={SuperAdminEntitySalaryCycleScreen} />
       <Stack.Screen name="AdminUserDetail" component={AdminUserDetailScreen as any} />
+      <Stack.Screen name="AdminPerformanceLog" component={AdminPerformanceLogScreen as any} />
       <Stack.Screen name="AdminReports" component={AdminReportsScreen} />
       <Stack.Screen name="AdminLegalUpdates" component={AdminLegalUpdatesScreen} />
       <Stack.Screen name="AdminAnnouncements" component={AdminAnnouncementsScreen} />

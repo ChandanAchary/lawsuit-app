@@ -454,6 +454,22 @@ export const AdminUserDetailScreen: React.FC<{ navigation: any; route: { params:
               {!isDeleted && (
                 <ActionRow icon="trash-outline" label="Soft delete account" tone="danger" onPress={() => startAction('SOFT_DELETE')} styles={styles} COLORS={COLORS} />
               )}
+              {/* Monthly activity log — opens the dedicated performance log
+                  for the picked role. Available for all three: lawyer, org,
+                  court admin. Source of truth for the salary decision. */}
+              {(role === 'LAWYER' || role === 'ORGANIZATION' || role === 'COURT_ADMIN') && (
+                <ActionRow
+                  icon="pulse-outline"
+                  label="Monthly activity log"
+                  tone="primary"
+                  onPress={() => navigation.navigate('AdminPerformanceLog', {
+                    role,
+                    subjectId: user.id,
+                    name: user.name || user.email,
+                  })}
+                  styles={styles} COLORS={COLORS}
+                />
+              )}
               {/* Salary & performance — opens the dedicated screen for
                   base salary, bonus rates, hold/release, and per-cycle payout. */}
               {(role === 'LAWYER' || role === 'ORGANIZATION') && (

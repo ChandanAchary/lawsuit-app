@@ -368,6 +368,17 @@ export const adminApi = {
   // which actually flips lawyer.isVerified (and client.isVerified) in DB.
   setUserVerified: (id: string, isVerified: boolean) =>
     api.put(`/admin/users/${encodeURIComponent(id)}/verification`, { isVerified }),
+
+  // Monthly performance / activity logs (super-admin). Backed by
+  // /admin/performance/{role}/:id?month=&year= on the server. Each endpoint
+  // returns headline metrics + activity timeline + auto-computed salary so
+  // the mobile detail screen can render the same data the web shows.
+  getLawyerMonthlyActivity: (id: string, params: { month: number; year: number }) =>
+    api.get(`/admin/performance/lawyer/${encodeURIComponent(id)}`, { params }),
+  getOrganizationMonthlyActivity: (id: string, params: { month: number; year: number }) =>
+    api.get(`/admin/performance/organization/${encodeURIComponent(id)}`, { params }),
+  getCourtAdminMonthlyActivity: (id: string, params: { month: number; year: number }) =>
+    api.get(`/admin/performance/court-admin/${encodeURIComponent(id)}`, { params }),
 };
 
 // ─── Admin Management API (SUPER_ADMIN only) ───────────────
