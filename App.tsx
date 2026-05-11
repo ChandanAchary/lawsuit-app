@@ -18,6 +18,7 @@ import { useAuthStore } from './src/stores/authStore';
 import { useThemeStore, DARK_COLORS } from './src/stores/themeStore';
 import { COLORS } from './src/constants';
 import { useNotificationStore } from './src/stores/notificationStore';
+import { useActiveCallStore } from './src/stores/activeCallStore';
 import { AuthStack, MainStack } from './src/navigation';
 import { requestAllPermissions } from './src/utils/permissions';
 import { socketService } from './src/services/socket';
@@ -171,7 +172,9 @@ export default function App() {
       });
 
       // Caller hung up before we answered, or remote side ended after we
-      // answered. Either way, dismiss any open incoming-call modal.
+      // answered. Either way, dismiss any open incoming-call modal AND
+      // clear the global active-call store so the chat "Tap to return to
+      // call" banner doesn't keep hanging around after the call is gone.
       const unsubCallCancelled = socketService.on('call:cancelled', (payload: unknown) => {
         const data = payload as { callId?: string };
         setIncomingCall((prev) => {
@@ -179,6 +182,10 @@ export default function App() {
           if (data?.callId && prev.callId !== data.callId) return prev;
           return null;
         });
+        const active = useActiveCallStore.getState().call;
+        if (active && (!data?.callId || active.callId === data.callId)) {
+          useActiveCallStore.getState().clear();
+        }
       });
 
       const unsubCallEnded = socketService.on('call:ended', (payload: unknown) => {
@@ -188,6 +195,10 @@ export default function App() {
           if (data?.callId && prev.callId !== data.callId) return prev;
           return null;
         });
+        const active = useActiveCallStore.getState().call;
+        if (active && (!data?.callId || active.callId === data.callId)) {
+          useActiveCallStore.getState().clear();
+        }
       });
 
       return () => {
@@ -218,6 +229,27 @@ export default function App() {
 
     const call = incomingCall;
     setIncomingCall(null);
+
+    // Seed the global active-call store right away so the chat resume
+    // banner works even if the user immediately minimizes the call screen.
+    // VideoCallScreen will re-seed on mount with the same data; both paths
+    // are idempotent.
+    useActiveCallStore.getState().setActive({
+      callId: call.callId,
+      roomUrl: call.roomUrl,
+      token: call.token,
+      mediaType: call.mediaType,
+      otherUser: {
+        id: call.caller.id,
+        name: call.caller.name,
+        avatarUrl: call.caller.avatar,
+      },
+      chatId: call.callType === 'chat' ? call.referenceId : undefined,
+      appointmentId: call.callType === 'appointment' ? call.referenceId : undefined,
+      isOutgoing: false,
+      startedAt: Date.now(),
+    });
+
     // Pass the server-issued Daily room + token straight through to the
     // VideoCall screen. The screen joins the Daily room with these and
     // does NOT re-emit `call:initiate` (it's an incoming call).

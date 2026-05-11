@@ -13,6 +13,7 @@ import { ChatTab } from '../../components/ChatTab';
 import { Button } from '../../components/Button';
 import { safeGoBack } from '../../utils/navigation';
 import { formatErrorMessage } from '../../utils/formatError';
+import { resolveMime } from '../../utils/mimeFromFilename';
 
 interface CaseTask {
   id: string;
@@ -115,11 +116,21 @@ export const CaseDetailScreen: React.FC<{ navigation: any; route: any }> = ({ na
       setUploadingDoc(true);
       const { data: signData } = await storageApi.getCloudinarySignature('case-documents');
 
+      // expo-document-picker sometimes returns mimeType as undefined or
+      // 'application/octet-stream' on Android — especially for PDFs picked
+      // from Drive/Downloads. The server's OCR dispatcher routes by mime
+      // string equality, so a generic octet-stream is a guaranteed
+      // "Unsupported mime type for extraction" later. Infer from the
+      // filename extension as a fallback so PDFs always carry the real
+      // application/pdf mime end-to-end.
+      const fileName = asset.name || 'upload';
+      const mimeType = resolveMime(asset.mimeType, fileName);
+
       const formData = new FormData();
       formData.append('file', {
         uri: asset.uri,
-        type: asset.mimeType || 'application/octet-stream',
-        name: asset.name || 'upload',
+        type: mimeType,
+        name: fileName,
       } as any);
       formData.append('timestamp', String(signData.timestamp));
       formData.append('signature', signData.signature);
@@ -129,7 +140,7 @@ export const CaseDetailScreen: React.FC<{ navigation: any; route: any }> = ({ na
       // Cloudinary's /image/upload endpoint rejects non-image bytes; for PDFs
       // and DOCX we have to use the /raw/upload endpoint instead. Detect by
       // mime so the same flow handles both branches.
-      const resourceType = (asset.mimeType || '').startsWith('image/') ? 'image' : 'raw';
+      const resourceType = mimeType.startsWith('image/') ? 'image' : 'raw';
       const uploadRes = await fetch(
         `https://api.cloudinary.com/v1_1/${encodeURIComponent(signData.cloudName)}/${resourceType}/upload`,
         { method: 'POST', body: formData },
@@ -141,8 +152,8 @@ export const CaseDetailScreen: React.FC<{ navigation: any; route: any }> = ({ na
 
       await casesApi.uploadDocument(caseId, {
         fileurl: uploadData.secure_url,
-        fileName: asset.name || 'upload',
-        mimeType: asset.mimeType || 'application/octet-stream',
+        fileName,
+        mimeType,
         size: asset.size,
       });
       await fetchDocuments();

@@ -8,6 +8,7 @@ import { chatApi } from '../../services/api';
 import { socketService } from '../../services/socket';
 import { ChatParticipant } from '../../types';
 import { useAuthStore } from '../../stores/authStore';
+import { useActiveCallStore } from '../../stores/activeCallStore';
 
 const normalizeChats = (payload: any): any[] => payload?.chats || payload?.items || payload || [];
 
@@ -81,6 +82,38 @@ export const ChatScreen: React.FC<{ navigation: any; route: any }> = ({ navigati
     } catch {
       return null;
     }
+  };
+
+  // Pull the global active-call (if any). The user can minimize the
+  // VideoCallScreen back to the chat without ending the call — when they
+  // do, this store still holds the room+token, so we render a sticky
+  // "Tap to return to call" banner below the header.
+  const activeCall = useActiveCallStore((s) => s.call);
+  const hasActiveCallForThisChat = !!(
+    activeCall && (
+      // Match by chatId when the active call is chat-scoped...
+      (chatId && activeCall.chatId && activeCall.chatId === chatId) ||
+      // ...otherwise fall back to "same peer" so a call started from an
+      // appointment / case context still resumes correctly.
+      (activeCall.otherUser?.id && activeCall.otherUser.id === otherId)
+    )
+  );
+
+  const resumeActiveCall = () => {
+    if (!activeCall) return;
+    navigation.navigate('VideoCall', {
+      callId: activeCall.callId,
+      roomUrl: activeCall.roomUrl,
+      token: activeCall.token,
+      mediaType: activeCall.mediaType,
+      callType: activeCall.mediaType,
+      otherUser: activeCall.otherUser,
+      // Resuming is always "incoming" from VideoCallScreen's POV — we
+      // already have roomUrl+token, so it should NOT re-emit `call:initiate`.
+      isOutgoing: false,
+      chatId: activeCall.chatId,
+      appointmentId: activeCall.appointmentId,
+    });
   };
 
   // Just navigate to the call screen with the recipient + media type. The
@@ -206,6 +239,36 @@ export const ChatScreen: React.FC<{ navigation: any; route: any }> = ({ navigati
         </View>
       </View>
 
+      {/* Sticky resume-call banner. Renders only when there's an active
+          call in the global store AND it belongs to the chat we're looking
+          at. Tapping the banner re-opens VideoCallScreen with the same
+          roomUrl/token — Daily simply rejoins the existing room. */}
+      {hasActiveCallForThisChat && activeCall && (
+        <TouchableOpacity
+          style={styles.resumeCallBar}
+          onPress={resumeActiveCall}
+          activeOpacity={0.85}
+        >
+          <View style={styles.resumeCallIcon}>
+            <Ionicons
+              name={activeCall.mediaType === 'audio' ? 'call' : 'videocam'}
+              size={16}
+              color={COLORS.white}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.resumeCallTitle} numberOfLines={1}>
+              In a {activeCall.mediaType === 'audio' ? 'voice' : 'video'} call
+              {activeCall.otherUser?.name ? ` with ${activeCall.otherUser.name}` : ''}
+            </Text>
+            <Text style={styles.resumeCallSub} numberOfLines={1}>
+              Tap to return to call
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={COLORS.white} />
+        </TouchableOpacity>
+      )}
+
       <KeyboardAvoidingView
         style={styles.chatBody}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -296,6 +359,21 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     width: 36, height: 36, borderRadius: 18,
     backgroundColor: COLORS.surfaceAlt, alignItems: 'center', justifyContent: 'center',
   },
+  // Sticky banner shown when there's a minimized in-progress call on this
+  // chat. Green = "active call you can return to". Style intentionally
+  // borrows from WhatsApp / Signal so users recognise the pattern.
+  resumeCallBar: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.md,
+    paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md,
+    backgroundColor: COLORS.success,
+  },
+  resumeCallIcon: {
+    width: 30, height: 30, borderRadius: 15,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  resumeCallTitle: { color: COLORS.white, fontSize: FONT_SIZE.sm, fontWeight: '800' },
+  resumeCallSub: { color: 'rgba(255,255,255,0.85)', fontSize: FONT_SIZE.xs, marginTop: 2, fontWeight: '600' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.xl },
   errorText: { fontSize: FONT_SIZE.md, color: COLORS.textSecondary, textAlign: 'center' },
 
