@@ -154,6 +154,42 @@ class SocketService {
     this.emit('chat:message:delivered', { chatId, messageId });
   }
 
+  // ─── Call signaling (mirrors lawsuit-server/src/sockets/index.ts) ─────────
+  // The server contract is callId-based and provisions the Daily room +
+  // tokens server-side. The mobile UI used to roll its own roomId/callType
+  // and emit `call:reject` — those events don't exist on the server. These
+  // helpers exist so screens never have to remember the wire payload.
+
+  /** Caller initiates a call. Server replies with `call:initiated`. */
+  initiateCall(opts: {
+    to: string;
+    referenceId: string;
+    callType: 'chat' | 'appointment';
+    mediaType: 'audio' | 'video';
+  }): void {
+    this.emit('call:initiate', opts);
+  }
+
+  /** Callee accepts an incoming call. Server replies to caller with `call:accepted`. */
+  acceptCall(callId: string): void {
+    this.emit('call:accept', { callId });
+  }
+
+  /** Callee declines an incoming call. Server replies to caller with `call:declined`. */
+  declineCall(callId: string): void {
+    this.emit('call:decline', { callId });
+  }
+
+  /** Caller hangs up before the callee answers. Server notifies callee via `call:cancelled`. */
+  cancelCall(callId: string): void {
+    this.emit('call:cancel', { callId });
+  }
+
+  /** Either side ends an in-progress call. Server emits `call:ended` to the other side. */
+  endCallById(callId: string): void {
+    this.emit('call:end', { callId });
+  }
+
   get isConnected(): boolean {
     return this.socket?.connected ?? false;
   }

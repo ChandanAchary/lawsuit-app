@@ -56,8 +56,6 @@ export const ChatScreen: React.FC<{ navigation: any; route: any }> = ({ navigati
   const displayAvatar = getParticipantAvatar(conversationOther) || other?.avatarUrl || other?.avatar || null;
   const otherId = getParticipantId(conversationOther) || String(other?.id || otherUserId || '').trim();
 
-  const generateRoomId = () => `call_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-
   const resolveExistingChatId = async (): Promise<string | null> => {
     if (!otherUserId) return null;
 
@@ -85,14 +83,17 @@ export const ChatScreen: React.FC<{ navigation: any; route: any }> = ({ navigati
     }
   };
 
-  const initiateCall = (callType: 'audio' | 'video') => {
+  // Just navigate to the call screen with the recipient + media type. The
+  // VideoCallScreen owns the `call:initiate` emit + listens for the server's
+  // `call:initiated` ack (which carries the Daily room URL + meeting token).
+  // The old contract ("client invents a roomId and emits it straight to the
+  // peer") never matched the server, which is why chat calls always failed.
+  const initiateCall = (mediaType: 'audio' | 'video') => {
     if (!otherId) return Alert.alert('Error', 'Cannot determine call recipient');
     if (!chatId) return Alert.alert('Please wait', 'Chat is still loading. Try the call again in a moment.');
-    const roomId = generateRoomId();
-    socketService.emit('call:initiate', { to: otherId, callType, roomId, chatId });
     navigation.navigate('VideoCall', {
-      roomId,
-      callType,
+      mediaType,
+      callType: mediaType, // legacy alias still read by older copies
       otherUser: {
         id: otherId,
         name: displayName,

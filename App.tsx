@@ -56,12 +56,25 @@ const linking: LinkingOptions<any> = {
 
 const navigationRef = createNavigationContainerRef<any>();
 
+// Mirrors the server payload for `call:incoming`. The mobile app used to
+// use a homegrown shape ({ from, roomId, callerName }) that the server has
+// never emitted — calls always silently dropped. We now follow the same
+// callId / roomUrl / token contract that lawsuit-frontend uses.
+type IncomingCallCaller = {
+  id: string;
+  name: string;
+  avatar?: string;
+  role?: 'CLIENT' | 'LAWYER';
+};
+
 type IncomingCall = {
-  from: string;
-  callerName: string;
-  callType: 'audio' | 'video';
-  roomId: string;
-  chatId?: string;
+  callId: string;
+  callType: 'chat' | 'appointment';
+  referenceId: string;
+  mediaType: 'audio' | 'video';
+  caller: IncomingCallCaller;
+  roomUrl: string;
+  token: string;
 };
 
 export default function App() {
@@ -139,23 +152,40 @@ export default function App() {
       const cleanupNotifications = initSocketListeners();
       fetchUnreadCount();
 
+      // Incoming call ringing — keep modal up until the user picks Accept
+      // / Decline, the caller cancels, or the call times out.
       const unsubIncomingCall = socketService.on('call:incoming', (payload: unknown) => {
         const call = payload as IncomingCall;
-        if (!call?.from || !call?.roomId) return;
+        if (!call?.callId || !call?.caller?.id || !call?.roomUrl || !call?.token) return;
         void presentIncomingCallNotification({
-          callerName: call.callerName,
-          callType: call.callType,
-          roomId: call.roomId,
-          chatId: call.chatId,
+          callerName: call.caller?.name || 'Unknown',
+          callType: call.mediaType === 'audio' ? 'audio' : 'video',
+          // The local notification layer was built around the old
+          // `roomId`/`chatId` payload — map the new server shape to the
+          // fields it still understands so the heads-up notification keeps
+          // working without forcing a rewrite of localNotifications.
+          roomId: call.callId,
+          chatId: call.callType === 'chat' ? call.referenceId : undefined,
         });
         setIncomingCall(call);
       });
 
-      const unsubCallEnded = socketService.on('call:ended', (payload: unknown) => {
-        const call = payload as { roomId?: string };
+      // Caller hung up before we answered, or remote side ended after we
+      // answered. Either way, dismiss any open incoming-call modal.
+      const unsubCallCancelled = socketService.on('call:cancelled', (payload: unknown) => {
+        const data = payload as { callId?: string };
         setIncomingCall((prev) => {
           if (!prev) return prev;
-          if (call?.roomId && prev.roomId !== call.roomId) return prev;
+          if (data?.callId && prev.callId !== data.callId) return prev;
+          return null;
+        });
+      });
+
+      const unsubCallEnded = socketService.on('call:ended', (payload: unknown) => {
+        const data = payload as { callId?: string };
+        setIncomingCall((prev) => {
+          if (!prev) return prev;
+          if (data?.callId && prev.callId !== data.callId) return prev;
           return null;
         });
       });
@@ -163,6 +193,7 @@ export default function App() {
       return () => {
         cleanupNotifications();
         unsubIncomingCall();
+        unsubCallCancelled();
         unsubCallEnded();
       };
     }
@@ -175,31 +206,34 @@ export default function App() {
   }, [isAuthenticated, initSocketListeners, fetchUnreadCount]);
 
   const rejectIncomingCall = () => {
-    if (!incomingCall || !user?.id) return;
-    socketService.emit('call:reject', {
-      to: incomingCall.from,
-      roomId: incomingCall.roomId,
-      chatId: incomingCall.chatId,
-    });
+    if (!incomingCall) return;
+    socketService.declineCall(incomingCall.callId);
     setIncomingCall(null);
   };
 
   const acceptIncomingCall = () => {
     if (!incomingCall || !navigationRef.isReady()) return;
 
-    socketService.emit('call:accept', {
-      to: incomingCall.from,
-      roomId: incomingCall.roomId,
-    });
+    socketService.acceptCall(incomingCall.callId);
 
     const call = incomingCall;
     setIncomingCall(null);
+    // Pass the server-issued Daily room + token straight through to the
+    // VideoCall screen. The screen joins the Daily room with these and
+    // does NOT re-emit `call:initiate` (it's an incoming call).
     navigationRef.navigate('VideoCall', {
-      roomId: call.roomId,
-      callType: call.callType,
-      otherUser: { id: call.from, name: call.callerName || 'Unknown' },
+      callId: call.callId,
+      roomUrl: call.roomUrl,
+      token: call.token,
+      mediaType: call.mediaType,
+      callType: call.mediaType, // legacy alias the screen used to read
+      otherUser: {
+        id: call.caller.id,
+        name: call.caller.name || 'Unknown',
+        avatarUrl: call.caller.avatar,
+      },
       isOutgoing: false,
-      chatId: call.chatId,
+      chatId: call.callType === 'chat' ? call.referenceId : undefined,
     });
   };
 
@@ -226,12 +260,12 @@ export default function App() {
         <View style={styles.callOverlay}>
           <View style={[styles.callCard, { backgroundColor: isDark ? DARK_COLORS.surface : COLORS.white }] }>
             <Ionicons
-              name={incomingCall?.callType === 'video' ? 'videocam' : 'call'}
+              name={incomingCall?.mediaType === 'video' ? 'videocam' : 'call'}
               size={42}
               color={isDark ? DARK_COLORS.primary : COLORS.primary}
             />
-            <Text style={[styles.callTitle, { color: isDark ? DARK_COLORS.text : COLORS.text }]}>Incoming {incomingCall?.callType === 'video' ? 'Video' : 'Audio'} Call</Text>
-            <Text style={[styles.callSubtitle, { color: isDark ? DARK_COLORS.textSecondary : COLORS.textSecondary }]}>from {incomingCall?.callerName || 'Unknown'}</Text>
+            <Text style={[styles.callTitle, { color: isDark ? DARK_COLORS.text : COLORS.text }]}>Incoming {incomingCall?.mediaType === 'video' ? 'Video' : 'Audio'} Call</Text>
+            <Text style={[styles.callSubtitle, { color: isDark ? DARK_COLORS.textSecondary : COLORS.textSecondary }]}>from {incomingCall?.caller?.name || 'Unknown'}</Text>
 
             <View style={styles.callActions}>
               <TouchableOpacity style={[styles.callActionBtn, { backgroundColor: COLORS.error }]} onPress={rejectIncomingCall}>
