@@ -32,9 +32,24 @@ function extractFromErrorPayload(payload: any): string | null {
 /** Extract a raw user-facing string from an unknown error shape, then run
  *  Sandbox-specific rewrites so cryptic provider errors get turned into
  *  copy that tells the user what to *do*. Anything not Sandbox-shaped
- *  passes through unchanged. */
+ *  passes through unchanged.
+ *
+ *  We also pass the originating axios URL down so the eKYC rewrites only
+ *  fire when the error actually came from the eKYC API — otherwise generic
+ *  errors like "Unauthorized" or "Forbidden" from totally unrelated
+ *  endpoints (document AI, Cloudinary, JWT refresh, etc.) were being
+ *  rewritten into the eKYC sandbox-down message.
+ */
 export function formatErrorMessage(msg: any): string {
-  return applyRewrites(extractRawMessage(msg));
+  return applyRewrites(extractRawMessage(msg), extractRequestUrl(msg));
+}
+
+function extractRequestUrl(msg: any): string {
+  if (!msg || typeof msg !== 'object') return '';
+  // axios stores the originating request config on the error.
+  const fromErr = msg?.config?.url;
+  const fromResp = msg?.response?.config?.url;
+  return String(fromErr || fromResp || '');
 }
 
 function extractRawMessage(msg: any): string {
@@ -76,11 +91,11 @@ function extractRawMessage(msg: any): string {
   return String(msg);
 }
 
-function applyRewrites(raw: string): string {
+function applyRewrites(raw: string, url: string): string {
   if (!raw) return raw;
   // Sandbox-specific rewrites for the eKYC provider's known error patterns.
   // Keep this list in ekycProvider.ts so the same logic ships in the web FE.
-  return rewriteSandboxError(raw);
+  return rewriteSandboxError(raw, { url });
 }
 
 export function alertError(title: string, err: unknown, fallback = 'Something went wrong'): void {

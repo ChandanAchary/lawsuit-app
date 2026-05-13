@@ -80,9 +80,26 @@ const SANDBOX_REWRITES: Array<{ match: RegExp; rewrite: string }> = [
   },
 ];
 
-export function rewriteSandboxError(raw: string): string {
+// Only fire the sandbox rewrites when the failing request actually came
+// from the eKYC API. The previous unscoped version turned every error
+// containing words like "unauthorized" / "forbidden" / "access token" /
+// "rate limit" into the generic eKYC sandbox-down message — even on
+// totally unrelated screens (document AI extract, JWT refresh, Cloudinary
+// permission errors). That left users staring at "Identity verification
+// is temporarily unavailable" when their real problem was something else
+// entirely.
+const EKYC_URL_RE = /\/ekyc(\/|$|\?)/i;
+
+export function rewriteSandboxError(raw: string, opts?: { url?: string }): string {
   if (!raw) return raw;
+  const url = opts?.url ?? '';
+  // Aadhaar-specific patterns mention 'aadhaar' explicitly in their regex,
+  // so they self-scope and are safe to keep enabled regardless of URL.
+  // The broad patterns (rate limit, unauthorized, forbidden, etc.) only
+  // run when we know the error came from an eKYC endpoint.
+  const fromEkyc = !!url && EKYC_URL_RE.test(url);
   for (const { match, rewrite } of SANDBOX_REWRITES) {
+    if (!fromEkyc && !/(aadhaar|aadhar)/i.test(match.source)) continue;
     if (match.test(raw)) return rewrite;
   }
   return raw;
