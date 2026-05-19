@@ -72,10 +72,9 @@ export const MediationsListScreen: React.FC<{ navigation: any }> = ({ navigation
     return off;
   }, [load, unavailable]);
 
-  const CONCLUDED = new Set(['RESOLVED', 'ESCALATED_TO_CASE', 'CANCELLED']);
+  const CONCLUDED = new Set(['RESOLVED', 'ESCALATED_TO_CASE', 'CANCELLED', 'SETTLED', 'NON_SETTLEMENT']);
   const filtered = items.filter((m) => tab === 'active' ? !CONCLUDED.has(m.status) : CONCLUDED.has(m.status));
   const isLawyer = user?.role === UserRole.LAWYER;
-  const isClient = user?.role === UserRole.CLIENT;
 
   const renderItem = ({ item }: { item: Mediation }) => {
     const other =
@@ -119,14 +118,9 @@ export const MediationsListScreen: React.FC<{ navigation: any }> = ({ navigation
 
       <TabBar tabs={TABS} active={tab} onSelect={setTab} />
 
-      {isClient && !unavailable && (
-        <View style={styles.ctaRow}>
-          <TouchableOpacity style={styles.cta} onPress={() => navigation.navigate('NewMediationInvite')}>
-            <Ionicons name="add-circle" size={18} color="#FFFFFF" />
-            <Text style={styles.ctaText}>New Mediation Invite</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+      {/* Mediation is initiated ONLY by the case lawyer, from the Case
+          (Resolution = Mediation). Clients/respondents never start one
+          here — this screen is a read-only tracker of their mediations. */}
 
       {loading ? <Loading /> : (
         <FlatList
@@ -141,7 +135,9 @@ export const MediationsListScreen: React.FC<{ navigation: any }> = ({ navigation
               title={unavailable ? 'Mediations not available' : (tab === 'active' ? 'No active mediations' : 'No concluded mediations')}
               message={unavailable
                 ? 'This feature is not enabled on the server yet. Please try again later.'
-                : (isClient && tab === 'active' ? 'Start one by inviting a respondent.' : 'Nothing here yet.')}
+                : (tab === 'active'
+                    ? 'A mediation appears here once your lawyer starts it from the case (Resolution = Mediation) and the other party accepts.'
+                    : 'Nothing here yet.')}
             />
           }
         />
