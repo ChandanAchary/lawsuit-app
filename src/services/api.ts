@@ -939,10 +939,19 @@ export const mediationApi = {
     respondentEmail: string;
     respondentName?: string;
     respondentPhone?: string;
-    disputeTitle: string;
-    disputeDescription: string;
+    disputeTitle?: string;
+    disputeDescription?: string;
     initiatorLawyerId?: string;
+    caseId?: string;
   }) => api.post('/mediations/invites', data),
+  /** Resend the existing pending invite email to the same recipient. */
+  resendInvite: (respondentEmail: string) =>
+    api.post('/mediations/invites/resend', { respondentEmail }),
+  /** Initiator edits a still-PENDING invite. */
+  editInvite: (
+    inviteId: string,
+    data: { respondentEmail?: string; respondentName?: string; disputeTitle?: string; disputeDescription?: string },
+  ) => api.patch(`/mediations/invites/${encodeURIComponent(inviteId)}`, data),
   getInviteByToken: (token: string) => api.get(`/mediations/invites/public/${encodeURIComponent(token)}`),
   acceptInvite: (token: string) => api.post(`/mediations/invites/${encodeURIComponent(token)}/accept`),
   declineInvite: (token: string) => api.post(`/mediations/invites/${encodeURIComponent(token)}/decline`),
@@ -961,11 +970,43 @@ export const mediationApi = {
   getById: (id: string) => api.get(`/mediations/${encodeURIComponent(id)}`),
   attachRespondentLawyer: (id: string, lawyerId: string) =>
     api.post(`/mediations/${encodeURIComponent(id)}/respondent-lawyer`, { lawyerId }),
+  attachInitiatorLawyer: (id: string, lawyerId: string) =>
+    api.post(`/mediations/${encodeURIComponent(id)}/initiator-lawyer`, { lawyerId }),
   pickMediator: (id: string, mediatorId: string) =>
     api.post(`/mediations/${encodeURIComponent(id)}/mediator-pick`, { mediatorId }),
+  /** MA 2023 escape — parties couldn't agree → platform appoints a neutral. */
+  requestNeutralMediator: (id: string) =>
+    api.post(`/mediations/${encodeURIComponent(id)}/mediator-neutral`, {}),
   getRoom: (id: string) => api.get(`/mediations/${encodeURIComponent(id)}/room`),
   conclude: (id: string, data: { outcome: 'RESOLVED' | 'ESCALATED_TO_CASE'; settlementTerms?: string; closureNotes?: string }) =>
     api.post(`/mediations/${encodeURIComponent(id)}/conclude`, data),
+  /** Cancel a pre-session mediation (either disputing party). */
+  cancelMediation: (id: string, reason?: string) =>
+    api.post(`/mediations/${encodeURIComponent(id)}/cancel`, reason ? { reason } : {}),
+
+  // ─── Canonical flow ───
+  /** Respondent submits their own side of the dispute. */
+  submitRespondentSide: (id: string, data: { statement: string; documentUrls?: string[] }) =>
+    api.post(`/mediations/${encodeURIComponent(id)}/respondent-side`, data),
+  /** Respondent attaches their lawyer via an accepted appointment. */
+  attachRespondentLawyerFromAppointment: (id: string, appointmentId: string) =>
+    api.post(`/mediations/${encodeURIComponent(id)}/respondent-lawyer-from-appointment`, { appointmentId }),
+  /** A side shortlists 1–3 mediators. */
+  submitMediatorShortlist: (id: string, mediatorIds: string[]) =>
+    api.post(`/mediations/${encodeURIComponent(id)}/mediator-shortlist`, { mediatorIds }),
+  /** A side picks one final mediator from the union. */
+  submitFinalMediator: (id: string, mediatorId: string) =>
+    api.post(`/mediations/${encodeURIComponent(id)}/mediator-final`, { mediatorId }),
+  /** Start a client's 50% fee share — returns a Razorpay order. */
+  startMediationFee: (id: string) => api.post(`/mediations/${encodeURIComponent(id)}/fee/start`, {}),
+  /** Confirm a client's fee half with the Razorpay proof. */
+  confirmMediationFee: (
+    id: string,
+    proof: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string },
+  ) => api.post(`/mediations/${encodeURIComponent(id)}/fee/confirm`, proof),
+  /** Selected mediator accepts/declines the offer. */
+  respondToMediatorOffer: (id: string, accept: boolean) =>
+    api.post(`/mediations/${encodeURIComponent(id)}/mediator-offer-response`, { accept }),
 };
 
 // ─── Organization API ──────────────────────────────────────────

@@ -28,6 +28,7 @@ interface AppointmentCardProps {
   onReschedule?: () => void;
   onJoinVideo?: () => void;
   onViewClient?: () => void;
+  onOpenMediation?: () => void;
   style?: ViewStyle;
 }
 
@@ -46,6 +47,7 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
   onReschedule,
   onJoinVideo,
   onViewClient,
+  onOpenMediation,
   style,
 }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
@@ -229,6 +231,18 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
           )}
         </View>
       )}
+
+      {/* Open Mediation — shown on any status once this appointment is
+          linked to a mediation (the respondent attached this lawyer from
+          it). Lands on the canonical mediation flow. */}
+      {appointment.mediationId && onOpenMediation && (
+        <View style={styles.mediationRow}>
+          <TouchableOpacity style={[styles.actionBtn, styles.actionPrimary]} onPress={onOpenMediation}>
+            <Ionicons name="git-compare-outline" size={14} color={COLORS.white} />
+            <Text style={styles.actionTextWhite}>Open Mediation</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </TouchableOpacity>
   );
 };
@@ -358,6 +372,13 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: SPACING.sm,
+    marginTop: SPACING.md,
+    paddingTop: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.borderLight,
+  },
+  mediationRow: {
+    flexDirection: 'row',
     marginTop: SPACING.md,
     paddingTop: SPACING.md,
     borderTopWidth: 1,

@@ -195,12 +195,34 @@ export const LawyerCaseDetailScreen: React.FC<{ navigation: any; route: any }> =
           <Row label="Case Number" value={caseData.caseNumber || '—'} />
           <Row label="Category" value={caseData.category || '—'} />
           <Row label="Status" value={caseData.status} />
+          <Row label="Resolution" value={caseData.resolutionMethod || '—'} />
           <Row label="Filed" value={formatDate(caseData.createdAt)} />
           {caseData.description && <Text style={styles.desc}>{caseData.description}</Text>}
           {caseData.client && (
             <View style={styles.personRow}>
               <Ionicons name="person" size={18} color={COLORS.accent} />
               <Text style={styles.personText}>{caseData.client.name} (Client)</Text>
+            </View>
+          )}
+
+          {/* Lawyer-initiated mediation — canonical flow step 1. Sends the
+              invitation from the Case; the server records initiator client =
+              case client, initiator lawyer = this lawyer, and links
+              Mediation.caseId on accept. */}
+          {caseData.resolutionMethod === 'MEDIATION' && (
+            <View style={styles.mediationBox}>
+              <Text style={styles.mediationTitle}>Start the mediation</Text>
+              <Text style={styles.mediationDesc}>
+                Send a mediation invitation to the other party on your client's behalf.
+                They'll get an email (and an in-app notification if they're on NyayaX) and,
+                once they accept, the mediation flow begins.
+              </Text>
+              <Button
+                title="Send mediation invitation"
+                size="md"
+                icon={<Ionicons name="send" size={16} color={COLORS.white} />}
+                onPress={() => navigation.navigate('NewMediationInvite', { caseId })}
+              />
             </View>
           )}
         </ScrollView>
@@ -425,6 +447,9 @@ const styles = StyleSheet.create({
   desc: { fontSize: FONT_SIZE.md, color: COLORS.textSecondary, marginTop: SPACING.xl, lineHeight: 22 },
   personRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginTop: SPACING.xl, backgroundColor: COLORS.white, padding: SPACING.lg, borderRadius: BORDER_RADIUS.lg, ...SHADOWS.sm },
   personText: { fontSize: FONT_SIZE.md, fontWeight: '600', color: COLORS.text },
+  mediationBox: { marginTop: SPACING.xl, backgroundColor: COLORS.white, padding: SPACING.lg, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.primary + '40', ...SHADOWS.sm },
+  mediationTitle: { fontSize: FONT_SIZE.md, fontWeight: '800', color: COLORS.text, marginBottom: 4 },
+  mediationDesc: { fontSize: FONT_SIZE.sm, color: COLORS.textSecondary, lineHeight: 20, marginBottom: SPACING.md },
   tlItem: { flexDirection: 'row', marginBottom: SPACING.xl, position: 'relative' },
   tlDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: COLORS.primary, marginTop: 4, marginRight: SPACING.md, zIndex: 1 },
   tlLine: { position: 'absolute', left: 5, top: 16, width: 2, height: '100%', backgroundColor: COLORS.borderLight },

@@ -1,18 +1,23 @@
 import { useThemeStore, useColors } from '../../stores/themeStore';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
-import { mediationApi } from '../../services/api';
+import { mediationApi, casesApi } from '../../services/api';
 import { Button } from '../../components/Button';
 import { formatErrorMessage, isEndpointMissing } from '../../utils/formatError';
 
-export const NewMediationInviteScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+export const NewMediationInviteScreen: React.FC<{ navigation: any; route?: any }> = ({ navigation, route }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
   const COLORS = useColors();
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+
+  // When opened from a Case (lawyer-initiated, canonical flow step 1) the
+  // dispute is derived from the case and the server auto-attaches the
+  // case's lawyer as initiator lawyer + links Mediation.caseId on accept.
+  const caseId: string | undefined = route?.params?.caseId;
 
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
@@ -21,15 +26,31 @@ export const NewMediationInviteScreen: React.FC<{ navigation: any }> = ({ naviga
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(() => {
+    if (!caseId) return;
+    casesApi.getById(caseId)
+      .then(({ data }) => {
+        const c = data.case || data;
+        if (c?.title && !title) setTitle(String(c.title));
+        if (c?.description && !description) setDescription(String(c.description));
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [caseId]);
+
   const submit = async () => {
     if (!email.trim() || !/^\S+@\S+\.\S+$/.test(email.trim())) {
       return Alert.alert('Error', 'Enter a valid respondent email');
     }
-    if (!title.trim() || title.trim().length < 3) {
-      return Alert.alert('Error', 'Dispute title (min 3 chars)');
-    }
-    if (!description.trim() || description.trim().length < 10) {
-      return Alert.alert('Error', 'Describe the dispute (min 10 chars)');
+    // When linked to a case the server derives the dispute from it, so the
+    // title/description fields are optional here.
+    if (!caseId) {
+      if (!title.trim() || title.trim().length < 3) {
+        return Alert.alert('Error', 'Dispute title (min 3 chars)');
+      }
+      if (!description.trim() || description.trim().length < 10) {
+        return Alert.alert('Error', 'Describe the dispute (min 10 chars)');
+      }
     }
     setSubmitting(true);
     try {
@@ -37,8 +58,9 @@ export const NewMediationInviteScreen: React.FC<{ navigation: any }> = ({ naviga
         respondentEmail: email.trim(),
         respondentName: name.trim() || undefined,
         respondentPhone: phone.trim() || undefined,
-        disputeTitle: title.trim(),
-        disputeDescription: description.trim(),
+        disputeTitle: title.trim() || undefined,
+        disputeDescription: description.trim() || undefined,
+        caseId,
       });
       Alert.alert('Invite Sent', 'The respondent has been invited to mediate.', [
         { text: 'OK', onPress: () => navigation.replace('Mediations') },
@@ -98,7 +120,11 @@ export const NewMediationInviteScreen: React.FC<{ navigation: any }> = ({ naviga
 
         <View style={styles.note}>
           <Ionicons name="information-circle-outline" size={18} color={COLORS.textMuted} />
-          <Text style={styles.noteText}>The respondent will receive an email with a link to accept or decline.</Text>
+          <Text style={styles.noteText}>
+            {caseId
+              ? 'Linked to this case — the dispute is prefilled and your firm is auto-attached as the initiator lawyer. The respondent gets an email + in-app notification to accept or decline.'
+              : 'The respondent will receive an email with a link to accept or decline.'}
+          </Text>
         </View>
 
         <Button title="Send Invite" onPress={submit} loading={submitting} size="lg" />

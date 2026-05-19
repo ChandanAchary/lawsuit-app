@@ -270,6 +270,7 @@ export const LawyerAppointmentsScreen: React.FC<{ navigation: any }> = ({ naviga
           ? () => navigation.navigate('VideoCall', { appointmentId: item.id }) : undefined
       }
       onViewClient={() => navigation.navigate('LawyerClientDetail', { clientId: item.clientId, name: item.client?.name })}
+      onOpenMediation={item.mediationId ? () => navigation.navigate('MediationDetail', { id: item.mediationId }) : undefined}
     />
       );
     })()
