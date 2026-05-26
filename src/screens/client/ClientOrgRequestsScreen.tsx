@@ -127,6 +127,22 @@ export const ClientOrgRequestsScreen: React.FC<{ navigation: any }> = ({ navigat
             <Text style={styles.viewAppText}>View Appointment</Text>
           </TouchableOpacity>
         )}
+
+        {/* Once a lawyer is assigned the client can coordinate with them
+            directly. Opens the 1:1 chat thread for that lawyer. */}
+        {item.status === 'ASSIGNED' && (lawyer.id || lawyer.userId) && (
+          <TouchableOpacity
+            style={styles.messageBtn}
+            onPress={() => navigation.navigate('ChatScreen', {
+              otherUserId: lawyer.id || lawyer.userId,
+              name: lawyer.name,
+              otherUser: lawyer,
+            })}
+          >
+            <Ionicons name="chatbubble-ellipses-outline" size={16} color={COLORS.primary} />
+            <Text style={styles.messageText}>Message Lawyer</Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   };
@@ -215,4 +231,10 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     backgroundColor: COLORS.primary + '10',
   },
   viewAppText: { fontSize: FONT_SIZE.sm, fontWeight: '700', color: COLORS.primary },
+  messageBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.xs,
+    marginTop: SPACING.sm, paddingVertical: SPACING.sm, borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1, borderColor: COLORS.primary + '40',
+  },
+  messageText: { fontSize: FONT_SIZE.sm, fontWeight: '700', color: COLORS.primary },
 });

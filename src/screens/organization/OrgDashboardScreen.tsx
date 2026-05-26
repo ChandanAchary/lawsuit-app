@@ -228,6 +228,15 @@ export const OrgDashboardScreen: React.FC<{ navigation: any }> = ({ navigation }
         />
 
         <MenuItem
+          icon="calendar-outline"
+          label="Calendar"
+          desc="Month view of appointment requests"
+          COLORS={COLORS}
+          styles={styles}
+          onPress={() => navigation.navigate('Calendar')}
+        />
+
+        <MenuItem
           icon="notifications-outline"
           label="Notifications"
           desc="View all notifications"

@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS, CASE_STATUS_COLORS } from '../../constants';
 import { Case, CaseStatus, Document as CaseDoc, TimelineEvent, Hearing } from '../../types';
-import { casesApi, chatApi, storageApi } from '../../services/api';
+import { casesApi, chatApi, storageApi, mediationApi } from '../../services/api';
 import { formatDate, formatTime, formatDateTime } from '../../utils/date';
 import { StatusBadge, Loading, EmptyState } from '../../components/Common';
 import { ChatTab } from '../../components/ChatTab';
@@ -50,8 +50,33 @@ export const CaseDetailScreen: React.FC<{ navigation: any; route: any }> = ({ na
   const [creatingTask, setCreatingTask] = useState(false);
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
   const [chatId, setChatId] = useState<string | null>(null);
+  // When a case is resolved via mediation, the matching Mediation row carries
+  // caseId. We resolve it here so the Info tab can deep-link the client into
+  // the mediation thread (clients can open but never start a mediation).
+  const [linkedMediationId, setLinkedMediationId] = useState<string | null>(null);
 
   useEffect(() => { fetchCase(); }, [caseId]);
+
+  // Resolve the linked mediation once we know the case is mediation-bound.
+  useEffect(() => {
+    const method = String(caseData?.resolutionMethod || '').toUpperCase();
+    if (!caseData || method !== 'MEDIATION') {
+      setLinkedMediationId(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await mediationApi.list();
+        const items: any[] = data?.data || data?.items || [];
+        const match = items.find((m) => m?.caseId === caseId);
+        if (!cancelled) setLinkedMediationId(match?.id || null);
+      } catch {
+        if (!cancelled) setLinkedMediationId(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [caseData, caseId]);
 
   useEffect(() => {
     if (caseData) {
@@ -253,6 +278,34 @@ export const CaseDetailScreen: React.FC<{ navigation: any; route: any }> = ({ na
           <InfoRow label="Status" value={caseData.status} />
           <InfoRow label="Resolution" value={caseData.resolutionMethod || '—'} />
           <InfoRow label="Filed Date" value={formatDate(caseData.createdAt)} />
+
+          {/* Mediation deep-link. When the case is resolved via mediation we
+              surface its status: tappable (open the mediation thread) once a
+              Mediation row exists, or a passive hint while the lawyer hasn't
+              started it yet. Clients can never initiate — that's lawyer-only. */}
+          {String(caseData.resolutionMethod || '').toUpperCase() === 'MEDIATION' && (
+            linkedMediationId ? (
+              <TouchableOpacity
+                style={styles.mediationLink}
+                activeOpacity={0.7}
+                onPress={() => navigation.navigate('MediationDetail', { id: linkedMediationId })}
+              >
+                <Ionicons name="people-circle" size={22} color={COLORS.primary} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.mediationLinkTitle}>This case is in mediation</Text>
+                  <Text style={styles.mediationLinkSub}>Tap to open the mediation and track its progress</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={COLORS.primary} />
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.mediationNote}>
+                <Ionicons name="information-circle-outline" size={18} color={COLORS.textSecondary} />
+                <Text style={styles.mediationNoteText}>
+                  This case is set for mediation. Your lawyer will start the mediation and invite the other party.
+                </Text>
+              </View>
+            )
+          )}
           {caseData.description && (
             <View style={styles.descSection}>
               <Text style={styles.descLabel}>Description</Text>
@@ -421,8 +474,14 @@ export const CaseDetailScreen: React.FC<{ navigation: any; route: any }> = ({ na
                   <TouchableOpacity onPress={() => navigation.navigate('DocumentAi', { caseId, document: doc })}>
                     <Ionicons name="flash-outline" size={20} color={COLORS.primary} />
                   </TouchableOpacity>
-                  <TouchableOpacity>
-                    <Ionicons name="download-outline" size={20} color={COLORS.primary} />
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate('DocumentPreview', {
+                      url: (doc as any).fileUrl || (doc as any).url,
+                      name: (doc as any).fileName || doc.name,
+                      mimeType: (doc as any).mimeType,
+                    })}
+                  >
+                    <Ionicons name="eye-outline" size={20} color={COLORS.primary} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -450,7 +509,11 @@ const styles = StyleSheet.create({
   backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
   topBarTitle: { flex: 1, marginLeft: SPACING.md, flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
   topBarText: { fontSize: FONT_SIZE.lg, fontWeight: '700', color: COLORS.text, flex: 1 },
-  tabStrip: { backgroundColor: COLORS.white, borderBottomWidth: 1, borderBottomColor: COLORS.borderLight },
+  // maxHeight pins the horizontal tab ScrollView to its content height. Without
+  // it, a horizontal ScrollView in a flex-column parent greedily expands to
+  // fill all remaining vertical space — floating the tabs mid-screen and
+  // pushing the tab content to the bottom (matches the lawyer screen).
+  tabStrip: { backgroundColor: COLORS.white, borderBottomWidth: 1, borderBottomColor: COLORS.borderLight, maxHeight: 50 },
   tabStripContent: { paddingHorizontal: SPACING.md, gap: SPACING.xs },
   tabItem: {
     flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: SPACING.md, paddingHorizontal: SPACING.md,
@@ -470,6 +533,20 @@ const styles = StyleSheet.create({
   descSection: { marginTop: SPACING.xl },
   descLabel: { fontSize: FONT_SIZE.lg, fontWeight: '700', color: COLORS.text, marginBottom: SPACING.sm },
   descText: { fontSize: FONT_SIZE.md, color: COLORS.textSecondary, lineHeight: 22 },
+  mediationLink: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.md,
+    backgroundColor: COLORS.primary + '12', borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg, marginTop: SPACING.lg,
+    borderWidth: 1, borderColor: COLORS.primary + '30',
+  },
+  mediationLinkTitle: { fontSize: FONT_SIZE.md, fontWeight: '800', color: COLORS.primary },
+  mediationLinkSub: { fontSize: FONT_SIZE.xs, color: COLORS.textSecondary, marginTop: 2 },
+  mediationNote: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: SPACING.sm,
+    backgroundColor: COLORS.surfaceAlt, borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg, marginTop: SPACING.lg,
+  },
+  mediationNoteText: { flex: 1, fontSize: FONT_SIZE.sm, color: COLORS.textSecondary, lineHeight: 19 },
   personCard: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING.md, backgroundColor: COLORS.white,
     borderRadius: BORDER_RADIUS.lg, padding: SPACING.lg, marginTop: SPACING.md, ...SHADOWS.sm,

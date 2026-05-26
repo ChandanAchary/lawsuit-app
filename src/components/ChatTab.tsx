@@ -76,6 +76,13 @@ export const ChatTab: React.FC<ChatTabProps> = ({ chatId, participants = [] }) =
     fetchMessages(1);
     socketService.joinChat(chatId);
 
+    // Clear the unread badge for this whole thread on open. Per-message
+    // socket markRead only covers messages that live-arrive while the
+    // thread is open; messages that were already unread when we entered
+    // need this bulk call so the server's unreadCount drops to 0 and the
+    // chat list stops showing them as unread.
+    chatApi.markChatRead(chatId).catch(() => {});
+
     // New message
     const unsubMsg = socketService.on('chat:message:new', (data: unknown) => {
       const { message } = data as { message: ChatMessage };
@@ -419,10 +426,25 @@ export const ChatTab: React.FC<ChatTabProps> = ({ chatId, participants = [] }) =
                     >
                       {d.filename}
                     </Text>
+                    <TouchableOpacity
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      onPress={() => navigation.navigate('DocumentPreview', {
+                        url: d.url || d.fileUrl,
+                        name: d.filename || d.fileName,
+                        mimeType: d.mimeType,
+                      })}
+                    >
+                      <Ionicons
+                        name="eye-outline"
+                        size={16}
+                        color={isMine ? 'rgba(255,255,255,0.85)' : COLORS.primary}
+                      />
+                    </TouchableOpacity>
                     <Ionicons
                       name="flash-outline"
                       size={16}
                       color={isMine ? 'rgba(255,255,255,0.85)' : COLORS.primary}
+                      style={{ marginLeft: 8 }}
                     />
                   </TouchableOpacity>
                 ))}

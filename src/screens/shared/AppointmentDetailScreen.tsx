@@ -484,7 +484,17 @@ export const AppointmentDetailScreen: React.FC<Props> = ({ navigation, route }) 
                             : 'Tap to extract text + summarize with AI'}
                     </Text>
                   </View>
-                  <Ionicons name="flash-outline" size={18} color={COLORS.primary} />
+                  <TouchableOpacity
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    onPress={() => navigation.navigate('DocumentPreview', {
+                      url: d.url || d.fileUrl,
+                      name: d.filename || d.fileName,
+                      mimeType: d.mimeType,
+                    })}
+                  >
+                    <Ionicons name="eye-outline" size={18} color={COLORS.primary} />
+                  </TouchableOpacity>
+                  <Ionicons name="flash-outline" size={18} color={COLORS.primary} style={{ marginLeft: SPACING.md }} />
                 </TouchableOpacity>
               ))}
             </View>

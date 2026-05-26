@@ -306,6 +306,11 @@ export const chatApi = {
     },
   ) => api.post(`/chat/${encodeURIComponent(chatId)}/messages`, data),
   getParticipants: (chatId: string) => api.get(`/chat/${encodeURIComponent(chatId)}/participants`),
+  // Bulk-mark every incoming message in this chat as read. Call on chat open
+  // so the chat-list unread badge clears for messages that were already
+  // unread before opening (per-message socket markRead only covers
+  // live-arriving messages).
+  markChatRead: (chatId: string) => api.put(`/chat/${encodeURIComponent(chatId)}/read`),
 };
 
 // ─── Notifications API ──────────────────────────────────────
@@ -888,6 +893,15 @@ export const courtAdminApi = {
   }) => api.put('/court-admin/me/court', data),
   getPublicCourtsByPincode: (pincode: string) => api.get(`/court-admin/public/courts/by-pincode/${encodeURIComponent(pincode)}`),
   getPublicAdminsByPincode: (pincode: string) => api.get(`/court-admin/public/admins/by-pincode/${encodeURIComponent(pincode)}`),
+  // ── Court-admin self-service (post-registration) ──
+  // After a court admin self-registers they sit in PENDING_SUPER_ADMIN_APPROVAL.
+  // These let them see their own authorization status, re-apply if rejected,
+  // and view their own salary slip — the mobile app previously had no way to
+  // surface any of this (web exposes them via CourtAdminAuthBanner + salary page).
+  getMyAuthorization: () => api.get('/court-admin/me/authorization'),
+  reapply: (data?: { idProofUrl?: string; authorizationProofUrl?: string; registrationNumber?: string }) =>
+    api.post('/court-admin/me/reapply', data ?? {}),
+  getMySalary: () => api.get('/court-admin/me/salary'),
   // District-based search. State is optional but recommended — districts
   // with the same name exist across states (e.g. Bilaspur in CG and HP).
   getPublicAdminsByDistrict: (district: string, state?: string) =>

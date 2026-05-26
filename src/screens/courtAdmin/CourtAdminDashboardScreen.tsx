@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { courtAdminApi } from '../../services/api';
 import { useAuthStore } from '../../stores/authStore';
+import { CourtAdminAuthBanner } from '../../components/CourtAdminAuthBanner';
 
 export const CourtAdminDashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
@@ -75,6 +76,11 @@ export const CourtAdminDashboardScreen: React.FC<{ navigation: any }> = ({ navig
         <Text style={styles.heroTitle}>Court Admin</Text>
         <Text style={styles.heroSub}>Welcome, {user?.name || 'Admin'}</Text>
       </LinearGradient>
+
+      {/* Authorization status — shows pending/rejected/suspended state and
+          a re-apply action for self-onboarded court admins. Renders nothing
+          once the account is approved + active. */}
+      <CourtAdminAuthBanner />
 
       <View style={styles.statsRow}>
         <TouchableOpacity

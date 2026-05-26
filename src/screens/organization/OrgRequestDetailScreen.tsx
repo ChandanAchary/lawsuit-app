@@ -199,6 +199,18 @@ export const OrgRequestDetailScreen: React.FC<{ navigation: any; route: { params
               {!!request.client?.email && <Text style={styles.personSub}>{request.client.email}</Text>}
               {!!request.client?.phone && <Text style={styles.personSub}>{request.client.phone}</Text>}
             </View>
+            {(request.client?.id || request.clientId) && (
+              <TouchableOpacity
+                style={styles.msgIconBtn}
+                onPress={() => navigation.navigate('ChatScreen', {
+                  otherUserId: request.client?.id || request.clientId,
+                  name: request.client?.name,
+                  otherUser: request.client,
+                })}
+              >
+                <Ionicons name="chatbubble-ellipses-outline" size={20} color={COLORS.primary} />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -261,7 +273,17 @@ export const OrgRequestDetailScreen: React.FC<{ navigation: any; route: { params
                         : 'Tap to extract text + summarise with AI'}
                     </Text>
                   </View>
-                  <Ionicons name="flash-outline" size={18} color={COLORS.primary} />
+                  <TouchableOpacity
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    onPress={() => navigation.navigate('DocumentPreview', {
+                      url: d.url || d.fileUrl,
+                      name: d.filename || d.fileName,
+                      mimeType: d.mimeType,
+                    })}
+                  >
+                    <Ionicons name="eye-outline" size={18} color={COLORS.primary} />
+                  </TouchableOpacity>
+                  <Ionicons name="flash-outline" size={18} color={COLORS.primary} style={{ marginLeft: SPACING.md }} />
                 </TouchableOpacity>
               ))}
             </View>
@@ -284,6 +306,18 @@ export const OrgRequestDetailScreen: React.FC<{ navigation: any; route: { params
                 <Text style={styles.personName}>{request.assignedLawyer.name}</Text>
                 {!!request.assignedLawyer.email && <Text style={styles.personSub}>{request.assignedLawyer.email}</Text>}
               </View>
+              {(request.assignedLawyer.id || request.assignedLawyerId) && (
+                <TouchableOpacity
+                  style={styles.msgIconBtn}
+                  onPress={() => navigation.navigate('ChatScreen', {
+                    otherUserId: request.assignedLawyer.id || request.assignedLawyerId,
+                    name: request.assignedLawyer.name,
+                    otherUser: request.assignedLawyer,
+                  })}
+                >
+                  <Ionicons name="chatbubble-ellipses-outline" size={20} color={COLORS.primary} />
+                </TouchableOpacity>
+              )}
             </View>
             {apptStatus ? (
               <View style={styles.apptBlock}>
@@ -415,6 +449,11 @@ const getStyles = (C: any) => StyleSheet.create({
   notesBody: { fontSize: FONT_SIZE.md, color: C.text, lineHeight: 22 },
 
   personRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
+  msgIconBtn: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: C.primaryLight + '18',
+    alignItems: 'center', justifyContent: 'center',
+  },
   avatar: { width: 44, height: 44, borderRadius: 22 },
   avatarPH: { backgroundColor: C.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
   personName: { fontSize: FONT_SIZE.md, fontWeight: '700', color: C.text },

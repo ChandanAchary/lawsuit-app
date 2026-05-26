@@ -706,6 +706,21 @@ export const LawyerDetailScreen: React.FC<{ navigation: any; route: any }> = ({ 
             <Ionicons name="arrow-back" size={24} color={COLORS.white} />
           </TouchableOpacity>
 
+          {/* Message this lawyer — opens the 1:1 chat thread. Lets a client
+              ask a question before (or after) booking a consultation. */}
+          {lawyer.id && (
+            <TouchableOpacity
+              style={styles.headerMsgBtn}
+              onPress={() => navigation.navigate('ChatScreen', {
+                otherUserId: lawyer.id,
+                name: lawyer.name,
+                otherUser: { id: lawyer.id, name: lawyer.name, avatarUrl: lawyer.avatar },
+              })}
+            >
+              <Ionicons name="chatbubble-ellipses-outline" size={22} color={COLORS.white} />
+            </TouchableOpacity>
+          )}
+
           <View style={styles.profileSection}>
             {lawyer.avatar ? (
               <Image source={{ uri: lawyer.avatar }} style={styles.avatar} />
@@ -1218,6 +1233,18 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  headerMsgBtn: {
+    position: 'absolute',
+    right: SPACING.xl,
+    top: SPACING.huge + 10,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 5,
   },
   profileSection: { alignItems: 'center', marginTop: SPACING.xl },
   avatar: { width: 90, height: 90, borderRadius: 45, borderWidth: 3, borderColor: 'rgba(255,255,255,0.3)' },

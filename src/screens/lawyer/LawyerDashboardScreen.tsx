@@ -179,6 +179,9 @@ export const LawyerDashboardScreen: React.FC<{ navigation: any }> = ({ navigatio
             <Text style={styles.name}>{displayName} ⚖️</Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <TouchableOpacity style={styles.alertBtn} onPress={() => navigation.navigate('Calendar')}>
+              <Ionicons name="calendar-outline" size={20} color={COLORS.white} />
+            </TouchableOpacity>
             <TouchableOpacity style={styles.alertBtn} onPress={() => navigation.navigate('Notifications')}>
               <Ionicons name="notifications-outline" size={20} color={COLORS.white} />
             </TouchableOpacity>

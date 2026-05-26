@@ -164,6 +164,8 @@ export const CourtAdminProfileScreen: React.FC<{ navigation: any }> = ({ navigat
         <View style={{ width: 28 }} />
       </View>
       <View style={styles.card}>
+        <MenuItem icon="cash-outline" label="My Salary" onPress={() => navigation.navigate('MySalary')} styles={styles} COLORS={COLORS} />
+        <MenuItem icon="card-outline" label="Bank & UPI Accounts" onPress={() => navigation.navigate('BankAccounts')} styles={styles} COLORS={COLORS} />
         <MenuItem icon="notifications-outline" label="Notifications" onPress={() => navigation.navigate('Notifications')} styles={styles} COLORS={COLORS} />
         <MenuItem icon="shield-checkmark-outline" label="Security & Account" onPress={() => navigation.navigate('Security')} styles={styles} COLORS={COLORS} />
         <MenuItem icon="help-circle-outline" label="Help Center" onPress={() => navigation.navigate('HelpCenter')} styles={styles} COLORS={COLORS} />

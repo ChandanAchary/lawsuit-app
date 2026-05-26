@@ -119,6 +119,8 @@ import { MediationRoomScreen } from '../screens/shared/MediationRoomScreen';
 import { MediatorSettingsScreen } from '../screens/lawyer/MediatorSettingsScreen';
 import { CallHistoryScreen } from '../screens/shared/CallHistoryScreen';
 import { DocumentAiScreen } from '../screens/shared/DocumentAiScreen';
+import { CalendarScreen } from '../screens/shared/CalendarScreen';
+import { DocumentPreviewScreen } from '../screens/shared/DocumentPreviewScreen';
 import { LegalUpdatesScreen } from '../screens/shared/LegalUpdatesScreen';
 import { ReportIssueScreen } from '../screens/shared/ReportIssueScreen';
 import { EkycStatusScreen } from '../screens/client/EkycStatusScreen';
@@ -419,6 +421,10 @@ export const MainStack = () => {
       <Stack.Screen name="Security" component={SecurityScreen} />
       <Stack.Screen name="AppointmentDetail" component={AppointmentDetailScreen as ComponentType<any>} />
       <Stack.Screen name="TeleLaw" component={TeleLawScreen} />
+      {/* Calendar — month view of appointments / org requests (all roles) */}
+      <Stack.Screen name="Calendar" component={CalendarScreen} />
+      {/* Universal document viewer (image / pdf / other) */}
+      <Stack.Screen name="DocumentPreview" component={DocumentPreviewScreen as ComponentType<any>} />
       {/* Payment History */}
       <Stack.Screen name="PaymentHistory" component={PaymentHistoryScreen} />
       <Stack.Screen name="CallHistory" component={CallHistoryScreen} />
