@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { ComponentType } from 'react';
-import { Platform } from 'react-native';
+import { Platform, View, Pressable, Text, Keyboard } from 'react-native';
 import { FONT_SIZE } from '../constants';
 import { UserRole } from '../types';
 import { useAuthStore } from '../stores/authStore';
@@ -125,9 +125,13 @@ import { LegalUpdatesScreen } from '../screens/shared/LegalUpdatesScreen';
 import { ReportIssueScreen } from '../screens/shared/ReportIssueScreen';
 import { EkycStatusScreen } from '../screens/client/EkycStatusScreen';
 import { EkycAadhaarScreen } from '../screens/client/EkycAadhaarScreen';
+import { SignDocumentScreen } from '../screens/shared/SignDocumentScreen';
 
 const Stack = createNativeStackNavigator();
-const Tab = createBottomTabNavigator();
+// MaterialTopTabs is backed by react-native-pager-view, giving native, UI-thread
+// driven horizontal swiping at 60fps. We position it at the bottom and supply a
+// custom floating tab bar so the look matches the previous bottom-tab design.
+const TopTab = createMaterialTopTabNavigator();
 
 const getFloatingTabBarStyle = (isDark: boolean) => ({
   position: 'absolute' as const,
@@ -166,194 +170,166 @@ export const AuthStack = () => (
   </Stack.Navigator>
 );
 
-// ─── Client Tab Navigator ───────────────────────────────
-const ClientTabs = () => {
+// ─── Swipeable role tabs ────────────────────────────────
+// One reusable factory drives every role's tab bar so swipe behaviour + the
+// floating-pill look stay identical across Client / Lawyer / Admin / Court /
+// Organization. Tap AND horizontal swipe both move between tabs, kept in sync
+// by the shared navigation state.
+type TabItem = {
+  name: string;
+  component: ComponentType<any>;
+  label: string;
+  icon: (focused: boolean) => string;
+};
+
+// Custom floating tab bar — reads the MaterialTopTab navigation state so it
+// updates the moment a swipe settles, and emits the same `tabPress` event a
+// normal tab bar would (so screens relying on it keep working).
+const FloatingTabBar = ({
+  state,
+  navigation,
+  items,
+}: {
+  state: any;
+  navigation: any;
+  items: TabItem[];
+}) => {
   const C = useColors();
   const isDark = useThemeStore((s) => s.isDark);
+
+  // Mirror the old bottom-tab `tabBarHideOnKeyboard` so the floating bar doesn't
+  // sit on top of the keyboard while typing in a tab screen.
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  useEffect(() => {
+    const showEvt = Platform.OS === 'android' ? 'keyboardDidShow' : 'keyboardWillShow';
+    const hideEvt = Platform.OS === 'android' ? 'keyboardDidHide' : 'keyboardWillHide';
+    const show = Keyboard.addListener(showEvt, () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener(hideEvt, () => setKeyboardVisible(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+  if (keyboardVisible) return null;
+
   return (
-    <Tab.Navigator
-      safeAreaInsets={{ bottom: 0 }}
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarActiveTintColor: C.primary,
-        tabBarInactiveTintColor: isDark ? 'rgba(210,217,230,0.88)' : C.textMuted,
-        tabBarActiveBackgroundColor: 'transparent',
-        tabBarLabelStyle: { fontSize: FONT_SIZE.xs - 1, fontWeight: '700', marginTop: 0 },
-        tabBarIconStyle: { marginBottom: -1 },
-        tabBarItemStyle: { paddingHorizontal: 0, borderRadius: 22, marginHorizontal: 2 },
-        tabBarStyle: getFloatingTabBarStyle(isDark),
-        tabBarHideOnKeyboard: true,
-        tabBarIcon: ({ focused, color }) => {
-          const icons: Record<string, string> = {
-            Home: focused ? 'home' : 'home-outline',
-            Search: focused ? 'search' : 'search-outline',
-            Appointments: focused ? 'calendar' : 'calendar-outline',
-            Cases: focused ? 'briefcase' : 'briefcase-outline',
-            Chats: focused ? 'chatbubbles' : 'chatbubbles-outline',
-            Profile: focused ? 'person' : 'person-outline',
-          };
-          return <Ionicons name={icons[route.name] as any} size={22} color={color} />;
-        },
-      })}
+    <View
+      style={[
+        getFloatingTabBarStyle(isDark),
+        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around' },
+      ]}
     >
-      <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Search" component={SearchScreen} />
-      <Tab.Screen name="Appointments" component={AppointmentsScreen} />
-      <Tab.Screen name="Cases" component={CasesScreen} />
-      <Tab.Screen name="Chats" component={ChatListScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
-    </Tab.Navigator>
+      {state.routes.map((route: any, index: number) => {
+        const item = items.find((t) => t.name === route.name);
+        if (!item) return null;
+        const focused = state.index === index;
+        const color = focused ? C.primary : isDark ? 'rgba(210,217,230,0.88)' : C.textMuted;
+        const onPress = () => {
+          const event = navigation.emit({
+            type: 'tabPress',
+            target: route.key,
+            canPreventDefault: true,
+          });
+          if (!focused && !event.defaultPrevented) {
+            navigation.navigate(route.name);
+          }
+        };
+        return (
+          <Pressable
+            key={route.key}
+            accessibilityRole="button"
+            accessibilityState={focused ? { selected: true } : {}}
+            onPress={onPress}
+            android_ripple={{ color: 'rgba(0,0,0,0.06)', borderless: true }}
+            style={{
+              flex: 1,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 22,
+              marginHorizontal: 2,
+              paddingVertical: 4,
+            }}
+          >
+            <Ionicons name={item.icon(focused) as any} size={22} color={color} />
+            <Text
+              numberOfLines={1}
+              style={{ color, fontSize: FONT_SIZE.xs - 1, fontWeight: '700', marginTop: 2 }}
+            >
+              {item.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 };
 
-// ─── Lawyer Tab Navigator ───────────────────────────────
-const LawyerTabs = () => {
-  const C = useColors();
-  const isDark = useThemeStore((s) => s.isDark);
-  return (
-    <Tab.Navigator
-      safeAreaInsets={{ bottom: 0 }}
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarActiveTintColor: C.primary,
-        tabBarInactiveTintColor: isDark ? 'rgba(210,217,230,0.88)' : C.textMuted,
-        tabBarActiveBackgroundColor: 'transparent',
-        tabBarLabelStyle: { fontSize: FONT_SIZE.xs - 1, fontWeight: '700', marginTop: 0 },
-        tabBarIconStyle: { marginBottom: -1 },
-        tabBarItemStyle: { paddingHorizontal: 0, borderRadius: 22, marginHorizontal: 2 },
-        tabBarStyle: getFloatingTabBarStyle(isDark),
-        tabBarHideOnKeyboard: true,
-        tabBarIcon: ({ focused, color }) => {
-          const icons: Record<string, string> = {
-            Dashboard: focused ? 'grid' : 'grid-outline',
-            LawyerAppointments: focused ? 'calendar' : 'calendar-outline',
-            LawyerCases: focused ? 'briefcase' : 'briefcase-outline',
-            LawyerChats: focused ? 'chatbubbles' : 'chatbubbles-outline',
-            LawyerProfile: focused ? 'person' : 'person-outline',
-          };
-          return <Ionicons name={icons[route.name] as any} size={22} color={color} />;
-        },
-      })}
+const makeSwipeableTabs = (items: TabItem[]) => {
+  const SwipeableTabs = () => (
+    <TopTab.Navigator
+      tabBarPosition="bottom"
+      tabBar={(props) => <FloatingTabBar {...(props as any)} items={items} />}
+      screenOptions={{
+        swipeEnabled: true,
+        animationEnabled: true,
+        // Render the focused tab + its immediate neighbour so a swipe reveals a
+        // ready screen (smooth) without eagerly mounting every tab on launch.
+        lazy: true,
+        lazyPreloadDistance: 1,
+      }}
     >
-      <Tab.Screen name="Dashboard" component={LawyerDashboardScreen} />
-      <Tab.Screen name="LawyerAppointments" component={LawyerAppointmentsScreen} options={{ title: 'Appointments' }} />
-      <Tab.Screen name="LawyerCases" component={LawyerCasesScreen} options={{ title: 'Cases' }} />
-      <Tab.Screen name="LawyerChats" component={ChatListScreen} options={{ title: 'Chats' }} />
-      <Tab.Screen name="LawyerProfile" component={LawyerProfileScreen} options={{ title: 'Profile' }} />
-    </Tab.Navigator>
+      {items.map((it) => (
+        <TopTab.Screen key={it.name} name={it.name} component={it.component} />
+      ))}
+    </TopTab.Navigator>
   );
+  return SwipeableTabs;
 };
 
-// ─── Admin Tab Navigator ────────────────────────────────
-const AdminTabs = () => {
-  const C = useColors();
-  const isDark = useThemeStore((s) => s.isDark);
-  return (
-    <Tab.Navigator
-      safeAreaInsets={{ bottom: 0 }}
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarActiveTintColor: C.primary,
-        tabBarInactiveTintColor: isDark ? 'rgba(210,217,230,0.88)' : C.textMuted,
-        tabBarActiveBackgroundColor: 'transparent',
-        tabBarLabelStyle: { fontSize: FONT_SIZE.xs - 1, fontWeight: '700', marginTop: 0 },
-        tabBarIconStyle: { marginBottom: -1 },
-        tabBarItemStyle: { paddingHorizontal: 0, borderRadius: 22, marginHorizontal: 2 },
-        tabBarStyle: getFloatingTabBarStyle(isDark),
-        tabBarHideOnKeyboard: true,
-        tabBarIcon: ({ focused, color }) => {
-          const icons: Record<string, string> = {
-            AdminDashboard: focused ? 'shield-checkmark' : 'shield-checkmark-outline',
-            AdminUsers: focused ? 'people' : 'people-outline',
-            AdminOperations: focused ? 'cash' : 'cash-outline',
-            AdminPlatform: focused ? 'grid' : 'grid-outline',
-          };
-          return <Ionicons name={icons[route.name] as any} size={22} color={color} />;
-        },
-      })}
-    >
-      <Tab.Screen name="AdminDashboard" component={AdminDashboardScreen} options={{ title: 'Dashboard' }} />
-      <Tab.Screen name="AdminUsers" component={AdminUsersScreen} options={{ title: 'Users' }} />
-      <Tab.Screen name="AdminOperations" component={AdminOperationsScreen} options={{ title: 'Operations' }} />
-      {/* Profile moved out of the tab bar; it's reachable from the
-          dashboard's top-right header button. The Platform tab now hosts
-          the People / Courts / Content / Platform menus. */}
-      <Tab.Screen name="AdminPlatform" component={AdminPlatformScreen} options={{ title: 'Platform' }} />
-    </Tab.Navigator>
-  );
-};
+// ─── Per-role tab configs ───────────────────────────────
+const CLIENT_TABS: TabItem[] = [
+  { name: 'Home', component: HomeScreen, label: 'Home', icon: (f) => (f ? 'home' : 'home-outline') },
+  { name: 'Search', component: SearchScreen, label: 'Search', icon: (f) => (f ? 'search' : 'search-outline') },
+  { name: 'Appointments', component: AppointmentsScreen, label: 'Appointments', icon: (f) => (f ? 'calendar' : 'calendar-outline') },
+  { name: 'Cases', component: CasesScreen, label: 'Cases', icon: (f) => (f ? 'briefcase' : 'briefcase-outline') },
+  { name: 'Chats', component: ChatListScreen, label: 'Chats', icon: (f) => (f ? 'chatbubbles' : 'chatbubbles-outline') },
+  { name: 'Profile', component: ProfileScreen, label: 'Profile', icon: (f) => (f ? 'person' : 'person-outline') },
+];
 
-// ─── Court Admin Tab Navigator ──────────────────────────
-const CourtAdminTabs = () => {
-  const C = useColors();
-  const isDark = useThemeStore((s) => s.isDark);
-  return (
-    <Tab.Navigator
-      safeAreaInsets={{ bottom: 0 }}
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarActiveTintColor: C.primary,
-        tabBarInactiveTintColor: isDark ? 'rgba(210,217,230,0.88)' : C.textMuted,
-        tabBarActiveBackgroundColor: 'transparent',
-        tabBarLabelStyle: { fontSize: FONT_SIZE.xs - 1, fontWeight: '700', marginTop: 0 },
-        tabBarIconStyle: { marginBottom: -1 },
-        tabBarItemStyle: { paddingHorizontal: 0, borderRadius: 22, marginHorizontal: 2 },
-        tabBarStyle: getFloatingTabBarStyle(isDark),
-        tabBarHideOnKeyboard: true,
-        tabBarIcon: ({ focused, color }) => {
-          const icons: Record<string, string> = {
-            CourtAdminDashboard: focused ? 'shield-checkmark' : 'shield-checkmark-outline',
-            LawyerVerification: focused ? 'checkmark-done-circle' : 'checkmark-done-circle-outline',
-            OrgVerification: focused ? 'business' : 'business-outline',
-            CourtAdminProfile: focused ? 'person' : 'person-outline',
-          };
-          return <Ionicons name={icons[route.name] as any} size={22} color={color} />;
-        },
-      })}
-    >
-      <Tab.Screen name="CourtAdminDashboard" component={CourtAdminDashboardScreen} options={{ title: 'Dashboard' }} />
-      <Tab.Screen name="LawyerVerification" component={LawyerVerificationScreen} options={{ title: 'Lawyers' }} />
-      <Tab.Screen name="OrgVerification" component={OrgVerificationScreen} options={{ title: 'Orgs' }} />
-      <Tab.Screen name="CourtAdminProfile" component={CourtAdminProfileScreen} options={{ title: 'Profile' }} />
-    </Tab.Navigator>
-  );
-};
+const LAWYER_TABS: TabItem[] = [
+  { name: 'Dashboard', component: LawyerDashboardScreen, label: 'Dashboard', icon: (f) => (f ? 'grid' : 'grid-outline') },
+  { name: 'LawyerAppointments', component: LawyerAppointmentsScreen, label: 'Appointments', icon: (f) => (f ? 'calendar' : 'calendar-outline') },
+  { name: 'LawyerCases', component: LawyerCasesScreen, label: 'Cases', icon: (f) => (f ? 'briefcase' : 'briefcase-outline') },
+  { name: 'LawyerChats', component: ChatListScreen, label: 'Chats', icon: (f) => (f ? 'chatbubbles' : 'chatbubbles-outline') },
+  { name: 'LawyerProfile', component: LawyerProfileScreen, label: 'Profile', icon: (f) => (f ? 'person' : 'person-outline') },
+];
 
-// ─── Organization Tab Navigator ─────────────────────────
-const OrgTabs = () => {
-  const C = useColors();
-  const isDark = useThemeStore((s) => s.isDark);
-  return (
-    <Tab.Navigator
-      safeAreaInsets={{ bottom: 0 }}
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarActiveTintColor: C.primary,
-        tabBarInactiveTintColor: isDark ? 'rgba(210,217,230,0.88)' : C.textMuted,
-        tabBarActiveBackgroundColor: 'transparent',
-        tabBarLabelStyle: { fontSize: FONT_SIZE.xs - 1, fontWeight: '700', marginTop: 0 },
-        tabBarIconStyle: { marginBottom: -1 },
-        tabBarItemStyle: { paddingHorizontal: 0, borderRadius: 22, marginHorizontal: 2 },
-        tabBarStyle: getFloatingTabBarStyle(isDark),
-        tabBarHideOnKeyboard: true,
-        tabBarIcon: ({ focused, color }) => {
-          const icons: Record<string, string> = {
-            OrgDashboard: focused ? 'grid' : 'grid-outline',
-            OrgRequests: focused ? 'calendar' : 'calendar-outline',
-            OrgLawyers: focused ? 'people' : 'people-outline',
-            OrgProfile: focused ? 'person' : 'person-outline',
-          };
-          return <Ionicons name={icons[route.name] as any} size={22} color={color} />;
-        },
-      })}
-    >
-      <Tab.Screen name="OrgDashboard" component={OrgDashboardScreen} options={{ title: 'Dashboard' }} />
-      <Tab.Screen name="OrgRequests" component={OrgRequestsScreen} options={{ title: 'Requests' }} />
-      <Tab.Screen name="OrgLawyers" component={OrgLawyersScreen} options={{ title: 'Lawyers' }} />
-      <Tab.Screen name="OrgProfile" component={OrgProfileScreen} options={{ title: 'Profile' }} />
-    </Tab.Navigator>
-  );
-};
+const ADMIN_TABS: TabItem[] = [
+  { name: 'AdminDashboard', component: AdminDashboardScreen, label: 'Dashboard', icon: (f) => (f ? 'shield-checkmark' : 'shield-checkmark-outline') },
+  { name: 'AdminUsers', component: AdminUsersScreen, label: 'Users', icon: (f) => (f ? 'people' : 'people-outline') },
+  { name: 'AdminOperations', component: AdminOperationsScreen, label: 'Operations', icon: (f) => (f ? 'cash' : 'cash-outline') },
+  { name: 'AdminPlatform', component: AdminPlatformScreen, label: 'Platform', icon: (f) => (f ? 'grid' : 'grid-outline') },
+];
+
+const COURT_ADMIN_TABS: TabItem[] = [
+  { name: 'CourtAdminDashboard', component: CourtAdminDashboardScreen, label: 'Dashboard', icon: (f) => (f ? 'shield-checkmark' : 'shield-checkmark-outline') },
+  { name: 'LawyerVerification', component: LawyerVerificationScreen, label: 'Lawyers', icon: (f) => (f ? 'checkmark-done-circle' : 'checkmark-done-circle-outline') },
+  { name: 'OrgVerification', component: OrgVerificationScreen, label: 'Orgs', icon: (f) => (f ? 'business' : 'business-outline') },
+  { name: 'CourtAdminProfile', component: CourtAdminProfileScreen, label: 'Profile', icon: (f) => (f ? 'person' : 'person-outline') },
+];
+
+const ORG_TABS: TabItem[] = [
+  { name: 'OrgDashboard', component: OrgDashboardScreen, label: 'Dashboard', icon: (f) => (f ? 'grid' : 'grid-outline') },
+  { name: 'OrgRequests', component: OrgRequestsScreen, label: 'Requests', icon: (f) => (f ? 'calendar' : 'calendar-outline') },
+  { name: 'OrgLawyers', component: OrgLawyersScreen, label: 'Lawyers', icon: (f) => (f ? 'people' : 'people-outline') },
+  { name: 'OrgProfile', component: OrgProfileScreen, label: 'Profile', icon: (f) => (f ? 'person' : 'person-outline') },
+];
+
+const ClientTabs = makeSwipeableTabs(CLIENT_TABS);
+const LawyerTabs = makeSwipeableTabs(LAWYER_TABS);
+const AdminTabs = makeSwipeableTabs(ADMIN_TABS);
+const CourtAdminTabs = makeSwipeableTabs(COURT_ADMIN_TABS);
+const OrgTabs = makeSwipeableTabs(ORG_TABS);
 
 // ─── Role-based Main Navigator ──────────────────────────
 const getRoleTabs = (role: UserRole | string) => {
@@ -431,6 +407,9 @@ export const MainStack = () => {
       <Stack.Screen name="DocumentAi" component={DocumentAiScreen} />
       <Stack.Screen name="LegalUpdates" component={LegalUpdatesScreen} />
       <Stack.Screen name="ReportIssue" component={ReportIssueScreen} />
+      {/* OTP-based document signing (reached from a SIGNATURE_REQUESTED
+          notification or a "Sign" CTA with { signatureRequestId }). */}
+      <Stack.Screen name="SignDocument" component={SignDocumentScreen} />
       {/* eKYC (Aadhaar identity verification — CLIENT only) */}
       <Stack.Screen name="EkycStatus" component={EkycStatusScreen} />
       <Stack.Screen name="EkycAadhaar" component={EkycAadhaarScreen} />

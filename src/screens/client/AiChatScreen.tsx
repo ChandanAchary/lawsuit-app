@@ -1,21 +1,14 @@
-import {  useThemeStore , useColors } from '../../stores/themeStore';
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { useThemeStore, useColors } from '../../stores/themeStore';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
-import { modelChatApi } from '../../services/api';
 import Markdown from 'react-native-markdown-display';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../../stores/authStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-interface Message {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-}
+import { useLegalEagleStore, LEMessage } from '../../stores/legalEagleStore';
 
 const SUGGESTIONS = [
   'What are my rights as a tenant?',
@@ -24,99 +17,31 @@ const SUGGESTIONS = [
   'What is bail and how to apply?',
 ];
 
-const AI_CHAT_HISTORY_KEY_PREFIX = 'ai_chat_history_v1';
-const MAX_HISTORY_MESSAGES = 100;
-
 export const AiChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const isDark = useThemeStore((s: any) => s.isDark);
-  const userId = useAuthStore((s: any) => s.user?.id ?? 'guest');
+  const userId = useAuthStore((s: any) => s.user?.id ?? null);
   const COLORS = useColors();
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
   const markdownStyles = React.useMemo(() => getMarkdownStyles(COLORS), [isDark]);
-  const historyKey = `${AI_CHAT_HISTORY_KEY_PREFIX}:${userId}`;
   const insets = useSafeAreaInsets();
 
-  const [messages, setMessages] = useState<Message[]>([]);
+  // Shared store — the SAME conversation history as the floating Legal Eagle
+  // FAB, so the full-screen view and the widget stay perfectly in sync.
+  const { messages, loading, hydrate, send } = useLegalEagleStore();
   const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [historyReady, setHistoryReady] = useState(false);
   const flatRef = useRef<FlatList>(null);
-  const messagesRef = useRef<Message[]>([]);
 
   useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
+    void hydrate(userId);
+  }, [userId, hydrate]);
 
-  useEffect(() => {
-    let mounted = true;
-    const loadHistory = async () => {
-      try {
-        const raw = await AsyncStorage.getItem(historyKey);
-        if (!mounted) return;
-        if (!raw) {
-          setMessages([]);
-          return;
-        }
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          const sanitized = parsed
-            .filter((m: any) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
-            .slice(-MAX_HISTORY_MESSAGES);
-          setMessages(sanitized);
-        } else {
-          setMessages([]);
-        }
-      } catch {
-        setMessages([]);
-      } finally {
-        if (mounted) setHistoryReady(true);
-      }
-    };
-
-    setHistoryReady(false);
-    loadHistory();
-    return () => {
-      mounted = false;
-    };
-  }, [historyKey]);
-
-  useEffect(() => {
-    if (!historyReady) return;
-    AsyncStorage.setItem(historyKey, JSON.stringify(messages.slice(-MAX_HISTORY_MESSAGES))).catch(() => {});
-  }, [historyReady, historyKey, messages]);
-
-  const sendMessage = useCallback(async (text: string) => {
+  const sendMessage = (text: string) => {
     if (!text.trim() || loading) return;
-    const userMsg: Message = { id: Date.now().toString(), role: 'user', content: text.trim() };
-    const nextHistory = [...messagesRef.current, userMsg].slice(-MAX_HISTORY_MESSAGES);
-    messagesRef.current = nextHistory;
-    setMessages(nextHistory);
     setInput('');
-    setLoading(true);
-    try {
-      const history = nextHistory.map((m) => ({ role: m.role, content: m.content }));
-      const { data } = await modelChatApi.chatCompletion(history);
-      const assistantMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: data.response || data.message || data.reply || 'I could not generate a response.',
-      };
-      setMessages((prev) => {
-        const updated = [...prev, assistantMsg].slice(-MAX_HISTORY_MESSAGES);
-        messagesRef.current = updated;
-        return updated;
-      });
-    } catch {
-      setMessages((prev) => [
-        ...prev.slice(-(MAX_HISTORY_MESSAGES - 1)),
-        { id: (Date.now() + 1).toString(), role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' },
-      ]);
-    } finally {
-      setLoading(false);
-    }
-  }, [loading]);
+    void send(text);
+  };
 
-  const renderMessage = ({ item }: { item: Message }) => {
+  const renderMessage = ({ item }: { item: LEMessage }) => {
     const isUser = item.role === 'user';
     return (
       <View style={[styles.bubble, isUser ? styles.userBubble : styles.aiBubble]}>

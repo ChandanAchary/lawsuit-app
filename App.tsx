@@ -1,5 +1,5 @@
 import './src/utils/debugTextError';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import {
   View,
@@ -20,6 +20,8 @@ import { COLORS } from './src/constants';
 import { useNotificationStore } from './src/stores/notificationStore';
 import { useActiveCallStore } from './src/stores/activeCallStore';
 import { AuthStack, MainStack } from './src/navigation';
+import { DpdpConsentGate } from './src/components/DpdpConsentGate';
+import { LegalEagleFAB } from './src/components/LegalEagleFAB';
 import { requestAllPermissions } from './src/utils/permissions';
 import { socketService } from './src/services/socket';
 import { initRuntimeApiConfig } from './src/services/runtimeApiConfig';
@@ -83,6 +85,10 @@ export default function App() {
   const { initSocketListeners, fetchUnreadCount } = useNotificationStore();
   const [isReady, setIsReady] = useState(false);
   const [incomingCall, setIncomingCall] = useState<IncomingCall | null>(null);
+  // The Legal Eagle FAB shows only on the main tab screens. When a stack
+  // screen is pushed on top (LawyerDetail, Chat, VideoCall, …) the root route
+  // is no longer "MainTabs" and the FAB animates out.
+  const [onTabScreen, setOnTabScreen] = useState(true);
   const initTheme = useThemeStore(state => state.init);
   const isDark = useThemeStore(state => state.isDark);
   const mode = useThemeStore(state => state.mode);
@@ -269,9 +275,22 @@ export default function App() {
     });
   };
 
+  // Recompute FAB visibility from the navigation state. The root navigator is
+  // a stack whose first route is "MainTabs" (the bottom-tab navigator); once
+  // any other screen is pushed, the root route name changes and we hide the FAB.
+  const syncFabVisibility = useCallback(() => {
+    try {
+      const rootState = navigationRef.getRootState();
+      const name = rootState?.routes?.[rootState.index]?.name;
+      setOnTabScreen(name === 'MainTabs');
+    } catch {
+      setOnTabScreen(false);
+    }
+  }, []);
+
   if (!isReady) {
     return (
-      <View style={styles.splashScreen}> 
+      <View style={styles.splashScreen}>
         <Image source={require('./assets/splash-icon.png')} style={styles.splashLogo} resizeMode="contain" />
         <Text style={styles.splashBrand}>NyayaX</Text>
         <ActivityIndicator size="small" color={COLORS.textSecondary} style={styles.splashLoader} />
@@ -282,11 +301,23 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={styles.appRoot}>
-        <NavigationContainer ref={navigationRef} linking={linking} theme={navTheme}>
+        <NavigationContainer
+          ref={navigationRef}
+          linking={linking}
+          theme={navTheme}
+          onReady={syncFabVisibility}
+          onStateChange={syncFabVisibility}
+        >
           <StatusBar style={isDark ? 'light' : 'dark'} />
           {isAuthenticated ? <MainStack /> : <AuthStack />}
         </NavigationContainer>
+        {/* Floating Legal Eagle AI assistant — shown only on the main tab
+            screens (hidden on pushed stack screens), animated in/out. Shares
+            history with the full-screen AI chat. */}
+        {isAuthenticated && <LegalEagleFAB visible={onTabScreen} />}
       </View>
+      {/* First-login DPDP privacy-notice gate (blocking modal). */}
+      {isAuthenticated && <DpdpConsentGate />}
 
       <Modal visible={!!incomingCall} transparent animationType="fade" onRequestClose={rejectIncomingCall}>
         <View style={styles.callOverlay}>

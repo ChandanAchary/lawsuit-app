@@ -114,9 +114,18 @@ export const EkycStatusScreen: React.FC<{ navigation: any }> = ({ navigation }) 
                 <InfoRow label="Method" value={verifiedViaLabel(via)} styles={styles} />
                 <Text style={styles.helperText}>
                   {isTemp
-                    ? 'You verified via the temporary email-OTP path. Once Aadhaar verification is back online we may ask you to upgrade.'
+                    ? "You're verified via the temporary email-OTP path. Upgrade to full Aadhaar verification via DigiLocker for complete identity verification."
                     : 'Your identity is locked to your Aadhaar profile. You cannot change name, date of birth, or gender without contacting support.'}
                 </Text>
+                {isTemp && (
+                  <View style={{ marginTop: SPACING.lg }}>
+                    <Button
+                      title="Upgrade to Aadhaar verification"
+                      onPress={() => handleStart()}
+                      size="lg"
+                    />
+                  </View>
+                )}
               </View>
             );
           })()

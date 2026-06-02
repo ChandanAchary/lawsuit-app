@@ -141,6 +141,7 @@ export function resolveNotificationNavigationTarget(data: Record<string, unknown
   const mediationId = data.mediationId ? String(data.mediationId) : '';
   const inviteToken = data.token ? String(data.token) : '';
   const escalatedCaseId = data.escalatedCaseId ? String(data.escalatedCaseId) : '';
+  const signatureRequestId = data.signatureRequestId ? String(data.signatureRequestId) : '';
 
   switch (type) {
     case NotificationType.APPOINTMENT_BOOKED:
@@ -199,6 +200,12 @@ export function resolveNotificationNavigationTarget(data: Record<string, unknown
     case NotificationType.ORGANIZATION_VERIFIED:
     case NotificationType.ORGANIZATION_REJECTED:
       return { name: 'OrgProfile' };
+
+    // E-signature — server emits SIGNATURE_REQUESTED / SIGNATURE_COMPLETED
+    // with { signatureRequestId }. Both deep-link to the signing screen.
+    case 'SIGNATURE_REQUESTED':
+    case 'SIGNATURE_COMPLETED':
+      return signatureRequestId ? { name: 'SignDocument', params: { signatureRequestId } } : null;
 
     default:
       return null;

@@ -285,6 +285,11 @@ export const usersApi = {
   registerFcmToken: (token: string) => api.post('/users/fcm-token', { fcmToken: token }),
   removeFcmToken: (token: string) => api.delete('/users/fcm-token', { data: { fcmToken: token } }),
   getUserById: (id: string) => api.get(`/users/${encodeURIComponent(id)}`),
+  // DPDP (Digital Personal Data Protection Act, 2023) privacy-notice consent.
+  // GET returns { consented: boolean, text: string }; POST records the consent
+  // verbatim (idempotent). Mirrors the web's DpdpNoticeGate.
+  getDpdpConsentStatus: () => api.get('/consents/dpdp'),
+  recordDpdpConsent: () => api.post('/consents/dpdp', {}),
 };
 
 // ─── Chat API ───────────────────────────────────────────────
@@ -340,6 +345,18 @@ export const walletApi = {
 export const modelChatApi = {
   chatCompletion: (messages: { role: string; content: string }[]) =>
     api.post('/model/chat', { messages }),
+};
+
+// ─── E-signature API ────────────────────────────────────────
+// OTP-based document signing. Mirrors the web SignDocumentPage flow:
+// view request → send OTP → submit OTP to sign → download signed PDF.
+export const esignApi = {
+  getRequest: (id: string) => api.get(`/esign/requests/${encodeURIComponent(id)}`),
+  sendOtp: (id: string, partyId?: string) =>
+    api.post(`/esign/requests/${encodeURIComponent(id)}/send-otp`, { partyId }),
+  sign: (id: string, otp: string, partyId?: string) =>
+    api.post(`/esign/requests/${encodeURIComponent(id)}/sign`, { otp, partyId }),
+  signedUrl: (id: string) => api.get(`/esign/requests/${encodeURIComponent(id)}/signed-url`),
 };
 
 // ─── Agreement Templates API ────────────────────────────────
@@ -794,6 +811,16 @@ export const ekycApi = {
   initiateEmailOtp: () => api.post('/ekyc/email-otp/initiate', {}),
   submitEmailOtp: (submissionId: string, otp: string) =>
     api.post('/ekyc/email-otp/submit', { submissionId, otp }),
+
+  // DigiLocker (Surepass) — the active Aadhaar eKYC path. initiate returns
+  // { id, url, expiresAt, provider }; the user completes consent at `url`
+  // (opened via expo-web-browser), then complete is called with the
+  // submissionId (and/or the provider client_id parsed from the return URL).
+  // complete returns the verified client (ekycVerified, ekycVerifiedVia:
+  // 'AADHAAR', aadhaarName, aadhaarLast4, name, phone) or { pending: true }.
+  initiateDigilocker: () => api.post('/ekyc/digilocker/initiate', {}),
+  completeDigilocker: (params: { submissionId?: string; clientId?: string }) =>
+    api.post('/ekyc/digilocker/complete', params),
 };
 
 // ─── Reviews API ────────────────────────────────────────────

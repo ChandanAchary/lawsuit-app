@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as WebBrowser from 'expo-web-browser';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { useColors, useThemeStore } from '../../stores/themeStore';
 import { ekycApi } from '../../services/api';
@@ -61,6 +62,10 @@ export const EkycAadhaarScreen: React.FC<{ navigation: any; route: any }> = ({ n
   const [aadhaar, setAadhaar] = useState('');
   const [consent, setConsent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // When the active provider is Surepass DigiLocker, the redirect flow is the
+  // primary path (the legacy 12-digit Aadhaar-OTP form doesn't apply). Detected
+  // from GET /ekyc/status → provider.supportsDigilocker.
+  const [supportsDigilocker, setSupportsDigilocker] = useState(false);
 
   const [submissionId, setSubmissionId] = useState<string | null>(resumeSubmissionId ?? null);
   const [expiresAt, setExpiresAt] = useState<string | null>(resumeExpiresAt ?? null);
@@ -86,6 +91,22 @@ export const EkycAadhaarScreen: React.FC<{ navigation: any; route: any }> = ({ n
     }, 1000);
     return () => clearInterval(tick);
   }, [stage, expiresAt]);
+
+  // Detect whether the active eKYC provider supports the DigiLocker redirect
+  // flow so we can offer it as the primary path.
+  useEffect(() => {
+    let mounted = true;
+    ekycApi
+      .getStatus()
+      .then((resp) => {
+        const payload = resp.data?.data ?? resp.data;
+        if (mounted) setSupportsDigilocker(!!payload?.provider?.supportsDigilocker);
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleAadhaarChange = (text: string) => {
     // Strip non-digits and clamp at 12. Display formatter adds spaces for
@@ -116,6 +137,103 @@ export const EkycAadhaarScreen: React.FC<{ navigation: any; route: any }> = ({ n
       // Surfaces server-side errors directly: "Invalid Aadhaar", "Too many
       // OTP requests, try again in an hour", "eKYC already completed", etc.
       Alert.alert('Could not send OTP', formatErrorMessage(err) || 'Please try again');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Mirror a verified DigiLocker result onto the auth-store user, then exit to
+  // the status screen. complete may return { pending: true } while the one-time
+  // download finishes — retry a few times before falling back to manual retry.
+  const completeDigilocker = async (
+    params: { submissionId?: string; clientId?: string },
+    attempt = 0,
+  ): Promise<void> => {
+    try {
+      const { data } = await ekycApi.completeDigilocker(params);
+      const payload = data?.data ?? data;
+      if (payload?.pending) {
+        if (attempt < 3) {
+          await new Promise((r) => setTimeout(r, 2500));
+          return completeDigilocker(params, attempt + 1);
+        }
+        Alert.alert(
+          'Still processing',
+          'DigiLocker is still finalising your consent. Give it a few seconds and retry.',
+          [
+            { text: 'Retry', onPress: () => { void completeDigilocker(params, 0); } },
+            { text: 'Later', style: 'cancel' },
+          ],
+        );
+        return;
+      }
+      if (user && payload?.ekycVerified) {
+        setUser({
+          ...user,
+          ekycVerified: true,
+          ekycVerifiedAt: payload.ekycVerifiedAt,
+          ekycVerifiedVia: payload.ekycVerifiedVia ?? 'AADHAAR',
+          aadhaarLast4: payload.aadhaarLast4 ?? user.aadhaarLast4 ?? null,
+          aadhaarName: payload.aadhaarName ?? user.aadhaarName ?? null,
+          ...(payload.name ? { name: payload.name } : {}),
+          ...(payload.phone ? { phone: payload.phone } : {}),
+        });
+      }
+      Alert.alert(
+        'Verified',
+        payload?.aadhaarName
+          ? `Welcome, ${payload.aadhaarName}. Your identity has been verified.`
+          : 'Your identity has been verified.',
+        [{ text: 'OK', onPress: () => navigation.replace('EkycStatus') }],
+      );
+    } catch (err: any) {
+      const status = err?.response?.status;
+      if (status === 410) {
+        Alert.alert('Session expired', 'Your DigiLocker session expired. Please start verification again.');
+      } else if (status === 403) {
+        Alert.alert('Not eligible', formatErrorMessage(err) || 'You must be at least 18 to verify.');
+      } else {
+        Alert.alert('Verification failed', formatErrorMessage(err) || 'Please try again.');
+      }
+    }
+  };
+
+  const handleDigilocker = async () => {
+    if (!consent) {
+      Alert.alert('Consent required', 'Please confirm consent to continue with DigiLocker.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const { data } = await ekycApi.initiateDigilocker();
+      const payload = data?.data ?? data;
+      const url: string | undefined = payload?.url;
+      if (payload?.id) setSubmissionId(payload.id);
+      if (!url) throw new Error('No DigiLocker URL returned');
+
+      // Opens an in-app browser tab; returns to this same JS context (component
+      // state is preserved) with the provider's redirect URL on success.
+      const result = await WebBrowser.openAuthSessionAsync(url, 'nyayax://');
+      if (result.type === 'success' && result.url) {
+        // Parse client_id from the return URL without relying on URL/searchParams
+        // (RN's URL polyfill support is patchy).
+        const m = result.url.match(/[?&](?:client_id|clientId)=([^&]+)/i);
+        const clientId = m ? decodeURIComponent(m[1]) : undefined;
+        await completeDigilocker({ submissionId: payload.id, clientId });
+      } else {
+        // Dismissed/cancelled — consent may still have been granted before the
+        // tab closed, so try completing once; on failure the user can retry.
+        await completeDigilocker({ submissionId: payload.id });
+      }
+    } catch (err: any) {
+      const status = err?.response?.status;
+      if (status === 429) {
+        Alert.alert('Too many attempts', 'You started verification several times. Please wait a little and retry.');
+      } else if (status === 409) {
+        Alert.alert('Already verified', 'Your identity is already verified.');
+      } else {
+        Alert.alert("Couldn't start DigiLocker", formatErrorMessage(err) || 'Please try again.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -256,57 +374,103 @@ export const EkycAadhaarScreen: React.FC<{ navigation: any; route: any }> = ({ n
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         {stage === 'aadhaar' && (
           <>
-            <View style={styles.card}>
-              <Text style={styles.label}>Aadhaar Number</Text>
-              <TextInput
-                style={styles.aadhaarInput}
-                value={formatAadhaarDisplay(aadhaar)}
-                onChangeText={handleAadhaarChange}
-                placeholder="1234 5678 9012"
-                placeholderTextColor={COLORS.textMuted}
-                keyboardType="number-pad"
-                maxLength={14}
-                autoFocus
-              />
-
-              <TouchableOpacity
-                style={styles.consentRow}
-                activeOpacity={0.8}
-                onPress={() => setConsent((c) => !c)}
-              >
-                <View style={[styles.checkbox, consent && styles.checkboxOn]}>
-                  {consent && <Ionicons name="checkmark" size={14} color={COLORS.white} />}
+            {supportsDigilocker ? (
+              <View style={styles.card}>
+                <View style={styles.altHeader}>
+                  <View style={[styles.altIcon, { backgroundColor: COLORS.primary + '1A' }]}>
+                    <Ionicons name="shield-checkmark" size={18} color={COLORS.primary} />
+                  </View>
+                  <Text style={styles.label}>Verify with DigiLocker</Text>
                 </View>
-                <Text style={styles.consentText}>
-                  I authorise NyayaX to verify my identity through Aadhaar OTP. My Aadhaar number is hashed
-                  and never stored in full; only the last four digits are kept.
+                <Text style={styles.helperText}>
+                  Use the Government of India's DigiLocker to securely share your Aadhaar.
+                  Your full Aadhaar number is never stored — only the last four digits are kept.
                 </Text>
-              </TouchableOpacity>
 
-              <Button
-                title={submitting && path === 'AADHAAR' ? '' : 'Send OTP'}
-                onPress={handleInitiate}
-                loading={submitting && path === 'AADHAAR'}
-                size="lg"
-              />
+                <TouchableOpacity
+                  style={styles.consentRow}
+                  activeOpacity={0.8}
+                  onPress={() => setConsent((c) => !c)}
+                >
+                  <View style={[styles.checkbox, consent && styles.checkboxOn]}>
+                    {consent && <Ionicons name="checkmark" size={14} color={COLORS.white} />}
+                  </View>
+                  <Text style={styles.consentText}>
+                    I consent to share my Aadhaar details from DigiLocker with NyayaX for identity verification.
+                  </Text>
+                </TouchableOpacity>
 
-              {/* Mid-flow escape hatch — lets the user defer verification
-                  without needing to rotate through the OTP step. The user can
-                  always return via the Profile → Identity Verification tile. */}
-              <TouchableOpacity
-                onPress={() => navigation.navigate('EkycStatus')}
-                style={styles.skipBtn}
-              >
-                <Text style={styles.skipText}>Skip for now — verify later</Text>
-              </TouchableOpacity>
+                <Button
+                  title={submitting && path === 'AADHAAR' ? '' : 'Continue with DigiLocker'}
+                  onPress={handleDigilocker}
+                  loading={submitting && path === 'AADHAAR'}
+                  size="lg"
+                />
 
-              <Text style={styles.helperText}>
-                An OTP will be sent to the mobile number registered with this Aadhaar.
-              </Text>
-              <Text style={styles.poweredByText}>
-                Powered by <Text style={styles.poweredByName}>{ekycProviderLabel('sandbox')}</Text>
-              </Text>
-            </View>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('EkycStatus')}
+                  style={styles.skipBtn}
+                >
+                  <Text style={styles.skipText}>Skip for now — verify later</Text>
+                </TouchableOpacity>
+
+                <Text style={styles.poweredByText}>
+                  Powered by <Text style={styles.poweredByName}>DigiLocker</Text>
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.card}>
+                <Text style={styles.label}>Aadhaar Number</Text>
+                <TextInput
+                  style={styles.aadhaarInput}
+                  value={formatAadhaarDisplay(aadhaar)}
+                  onChangeText={handleAadhaarChange}
+                  placeholder="1234 5678 9012"
+                  placeholderTextColor={COLORS.textMuted}
+                  keyboardType="number-pad"
+                  maxLength={14}
+                  autoFocus
+                />
+
+                <TouchableOpacity
+                  style={styles.consentRow}
+                  activeOpacity={0.8}
+                  onPress={() => setConsent((c) => !c)}
+                >
+                  <View style={[styles.checkbox, consent && styles.checkboxOn]}>
+                    {consent && <Ionicons name="checkmark" size={14} color={COLORS.white} />}
+                  </View>
+                  <Text style={styles.consentText}>
+                    I authorise NyayaX to verify my identity through Aadhaar OTP. My Aadhaar number is hashed
+                    and never stored in full; only the last four digits are kept.
+                  </Text>
+                </TouchableOpacity>
+
+                <Button
+                  title={submitting && path === 'AADHAAR' ? '' : 'Send OTP'}
+                  onPress={handleInitiate}
+                  loading={submitting && path === 'AADHAAR'}
+                  size="lg"
+                />
+
+                {/* Mid-flow escape hatch — lets the user defer verification
+                    without needing to rotate through the OTP step. The user can
+                    always return via the Profile → Identity Verification tile. */}
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('EkycStatus')}
+                  style={styles.skipBtn}
+                >
+                  <Text style={styles.skipText}>Skip for now — verify later</Text>
+                </TouchableOpacity>
+
+                <Text style={styles.helperText}>
+                  An OTP will be sent to the mobile number registered with this Aadhaar.
+                </Text>
+                <Text style={styles.poweredByText}>
+                  Powered by <Text style={styles.poweredByName}>{ekycProviderLabel('sandbox')}</Text>
+                </Text>
+              </View>
+            )}
 
             {/* ── OR — Temporary alternative (email OTP) ─────────────────
                 Shown while the Aadhaar provider API key is not yet active.
