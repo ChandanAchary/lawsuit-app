@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { NavigationContainer, LinkingOptions, DefaultTheme, DarkTheme, Theme, createNavigationContainerRef } from '@react-navigation/native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from './src/stores/authStore';
 import { useThemeStore, DARK_COLORS } from './src/stores/themeStore';
@@ -300,6 +301,7 @@ export default function App() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
       <View style={styles.appRoot}>
         <NavigationContainer
           ref={navigationRef}
@@ -341,6 +343,7 @@ export default function App() {
           </View>
         </View>
       </Modal>
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }

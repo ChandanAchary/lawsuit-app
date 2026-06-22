@@ -271,7 +271,11 @@ export const ChatScreen: React.FC<{ navigation: any; route: any }> = ({ navigati
 
       <KeyboardAvoidingView
         style={styles.chatBody}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        // 'padding' on both platforms — the KAV lifts the input above the
+        // keyboard (same approach as the floating Legal Eagle popup). Under
+        // edge-to-edge the OS resize is unreliable; ChatTab collapses its bottom
+        // inset while the keyboard is open so the input sits flush above it.
+        behavior="padding"
         keyboardVerticalOffset={0}
       >
         {loading ? (

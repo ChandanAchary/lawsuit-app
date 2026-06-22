@@ -4,6 +4,7 @@ import { View, Text, StyleSheet, Dimensions, StatusBar, Animated } from 'react-n
 import { LinearGradient } from 'expo-linear-gradient';
 import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../../constants';
 import { Button } from '../../components/Button';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width, height } = Dimensions.get('window');
 
@@ -11,6 +12,7 @@ export const LandingScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
   const isDark = useThemeStore((s: any) => s.isDark);
   const COLORS = useColors();
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
+  const insets = useSafeAreaInsets();
 
   const pulseAnim1 = useRef(new Animated.Value(1)).current;
   const pulseAnim2 = useRef(new Animated.Value(1)).current;
@@ -93,7 +95,17 @@ export const LandingScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
         <Animated.View style={[styles.decorCircle, styles.circle2, { transform: [{ scale: pulseAnim2 }] }]} />
         <Animated.View style={[styles.decorCircle, styles.circle3, { transform: [{ scale: pulseAnim3 }] }]} />
 
-        <View style={styles.content}>
+        <View
+          style={[
+            styles.content,
+            {
+              // Respect the device's safe area so the bottom buttons clear the
+              // system nav bar and the logo clears the status bar / notch.
+              paddingTop: Math.max(height * 0.1, insets.top + SPACING.xl),
+              paddingBottom: insets.bottom + SPACING.xl,
+            },
+          ]}
+        >
           <View style={styles.logoSection}>
             <Animated.View style={[styles.logoContainer, { transform: [{ translateY: floatAnim }] }]}>
               <View style={styles.logoBg}>

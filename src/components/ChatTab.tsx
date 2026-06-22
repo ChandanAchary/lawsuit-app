@@ -47,7 +47,10 @@ export const ChatTab: React.FC<ChatTabProps> = ({ chatId, participants = [] }) =
   const flatListRef = useRef<FlatList>(null);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentUser = useAuthStore((s: any) => s.user);
-  const inputBottomInset = Math.max(insets.bottom, SPACING.sm);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  // Collapse the bottom safe-area inset while the keyboard is open so the input
+  // sits flush above the keyboard (WhatsApp-style); restore it on close.
+  const inputBottomInset = keyboardVisible ? SPACING.sm : Math.max(insets.bottom, SPACING.sm);
 
   const participantMap = React.useMemo(() => {
     const m = new Map<string, ChatParticipant>();
@@ -142,13 +145,17 @@ export const ChatTab: React.FC<ChatTabProps> = ({ chatId, participants = [] }) =
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
 
     const showSub = Keyboard.addListener(showEvent, () => {
+      setKeyboardVisible(true);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
     });
+    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
 
     return () => {
       showSub.remove();
+      hideSub.remove();
     };
   }, []);
 

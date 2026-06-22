@@ -8,6 +8,7 @@ import { FONT_SIZE } from '../constants';
 import { UserRole } from '../types';
 import { useAuthStore } from '../stores/authStore';
 import { useColors, useThemeStore } from '../stores/themeStore';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Auth screens
 import { LandingScreen } from '../screens/auth/LandingScreen';
@@ -133,11 +134,13 @@ const Stack = createNativeStackNavigator();
 // custom floating tab bar so the look matches the previous bottom-tab design.
 const TopTab = createMaterialTopTabNavigator();
 
-const getFloatingTabBarStyle = (isDark: boolean) => ({
+const getFloatingTabBarStyle = (isDark: boolean, bottomInset = 0) => ({
   position: 'absolute' as const,
   left: 14,
   right: 14,
-  bottom: 10 ,
+  // Lift above the device's bottom safe area (3-button nav / gesture / iOS home
+  // indicator) so the floating bar never collides with the system nav.
+  bottom: 10 + bottomInset,
   height: 72,
   borderTopWidth: 0,
   borderWidth: 0.8,
@@ -196,6 +199,7 @@ const FloatingTabBar = ({
 }) => {
   const C = useColors();
   const isDark = useThemeStore((s) => s.isDark);
+  const insets = useSafeAreaInsets();
 
   // Mirror the old bottom-tab `tabBarHideOnKeyboard` so the floating bar doesn't
   // sit on top of the keyboard while typing in a tab screen.
@@ -215,7 +219,7 @@ const FloatingTabBar = ({
   return (
     <View
       style={[
-        getFloatingTabBarStyle(isDark),
+        getFloatingTabBarStyle(isDark, insets.bottom),
         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around' },
       ]}
     >

@@ -1,7 +1,7 @@
 import { useThemeStore, useColors } from '../../stores/themeStore';
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform,
+  View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
@@ -29,7 +29,19 @@ export const AiChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   // FAB, so the full-screen view and the widget stay perfectly in sync.
   const { messages, loading, hydrate, send } = useLegalEagleStore();
   const [input, setInput] = useState('');
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const flatRef = useRef<FlatList>(null);
+
+  useEffect(() => {
+    const showEvt = Platform.OS === 'android' ? 'keyboardDidShow' : 'keyboardWillShow';
+    const hideEvt = Platform.OS === 'android' ? 'keyboardDidHide' : 'keyboardWillHide';
+    const showSub = Keyboard.addListener(showEvt, () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener(hideEvt, () => setKeyboardVisible(false));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   useEffect(() => {
     void hydrate(userId);
@@ -81,7 +93,10 @@ export const AiChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
       <KeyboardAvoidingView
         style={styles.chatBody}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        // 'padding' on both platforms — lift the input via the KAV (same as the
+        // floating Legal Eagle popup); the bottom inset collapses while the
+        // keyboard is open so the input sits flush above it.
+        behavior="padding"
         keyboardVerticalOffset={0}
       >
         {messages.length === 0 ? (
@@ -126,7 +141,7 @@ export const AiChatScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         )}
 
         {/* Input */}
-        <View style={[styles.inputBar, { paddingBottom: Math.max(SPACING.md, insets.bottom) }] }>
+        <View style={[styles.inputBar, { paddingBottom: keyboardVisible ? SPACING.md : Math.max(SPACING.md, insets.bottom) }] }>
           <TextInput
             style={styles.input}
             value={input}

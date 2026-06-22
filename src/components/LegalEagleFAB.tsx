@@ -9,11 +9,11 @@ import {
   ActivityIndicator,
   StyleSheet,
   KeyboardAvoidingView,
-  Platform,
   Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Markdown from 'react-native-markdown-display';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../stores/authStore';
 import { useColors } from '../stores/themeStore';
 import { useLegalEagleStore } from '../stores/legalEagleStore';
@@ -28,6 +28,7 @@ import { FONT_SIZE } from '../constants';
 export const LegalEagleFAB: React.FC<{ visible?: boolean }> = ({ visible = true }) => {
   const user = useAuthStore((s) => s.user);
   const C = useColors();
+  const insets = useSafeAreaInsets();
   const { messages, loading, open, setOpen, hydrate, send, clear } = useLegalEagleStore();
   const [input, setInput] = useState('');
   const scrollRef = useRef<ScrollView>(null);
@@ -70,7 +71,9 @@ export const LegalEagleFAB: React.FC<{ visible?: boolean }> = ({ visible = true 
           pointerEvents={visible ? 'auto' : 'none'}
           style={[
             styles.fab,
-            { backgroundColor: C.primary },
+            // Lift above the floating tab bar (bottom 10 + inset + 72 tall) so
+            // it never overlaps the system nav bar, on any device.
+            { backgroundColor: C.primary, bottom: 108 + insets.bottom },
             {
               opacity: appear,
               transform: [{ scale: appear.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }) }],
@@ -91,7 +94,9 @@ export const LegalEagleFAB: React.FC<{ visible?: boolean }> = ({ visible = true 
       <Modal visible={open} animationType="slide" transparent onRequestClose={() => setOpen(false)}>
         <View style={styles.overlay}>
           <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            // 'padding' on both platforms so the input lifts above the keyboard
+            // inside the Modal (Android Modals don't get the window's resize).
+            behavior="padding"
             style={styles.kav}
           >
             <View style={[styles.panel, { backgroundColor: C.background }]}>
@@ -233,7 +238,10 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   kav: {
-    width: '100%',
+    // Fill the overlay so the 85%-tall panel has a parent height to shrink
+    // against when 'padding' is added on keyboard open (keeps the input visible).
+    flex: 1,
+    justifyContent: 'flex-end',
   },
   panel: {
     height: '85%',
