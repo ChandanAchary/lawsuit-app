@@ -21,6 +21,7 @@ const FEATURES = [
   { icon: 'calendar', title: 'Appointments', desc: 'Manage consultations', route: 'Appointments', color: '#EF4444' },
   { icon: 'scale', title: 'Tele-Law', desc: 'Free legal aid eligibility', route: 'TeleLaw', color: '#8B5CF6' },
   { icon: 'business', title: 'Organizations', desc: 'Browse law firms', route: 'OrgList', color: '#0EA5E9' },
+  { icon: 'people-circle', title: 'Mediations', desc: 'Your mediation disputes', route: 'Mediations', color: '#7C3AED' },
   { icon: 'clipboard', title: 'Org Requests', desc: 'Track org appointments', route: 'ClientOrgRequests', color: '#EC4899' },
   { icon: 'newspaper', title: 'Legal Updates', desc: 'Latest law changes', route: 'LegalUpdates', color: '#0D9488' },
   { icon: 'bug', title: 'Report Issue', desc: 'Submit bugs or feedback', route: 'ReportIssue', color: '#DC2626' },
@@ -93,6 +94,12 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               <Text style={styles.heroSubtitle}>Find the best legal assistance</Text>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <TouchableOpacity
+              style={styles.alertIconBtn}
+              onPress={() => navigation.navigate('Calendar')}
+            >
+              <Ionicons name="calendar-outline" size={22} color={COLORS.primary} />
+            </TouchableOpacity>
             <TouchableOpacity
               style={styles.alertIconBtn}
               onPress={() => navigation.navigate('Notifications')}

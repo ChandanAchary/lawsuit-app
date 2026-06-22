@@ -2,7 +2,14 @@
   "permissions": {
     "allow": [
       "Bash(npx tsc *)",
-      "Bash(echo \"exit=$?\")"
+      "Bash(echo \"exit=$?\")",
+      "Bash(ls ../lawsuit-server/src/routes/)",
+      "Bash(grep -n \"model OrgAppointmentRequest\" -A 50 ../lawsuit-server/prisma/schema.prisma)",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(npx prisma *)",
+      "Bash(ls ../ 2>&1 | head -10)",
+      "Bash(node -e \"const p = require\\('./package.json'\\); const ks = Object.keys\\(p.dependencies\\); console.log\\(ks.filter\\(k => k.includes\\('chart'\\) || k.includes\\('svg'\\) || k.includes\\('victory'\\)\\).join\\('\\\\\\\\n'\\)\\);\")",
+      "PowerShell(Set-Location 'C:\\\\Users\\\\chand\\\\OneDrive\\\\Desktop\\\\NexusWS\\\\NyayaX\\\\lawsuit-server'; & npx tsc --noEmit 2>&1; \"EXIT=$LASTEXITCODE\")"
     ]
   }
 }

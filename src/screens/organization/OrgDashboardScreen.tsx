@@ -18,6 +18,13 @@ export const OrgDashboardScreen: React.FC<{ navigation: any }> = ({ navigation }
   const [org, setOrg] = useState<any>(null);
   const [lawyerCount, setLawyerCount] = useState(0);
   const [requestCount, setRequestCount] = useState(0);
+  // Two extra stats so the org head gets a fuller picture of routing
+  // performance — assignments made this calendar month, and assignments
+  // that the lawyer is still working through (not yet attended). Both
+  // derived from the same listOrgAppointmentRequests() response so we
+  // don't fan out to a second endpoint.
+  const [assignedThisMonth, setAssignedThisMonth] = useState(0);
+  const [activeAssignments, setActiveAssignments] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchDashboardData = useCallback(async () => {
@@ -31,9 +38,31 @@ export const OrgDashboardScreen: React.FC<{ navigation: any }> = ({ navigation }
       setOrg(orgRes.data.organization || orgRes.data);
       const lawyers = lawyersRes.data.lawyers || lawyersRes.data.items || lawyersRes.data || [];
       setLawyerCount(Array.isArray(lawyers) ? lawyers.length : 0);
-      const requests = requestsRes.data.requests || requestsRes.data.items || requestsRes.data || [];
-      const pendingReqs = Array.isArray(requests) ? requests.filter((r: any) => r.status === 'PENDING') : [];
-      setRequestCount(pendingReqs.length);
+      const requests: any[] = requestsRes.data.requests || requestsRes.data.items || requestsRes.data || [];
+      const list = Array.isArray(requests) ? requests : [];
+      setRequestCount(list.filter((r) => r.status === 'PENDING').length);
+
+      const monthStart = new Date();
+      monthStart.setDate(1);
+      monthStart.setHours(0, 0, 0, 0);
+      setAssignedThisMonth(
+        list.filter(
+          (r) =>
+            r.status === 'ASSIGNED' &&
+            r.updatedAt &&
+            new Date(r.updatedAt).getTime() >= monthStart.getTime(),
+        ).length,
+      );
+      // "Active" = assigned but the appointment hasn't been completed yet.
+      // We rely on the embedded appointment status when present; fall back
+      // to ASSIGNED state otherwise (org request hasn't progressed past it).
+      setActiveAssignments(
+        list.filter((r) => {
+          if (r.status !== 'ASSIGNED') return false;
+          const apptStatus = r.appointment?.status;
+          return !apptStatus || (apptStatus !== 'COMPLETED' && apptStatus !== 'CANCELLED');
+        }).length,
+      );
     } catch (err) {
       // Ignore
     }
@@ -116,6 +145,36 @@ export const OrgDashboardScreen: React.FC<{ navigation: any }> = ({ navigation }
         </TouchableOpacity>
       </View>
 
+      {/* Second row — assignment-flow telemetry. Distinguishes routing
+          throughput (Assigned this month) from the lawyers' current
+          workload (Active consultations). Both derived from the same
+          requests list so this adds no new network calls. */}
+      <View style={styles.statsRow}>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={styles.statCard}
+          onPress={() => navigation.navigate('OrgRequests')}
+        >
+          <View style={[styles.statIcon, { backgroundColor: '#D1FAE5' }]}>
+            <Ionicons name="checkmark-done" size={24} color="#10B981" />
+          </View>
+          <Text style={styles.statValue}>{assignedThisMonth}</Text>
+          <Text style={styles.statLabel}>Assigned this month</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={styles.statCard}
+          onPress={() => navigation.navigate('OrgRequests')}
+        >
+          <View style={[styles.statIcon, { backgroundColor: '#FCE7F3' }]}>
+            <Ionicons name="time" size={24} color="#DB2777" />
+          </View>
+          <Text style={styles.statValue}>{activeAssignments}</Text>
+          <Text style={styles.statLabel}>Active consultations</Text>
+        </TouchableOpacity>
+      </View>
+
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Management Tools</Text>
 
@@ -166,6 +225,15 @@ export const OrgDashboardScreen: React.FC<{ navigation: any }> = ({ navigation }
           COLORS={COLORS}
           styles={styles}
           onPress={() => navigation.navigate('OrgProfile')}
+        />
+
+        <MenuItem
+          icon="calendar-outline"
+          label="Calendar"
+          desc="Month view of appointment requests"
+          COLORS={COLORS}
+          styles={styles}
+          onPress={() => navigation.navigate('Calendar')}
         />
 
         <MenuItem

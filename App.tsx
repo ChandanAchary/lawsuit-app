@@ -1,5 +1,5 @@
 import './src/utils/debugTextError';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import {
   View,
@@ -18,7 +18,10 @@ import { useAuthStore } from './src/stores/authStore';
 import { useThemeStore, DARK_COLORS } from './src/stores/themeStore';
 import { COLORS } from './src/constants';
 import { useNotificationStore } from './src/stores/notificationStore';
+import { useActiveCallStore } from './src/stores/activeCallStore';
 import { AuthStack, MainStack } from './src/navigation';
+import { DpdpConsentGate } from './src/components/DpdpConsentGate';
+import { LegalEagleFAB } from './src/components/LegalEagleFAB';
 import { requestAllPermissions } from './src/utils/permissions';
 import { socketService } from './src/services/socket';
 import { initRuntimeApiConfig } from './src/services/runtimeApiConfig';
@@ -56,12 +59,25 @@ const linking: LinkingOptions<any> = {
 
 const navigationRef = createNavigationContainerRef<any>();
 
+// Mirrors the server payload for `call:incoming`. The mobile app used to
+// use a homegrown shape ({ from, roomId, callerName }) that the server has
+// never emitted — calls always silently dropped. We now follow the same
+// callId / roomUrl / token contract that lawsuit-frontend uses.
+type IncomingCallCaller = {
+  id: string;
+  name: string;
+  avatar?: string;
+  role?: 'CLIENT' | 'LAWYER';
+};
+
 type IncomingCall = {
-  from: string;
-  callerName: string;
-  callType: 'audio' | 'video';
-  roomId: string;
-  chatId?: string;
+  callId: string;
+  callType: 'chat' | 'appointment';
+  referenceId: string;
+  mediaType: 'audio' | 'video';
+  caller: IncomingCallCaller;
+  roomUrl: string;
+  token: string;
 };
 
 export default function App() {
@@ -69,6 +85,10 @@ export default function App() {
   const { initSocketListeners, fetchUnreadCount } = useNotificationStore();
   const [isReady, setIsReady] = useState(false);
   const [incomingCall, setIncomingCall] = useState<IncomingCall | null>(null);
+  // The Legal Eagle FAB shows only on the main tab screens. When a stack
+  // screen is pushed on top (LawyerDetail, Chat, VideoCall, …) the root route
+  // is no longer "MainTabs" and the FAB animates out.
+  const [onTabScreen, setOnTabScreen] = useState(true);
   const initTheme = useThemeStore(state => state.init);
   const isDark = useThemeStore(state => state.isDark);
   const mode = useThemeStore(state => state.mode);
@@ -139,30 +159,58 @@ export default function App() {
       const cleanupNotifications = initSocketListeners();
       fetchUnreadCount();
 
+      // Incoming call ringing — keep modal up until the user picks Accept
+      // / Decline, the caller cancels, or the call times out.
       const unsubIncomingCall = socketService.on('call:incoming', (payload: unknown) => {
         const call = payload as IncomingCall;
-        if (!call?.from || !call?.roomId) return;
+        if (!call?.callId || !call?.caller?.id || !call?.roomUrl || !call?.token) return;
         void presentIncomingCallNotification({
-          callerName: call.callerName,
-          callType: call.callType,
-          roomId: call.roomId,
-          chatId: call.chatId,
+          callerName: call.caller?.name || 'Unknown',
+          callType: call.mediaType === 'audio' ? 'audio' : 'video',
+          // The local notification layer was built around the old
+          // `roomId`/`chatId` payload — map the new server shape to the
+          // fields it still understands so the heads-up notification keeps
+          // working without forcing a rewrite of localNotifications.
+          roomId: call.callId,
+          chatId: call.callType === 'chat' ? call.referenceId : undefined,
         });
         setIncomingCall(call);
       });
 
-      const unsubCallEnded = socketService.on('call:ended', (payload: unknown) => {
-        const call = payload as { roomId?: string };
+      // Caller hung up before we answered, or remote side ended after we
+      // answered. Either way, dismiss any open incoming-call modal AND
+      // clear the global active-call store so the chat "Tap to return to
+      // call" banner doesn't keep hanging around after the call is gone.
+      const unsubCallCancelled = socketService.on('call:cancelled', (payload: unknown) => {
+        const data = payload as { callId?: string };
         setIncomingCall((prev) => {
           if (!prev) return prev;
-          if (call?.roomId && prev.roomId !== call.roomId) return prev;
+          if (data?.callId && prev.callId !== data.callId) return prev;
           return null;
         });
+        const active = useActiveCallStore.getState().call;
+        if (active && (!data?.callId || active.callId === data.callId)) {
+          useActiveCallStore.getState().clear();
+        }
+      });
+
+      const unsubCallEnded = socketService.on('call:ended', (payload: unknown) => {
+        const data = payload as { callId?: string };
+        setIncomingCall((prev) => {
+          if (!prev) return prev;
+          if (data?.callId && prev.callId !== data.callId) return prev;
+          return null;
+        });
+        const active = useActiveCallStore.getState().call;
+        if (active && (!data?.callId || active.callId === data.callId)) {
+          useActiveCallStore.getState().clear();
+        }
       });
 
       return () => {
         cleanupNotifications();
         unsubIncomingCall();
+        unsubCallCancelled();
         unsubCallEnded();
       };
     }
@@ -175,37 +223,74 @@ export default function App() {
   }, [isAuthenticated, initSocketListeners, fetchUnreadCount]);
 
   const rejectIncomingCall = () => {
-    if (!incomingCall || !user?.id) return;
-    socketService.emit('call:reject', {
-      to: incomingCall.from,
-      roomId: incomingCall.roomId,
-      chatId: incomingCall.chatId,
-    });
+    if (!incomingCall) return;
+    socketService.declineCall(incomingCall.callId);
     setIncomingCall(null);
   };
 
   const acceptIncomingCall = () => {
     if (!incomingCall || !navigationRef.isReady()) return;
 
-    socketService.emit('call:accept', {
-      to: incomingCall.from,
-      roomId: incomingCall.roomId,
-    });
+    socketService.acceptCall(incomingCall.callId);
 
     const call = incomingCall;
     setIncomingCall(null);
-    navigationRef.navigate('VideoCall', {
-      roomId: call.roomId,
-      callType: call.callType,
-      otherUser: { id: call.from, name: call.callerName || 'Unknown' },
+
+    // Seed the global active-call store right away so the chat resume
+    // banner works even if the user immediately minimizes the call screen.
+    // VideoCallScreen will re-seed on mount with the same data; both paths
+    // are idempotent.
+    useActiveCallStore.getState().setActive({
+      callId: call.callId,
+      roomUrl: call.roomUrl,
+      token: call.token,
+      mediaType: call.mediaType,
+      otherUser: {
+        id: call.caller.id,
+        name: call.caller.name,
+        avatarUrl: call.caller.avatar,
+      },
+      chatId: call.callType === 'chat' ? call.referenceId : undefined,
+      appointmentId: call.callType === 'appointment' ? call.referenceId : undefined,
       isOutgoing: false,
-      chatId: call.chatId,
+      startedAt: Date.now(),
+    });
+
+    // Pass the server-issued Daily room + token straight through to the
+    // VideoCall screen. The screen joins the Daily room with these and
+    // does NOT re-emit `call:initiate` (it's an incoming call).
+    navigationRef.navigate('VideoCall', {
+      callId: call.callId,
+      roomUrl: call.roomUrl,
+      token: call.token,
+      mediaType: call.mediaType,
+      callType: call.mediaType, // legacy alias the screen used to read
+      otherUser: {
+        id: call.caller.id,
+        name: call.caller.name || 'Unknown',
+        avatarUrl: call.caller.avatar,
+      },
+      isOutgoing: false,
+      chatId: call.callType === 'chat' ? call.referenceId : undefined,
     });
   };
 
+  // Recompute FAB visibility from the navigation state. The root navigator is
+  // a stack whose first route is "MainTabs" (the bottom-tab navigator); once
+  // any other screen is pushed, the root route name changes and we hide the FAB.
+  const syncFabVisibility = useCallback(() => {
+    try {
+      const rootState = navigationRef.getRootState();
+      const name = rootState?.routes?.[rootState.index]?.name;
+      setOnTabScreen(name === 'MainTabs');
+    } catch {
+      setOnTabScreen(false);
+    }
+  }, []);
+
   if (!isReady) {
     return (
-      <View style={styles.splashScreen}> 
+      <View style={styles.splashScreen}>
         <Image source={require('./assets/splash-icon.png')} style={styles.splashLogo} resizeMode="contain" />
         <Text style={styles.splashBrand}>NyayaX</Text>
         <ActivityIndicator size="small" color={COLORS.textSecondary} style={styles.splashLoader} />
@@ -216,22 +301,34 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={styles.appRoot}>
-        <NavigationContainer ref={navigationRef} linking={linking} theme={navTheme}>
+        <NavigationContainer
+          ref={navigationRef}
+          linking={linking}
+          theme={navTheme}
+          onReady={syncFabVisibility}
+          onStateChange={syncFabVisibility}
+        >
           <StatusBar style={isDark ? 'light' : 'dark'} />
           {isAuthenticated ? <MainStack /> : <AuthStack />}
         </NavigationContainer>
+        {/* Floating Legal Eagle AI assistant — shown only on the main tab
+            screens (hidden on pushed stack screens), animated in/out. Shares
+            history with the full-screen AI chat. */}
+        {isAuthenticated && <LegalEagleFAB visible={onTabScreen} />}
       </View>
+      {/* First-login DPDP privacy-notice gate (blocking modal). */}
+      {isAuthenticated && <DpdpConsentGate />}
 
       <Modal visible={!!incomingCall} transparent animationType="fade" onRequestClose={rejectIncomingCall}>
         <View style={styles.callOverlay}>
           <View style={[styles.callCard, { backgroundColor: isDark ? DARK_COLORS.surface : COLORS.white }] }>
             <Ionicons
-              name={incomingCall?.callType === 'video' ? 'videocam' : 'call'}
+              name={incomingCall?.mediaType === 'video' ? 'videocam' : 'call'}
               size={42}
               color={isDark ? DARK_COLORS.primary : COLORS.primary}
             />
-            <Text style={[styles.callTitle, { color: isDark ? DARK_COLORS.text : COLORS.text }]}>Incoming {incomingCall?.callType === 'video' ? 'Video' : 'Audio'} Call</Text>
-            <Text style={[styles.callSubtitle, { color: isDark ? DARK_COLORS.textSecondary : COLORS.textSecondary }]}>from {incomingCall?.callerName || 'Unknown'}</Text>
+            <Text style={[styles.callTitle, { color: isDark ? DARK_COLORS.text : COLORS.text }]}>Incoming {incomingCall?.mediaType === 'video' ? 'Video' : 'Audio'} Call</Text>
+            <Text style={[styles.callSubtitle, { color: isDark ? DARK_COLORS.textSecondary : COLORS.textSecondary }]}>from {incomingCall?.caller?.name || 'Unknown'}</Text>
 
             <View style={styles.callActions}>
               <TouchableOpacity style={[styles.callActionBtn, { backgroundColor: COLORS.error }]} onPress={rejectIncomingCall}>

@@ -7,6 +7,40 @@ export enum UserRole {
   ORGANIZATION = 'ORGANIZATION',
 }
 
+// Mirrors EkycStatus enum on the server (prisma/schema.prisma).
+export type EkycStatus = 'PENDING' | 'VERIFIED' | 'FAILED' | 'EXPIRED';
+
+export interface EkycSubmission {
+  id: string;
+  status: EkycStatus;
+  provider: string;
+  failureReason?: string | null;
+  expiresAt?: string | null;
+  completedAt?: string | null;
+  createdAt: string;
+}
+
+export interface EkycStatusResponse {
+  client: {
+    ekycVerified: boolean;
+    ekycVerifiedAt: string | null;
+    // Which path cleared the eKYC. `EMAIL_OTP` is the temporary fallback
+    // we run while the Aadhaar provider API key is unavailable. UI shows
+    // a different badge so the temporary status stays visible.
+    ekycVerifiedVia: 'AADHAAR' | 'EMAIL_OTP' | null;
+    aadhaarLast4: string | null;
+    aadhaarName: string | null;
+  };
+  latestSubmission: EkycSubmission | null;
+}
+
+export interface EkycInitiateResponse {
+  id: string;
+  status: EkycStatus;
+  provider: string;
+  expiresAt?: string | null;
+}
+
 export enum AppointmentStatus {
   PENDING = 'PENDING',
   CONFIRMED = 'CONFIRMED',
@@ -150,6 +184,19 @@ export interface User {
   // dashboard landing page. SUPER_ADMIN holds implicit access to all
   // modules and ignores this field.
   permissions?: string[];
+  // Client-only: Aadhaar eKYC mirror fields. Set by /ekyc/aadhaar/submit-otp
+  // on successful Sandbox.co.in verification. Used by ProfileScreen to
+  // render the "Identity verification" tile and lock auto-populated fields
+  // on EditProfileScreen.
+  ekycVerified?: boolean;
+  ekycVerifiedAt?: string | null;
+  // Records which path the user cleared eKYC through. `EMAIL_OTP` is the
+  // temporary fallback used while the Aadhaar provider API key is
+  // unavailable; `AADHAAR` is the full Sandbox / UIDAI verification.
+  // UI keys off this to render a different badge for the temporary path.
+  ekycVerifiedVia?: 'AADHAAR' | 'EMAIL_OTP' | null;
+  aadhaarLast4?: string | null;
+  aadhaarName?: string | null;
   // True until LAWYER (org-onboarded) or ADMIN (super-admin-invited) rotates
   // their server-generated temp password via POST /auth/change-password.
   // While true, every endpoint except /auth/me, /auth/change-password,
@@ -214,6 +261,9 @@ export interface Appointment {
   paymentId?: string;
   payment?: { amount: number; status: PaymentStatus };
   caseId?: string;
+  /** Set when this appointment is linked to a mediation (respondent
+      attached their lawyer from it). Drives the "Open Mediation" action. */
+  mediationId?: string | null;
   createdAt: string;
 }
 
@@ -533,12 +583,23 @@ export interface LawyerVerification {
 // ─── Mediation ──────────────────────────────────────────────
 export type MediationInviteStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'EXPIRED' | 'CANCELLED';
 export type MediationStatus =
+  // Legacy values (still emitted for old rows)
   | 'AWAITING_RESPONDENT_LAWYER'
   | 'AWAITING_MEDIATOR_SELECTION'
   | 'IN_SESSION'
   | 'RESOLVED'
   | 'ESCALATED_TO_CASE'
-  | 'CANCELLED';
+  | 'CANCELLED'
+  // Canonical flow
+  | 'RESPONDENT_ACCEPTED'
+  | 'RESPONDENT_SIDE_SUBMITTED'
+  | 'MEDIATOR_SHORTLIST'
+  | 'MEDIATOR_CONVERGE'
+  | 'AWAITING_MEDIATION_FEE'
+  | 'MEDIATOR_OFFERED'
+  | 'ACTIVE'
+  | 'SETTLED'
+  | 'NON_SETTLEMENT';
 export type MediationOutcome = 'RESOLVED' | 'ESCALATED_TO_CASE';
 
 export interface MediationPartyRef {
@@ -578,6 +639,21 @@ export interface Mediation {
   mediatorId?: string | null;
   initiatorMediatorPick?: string | null;
   respondentMediatorPick?: string | null;
+  // ─── Canonical flow fields ───
+  initiatorDocumentUrls?: string[];
+  respondentStatement?: string | null;
+  respondentDocumentUrls?: string[];
+  initiatorMediatorShortlist?: string[];
+  respondentMediatorShortlist?: string[];
+  initiatorFinalMediatorId?: string | null;
+  respondentFinalMediatorId?: string | null;
+  mediationFeeTotal?: number | null;
+  initiatorFeePaidAt?: string | null;
+  respondentFeePaidAt?: string | null;
+  mediatorOfferedAt?: string | null;
+  mediatorAcceptedAt?: string | null;
+  mediatorDeclinedAt?: string | null;
+  caseId?: string | null;
   disputeTitle: string;
   disputeDescription: string;
   status: MediationStatus;
@@ -597,6 +673,8 @@ export interface Mediation {
   respondentLawyer?: MediationPartyRef | null;
   mediator?: MediationPartyRef | null;
   invite?: MediationInvite;
+  /** MEDIATION_GROUP chat(s), created at ACTIVE. Usually length 1. */
+  chats?: { id: string }[];
 }
 
 export interface MediatorProfile {

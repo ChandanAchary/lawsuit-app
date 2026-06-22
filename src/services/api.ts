@@ -190,6 +190,27 @@ export const appointmentsApi = {
   confirmRazorpay: (id: string, data: { appointmentId: string; razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) =>
     api.post(`/appointments/${encodeURIComponent(id)}/confirm-payment`, data),
   getAllAppointments: () => api.get('/appointments/getall'),
+
+  // Supporting documents attached to a consultation booking. Bytes are
+  // uploaded directly to Cloudinary; this method only persists the
+  // resulting URL + metadata so the lawyer can OCR / summarise them.
+  attachDocument: (
+    appointmentId: string,
+    data: { fileurl: string; fileName: string; mimeType: string; size?: number },
+  ) => api.post(`/appointments/${encodeURIComponent(appointmentId)}/documents`, data),
+  listDocuments: (appointmentId: string) =>
+    api.get(`/appointments/${encodeURIComponent(appointmentId)}/documents`),
+};
+
+// ─── Generic per-document OCR / AI API ─────────────────────
+// Works for any Document regardless of its parent (case / appointment /
+// chat message). Permission is enforced server-side by walking the
+// document's parent — see document-access.service.ts.
+export const documentsApi = {
+  extract: (documentId: string) => api.post(`/documents/${encodeURIComponent(documentId)}/extract`),
+  summarize: (documentId: string) => api.post(`/documents/${encodeURIComponent(documentId)}/summarize`),
+  ask: (documentId: string, question: string) =>
+    api.post(`/documents/${encodeURIComponent(documentId)}/ask`, { question }),
 };
 
 // ─── Cases API ──────────────────────────────────────────────
@@ -208,12 +229,19 @@ export const casesApi = {
   addHearing: (id: string, data: { date: string; court?: string; judge?: string; purpose?: string; notes?: string }) =>
     api.post(`/cases/${encodeURIComponent(id)}/hearings`, data),
   getDocuments: (id: string) => api.get(`/cases/${encodeURIComponent(id)}/documents`),
+  // Saves an already-uploaded file's metadata onto the case. The actual
+  // bytes are uploaded directly to Cloudinary via storageApi.getCloudinarySignature
+  // first; this call only persists the resulting URL + filename + mime so
+  // the server can later run OCR / AI on it.
   uploadDocument: (id: string, data: { fileurl: string; fileName: string; mimeType: string; size?: number }) =>
-    api.post(`/cases/${encodeURIComponent(id)}/documents`, data),
+    api.post(`/cases/${encodeURIComponent(id)}/saveDocuments`, data),
   getPresignedUrl: (caseId: string, fileName?: string, mimeType?: string) =>
     api.get(`/cases/${encodeURIComponent(caseId)}/getpresignedUrl`, { params: { fileName, mimeType } }),
-  saveDocuments: (caseId: string, documents: { filename: string; url: string; mimeType: string; size?: number }[]) =>
-    api.post(`/cases/${encodeURIComponent(caseId)}/saveDocuments`, { documents }),
+  // (Use casesApi.uploadDocument above to persist a single uploaded
+  //  document — the server endpoint accepts a flat body, not a
+  //  { documents: [...] } array, so a multi-doc helper would mis-shape.)
+  // Case-scoped OCR/AI (legacy path — kept for the existing CaseDetail flow).
+  // New surfaces (appointment docs, chat attachments) use documentsApi below.
   extractText: (caseId: string, documentId: string) => api.post(`/cases/${encodeURIComponent(caseId)}/documents/${encodeURIComponent(documentId)}/extract`),
   summarize: (caseId: string, documentId: string) => api.post(`/cases/${encodeURIComponent(caseId)}/documents/${encodeURIComponent(documentId)}/summarize`),
   askQuestion: (caseId: string, documentId: string, question: string) => api.post(`/cases/${encodeURIComponent(caseId)}/documents/${encodeURIComponent(documentId)}/ask`, { question }),
@@ -257,6 +285,11 @@ export const usersApi = {
   registerFcmToken: (token: string) => api.post('/users/fcm-token', { fcmToken: token }),
   removeFcmToken: (token: string) => api.delete('/users/fcm-token', { data: { fcmToken: token } }),
   getUserById: (id: string) => api.get(`/users/${encodeURIComponent(id)}`),
+  // DPDP (Digital Personal Data Protection Act, 2023) privacy-notice consent.
+  // GET returns { consented: boolean, text: string }; POST records the consent
+  // verbatim (idempotent). Mirrors the web's DpdpNoticeGate.
+  getDpdpConsentStatus: () => api.get('/consents/dpdp'),
+  recordDpdpConsent: () => api.post('/consents/dpdp', {}),
 };
 
 // ─── Chat API ───────────────────────────────────────────────
@@ -266,9 +299,23 @@ export const chatApi = {
   getChats: () => api.get('/chat'),
   getMessages: (chatId: string, params?: Record<string, unknown>) =>
     api.get(`/chat/${encodeURIComponent(chatId)}/messages`, { params }),
-  sendMessage: (chatId: string, data: { text: string; attachments?: string[] }) =>
-    api.post(`/chat/${encodeURIComponent(chatId)}/messages`, data),
+  // text + attachments[] is the legacy contract; the optional
+  // attachmentMetas mirror lets the server auto-create Document rows with
+  // accurate mime + filename + size so OCR works without inference.
+  sendMessage: (
+    chatId: string,
+    data: {
+      text: string;
+      attachments?: string[];
+      attachmentMetas?: Array<{ url: string; filename?: string; mimeType?: string; size?: number }>;
+    },
+  ) => api.post(`/chat/${encodeURIComponent(chatId)}/messages`, data),
   getParticipants: (chatId: string) => api.get(`/chat/${encodeURIComponent(chatId)}/participants`),
+  // Bulk-mark every incoming message in this chat as read. Call on chat open
+  // so the chat-list unread badge clears for messages that were already
+  // unread before opening (per-message socket markRead only covers
+  // live-arriving messages).
+  markChatRead: (chatId: string) => api.put(`/chat/${encodeURIComponent(chatId)}/read`),
 };
 
 // ─── Notifications API ──────────────────────────────────────
@@ -298,6 +345,18 @@ export const walletApi = {
 export const modelChatApi = {
   chatCompletion: (messages: { role: string; content: string }[]) =>
     api.post('/model/chat', { messages }),
+};
+
+// ─── E-signature API ────────────────────────────────────────
+// OTP-based document signing. Mirrors the web SignDocumentPage flow:
+// view request → send OTP → submit OTP to sign → download signed PDF.
+export const esignApi = {
+  getRequest: (id: string) => api.get(`/esign/requests/${encodeURIComponent(id)}`),
+  sendOtp: (id: string, partyId?: string) =>
+    api.post(`/esign/requests/${encodeURIComponent(id)}/send-otp`, { partyId }),
+  sign: (id: string, otp: string, partyId?: string) =>
+    api.post(`/esign/requests/${encodeURIComponent(id)}/sign`, { otp, partyId }),
+  signedUrl: (id: string) => api.get(`/esign/requests/${encodeURIComponent(id)}/signed-url`),
 };
 
 // ─── Agreement Templates API ────────────────────────────────
@@ -331,6 +390,17 @@ export const adminApi = {
   // which actually flips lawyer.isVerified (and client.isVerified) in DB.
   setUserVerified: (id: string, isVerified: boolean) =>
     api.put(`/admin/users/${encodeURIComponent(id)}/verification`, { isVerified }),
+
+  // Monthly performance / activity logs (super-admin). Backed by
+  // /admin/performance/{role}/:id?month=&year= on the server. Each endpoint
+  // returns headline metrics + activity timeline + auto-computed salary so
+  // the mobile detail screen can render the same data the web shows.
+  getLawyerMonthlyActivity: (id: string, params: { month: number; year: number }) =>
+    api.get(`/admin/performance/lawyer/${encodeURIComponent(id)}`, { params }),
+  getOrganizationMonthlyActivity: (id: string, params: { month: number; year: number }) =>
+    api.get(`/admin/performance/organization/${encodeURIComponent(id)}`, { params }),
+  getCourtAdminMonthlyActivity: (id: string, params: { month: number; year: number }) =>
+    api.get(`/admin/performance/court-admin/${encodeURIComponent(id)}`, { params }),
 };
 
 // ─── Admin Management API (SUPER_ADMIN only) ───────────────
@@ -388,8 +458,12 @@ export const payoutsApi = {
 // Self-onboarded court admins land in PENDING_SUPER_ADMIN_APPROVAL with
 // isAuthorized=false. Their feature routes stay locked behind
 // requireCourtAdminAuthorized until an entry here flips them.
+export type CourtAdminApprovalStatus = 'PENDING_SUPER_ADMIN_APPROVAL' | 'APPROVED' | 'REJECTED';
+
 export const courtAdminApprovalApi = {
-  listPending: (params?: { page?: number; limit?: number }) =>
+  // verificationStatus drives the Pending / Approved / Rejected tabs on the
+  // super-admin approvals screen. Omit it for the legacy "pending only" call.
+  listPending: (params?: { page?: number; limit?: number; verificationStatus?: CourtAdminApprovalStatus }) =>
     api.get('/admin/court-admins/pending', { params }),
   getDetail: (id: string) => api.get(`/admin/court-admins/${encodeURIComponent(id)}`),
   approve: (id: string, data?: { notes?: string }) =>
@@ -483,6 +557,11 @@ export type EntitySalaryPreview = {
   };
   alreadyPaid: boolean;
   existingPayout: any | null;
+  // Populated by the server when the LAWYER subject belongs to an
+  // organisation. The super-admin salary screen uses this to switch into
+  // read-only "Managed by [Org Name]" mode and route writes through the
+  // org-side surface (orgLawyerSalaryApi) instead.
+  lawyerOrganization?: { id: string; name: string } | null;
 };
 
 export const entitySalaryApi = {
@@ -559,6 +638,50 @@ export const entitySalaryApi = {
   // super admin sees where to wire money for off-platform settlements.
   bankAccounts: (subject: EntitySalarySubject, id: string) =>
     api.get(`/admin/${entitySalarySegment(subject)}/${encodeURIComponent(id)}/bank-accounts`),
+};
+
+// ─── Org-managed lawyer salary (ORGANIZATION role) ─────────────────
+// The org head manages performance-based salary for lawyers in their
+// organisation. The platform-admin surface refuses writes for org-affiliated
+// lawyers (server-side guard), so this is the only legitimate write path.
+// Same payload shapes as entitySalaryApi so the FE can reuse the salary
+// management screen with just the API set swapped.
+export const orgLawyerSalaryApi = {
+  getConfig: (lawyerId: string) =>
+    api.get(`/organizations/me/lawyers/${encodeURIComponent(lawyerId)}/salary`),
+  setConfig: (
+    lawyerId: string,
+    data: Partial<{
+      baseSalary: number;
+      bonusPerConsultation: number;
+      bonusPerCaseClosed: number;
+      bonusPerWonCase: number;
+      reason: string;
+    }>,
+  ) => api.put(`/organizations/me/lawyers/${encodeURIComponent(lawyerId)}/salary`, data),
+  hold: (lawyerId: string, data: { reason: string }) =>
+    api.post(`/organizations/me/lawyers/${encodeURIComponent(lawyerId)}/salary/hold`, data),
+  release: (lawyerId: string, data?: { reason?: string }) =>
+    api.post(`/organizations/me/lawyers/${encodeURIComponent(lawyerId)}/salary/release`, data ?? {}),
+  preview: (lawyerId: string, params?: { cycleMonth?: number; cycleYear?: number }) =>
+    api.get(`/organizations/me/lawyers/${encodeURIComponent(lawyerId)}/salary/preview`, { params }),
+  pay: (
+    lawyerId: string,
+    data?: {
+      cycleMonth?: number;
+      cycleYear?: number;
+      bonusAmount?: number;
+      deductionAmount?: number;
+      notes?: string;
+      providerPayoutId?: string;
+    },
+  ) => api.post(`/organizations/me/lawyers/${encodeURIComponent(lawyerId)}/salary/pay`, data ?? {}),
+  adjustmentHistory: (lawyerId: string, limit?: number) =>
+    api.get(`/organizations/me/lawyers/${encodeURIComponent(lawyerId)}/salary/history`, { params: limit ? { limit } : {} }),
+  payoutHistory: (lawyerId: string, limit?: number) =>
+    api.get(`/organizations/me/lawyers/${encodeURIComponent(lawyerId)}/salary/payouts`, { params: limit ? { limit } : {} }),
+  bankAccounts: (lawyerId: string) =>
+    api.get(`/organizations/me/lawyers/${encodeURIComponent(lawyerId)}/bank-accounts`),
 };
 
 // ─── Self-view of own performance-based salary (lawyer / org head) ──
@@ -663,6 +786,43 @@ export const storageApi = {
     api.get('/storage/sign', { params: { folder } }),
 };
 
+// ─── eKYC API (CLIENT only) ─────────────────────────────────
+// Aadhaar identity verification through Sandbox.co.in. Two-step OTP:
+//   1. POST initiate(aadhaar) → server hits Sandbox, OTP delivered to
+//      the Aadhaar-linked phone, returns { id, status, expiresAt, provider }.
+//   2. POST submitOtp(submissionId, otp) → on success the Client row gets
+//      ekycVerified=true + aadhaarName/last4/dob/gender mirrored.
+// Server enforces aggressive rate limits (5 inits/hr, 10 OTPs/15min).
+// A temporary email-OTP fallback is exposed below as initiateEmailOtp /
+// submitEmailOtp while the Aadhaar provider key is unavailable.
+export const ekycApi = {
+  getStatus: () => api.get('/ekyc/status'),
+  initiateAadhaar: (aadhaar: string) =>
+    api.post('/ekyc/aadhaar/initiate', { aadhaar }),
+  submitOtp: (submissionId: string, otp: string) =>
+    api.post('/ekyc/aadhaar/submit-otp', { submissionId, otp }),
+
+  // Temporary email-OTP fallback while the Aadhaar provider key isn't
+  // available. Server emails a 6-digit OTP to the registered address and
+  // flips ekycVerified=true with ekycVerifiedVia='EMAIL_OTP' on success.
+  // Initiate takes no body (server uses the registered email); response
+  // returns { id, expiresAt, sentToEmailMasked } so the FE can show the
+  // masked recipient on the OTP screen.
+  initiateEmailOtp: () => api.post('/ekyc/email-otp/initiate', {}),
+  submitEmailOtp: (submissionId: string, otp: string) =>
+    api.post('/ekyc/email-otp/submit', { submissionId, otp }),
+
+  // DigiLocker (Surepass) — the active Aadhaar eKYC path. initiate returns
+  // { id, url, expiresAt, provider }; the user completes consent at `url`
+  // (opened via expo-web-browser), then complete is called with the
+  // submissionId (and/or the provider client_id parsed from the return URL).
+  // complete returns the verified client (ekycVerified, ekycVerifiedVia:
+  // 'AADHAAR', aadhaarName, aadhaarLast4, name, phone) or { pending: true }.
+  initiateDigilocker: () => api.post('/ekyc/digilocker/initiate', {}),
+  completeDigilocker: (params: { submissionId?: string; clientId?: string }) =>
+    api.post('/ekyc/digilocker/complete', params),
+};
+
 // ─── Reviews API ────────────────────────────────────────────
 export const reviewsApi = {
   getByLawyer: (lawyerId: string, params?: Record<string, unknown>) =>
@@ -720,6 +880,11 @@ export const dashboardApi = {
 };
 
 // ─── Video / Meetings API ───────────────────────────────────
+// Video sessions are appointment-bound on the server. The previous
+// /video/chat/:chatId/session* endpoints were never implemented server-side
+// and have been dropped from the mobile client too — VideoCallScreen now
+// surfaces a clear "needs an appointment" message when invoked from a chat
+// without an appointmentId.
 export const videoApi = {
   createMeeting: (data: { appointmentId: string; meetingType?: string }) =>
     api.post('/video/meeting', data),
@@ -727,12 +892,6 @@ export const videoApi = {
     api.get(`/video/meeting/${encodeURIComponent(appointmentId)}`),
   endMeeting: (appointmentId: string) =>
     api.post(`/video/meeting/${encodeURIComponent(appointmentId)}/end`),
-  createChatSession: (chatId: string) =>
-    api.post(`/video/chat/${encodeURIComponent(chatId)}/session`),
-  getChatSession: (chatId: string) =>
-    api.get(`/video/chat/${encodeURIComponent(chatId)}/session`),
-  endChatSession: (chatId: string) =>
-    api.post(`/video/chat/${encodeURIComponent(chatId)}/session/end`),
   getCallHistory: (params?: { page?: number; limit?: number }) =>
     api.get('/video/call-history', { params }),
 };
@@ -761,6 +920,19 @@ export const courtAdminApi = {
   }) => api.put('/court-admin/me/court', data),
   getPublicCourtsByPincode: (pincode: string) => api.get(`/court-admin/public/courts/by-pincode/${encodeURIComponent(pincode)}`),
   getPublicAdminsByPincode: (pincode: string) => api.get(`/court-admin/public/admins/by-pincode/${encodeURIComponent(pincode)}`),
+  // ── Court-admin self-service (post-registration) ──
+  // After a court admin self-registers they sit in PENDING_SUPER_ADMIN_APPROVAL.
+  // These let them see their own authorization status, re-apply if rejected,
+  // and view their own salary slip — the mobile app previously had no way to
+  // surface any of this (web exposes them via CourtAdminAuthBanner + salary page).
+  getMyAuthorization: () => api.get('/court-admin/me/authorization'),
+  reapply: (data?: { idProofUrl?: string; authorizationProofUrl?: string; registrationNumber?: string }) =>
+    api.post('/court-admin/me/reapply', data ?? {}),
+  getMySalary: () => api.get('/court-admin/me/salary'),
+  // District-based search. State is optional but recommended — districts
+  // with the same name exist across states (e.g. Bilaspur in CG and HP).
+  getPublicAdminsByDistrict: (district: string, state?: string) =>
+    api.get('/court-admin/public/admins/by-district', { params: { district, state } }),
   createCourt: (data: Record<string, unknown>) => api.post('/court-admin/courts', data),
   getCourts: () => api.get('/court-admin/courts'),
   getCourtById: (id: string) => api.get(`/court-admin/courts/${encodeURIComponent(id)}`),
@@ -808,10 +980,19 @@ export const mediationApi = {
     respondentEmail: string;
     respondentName?: string;
     respondentPhone?: string;
-    disputeTitle: string;
-    disputeDescription: string;
+    disputeTitle?: string;
+    disputeDescription?: string;
     initiatorLawyerId?: string;
+    caseId?: string;
   }) => api.post('/mediations/invites', data),
+  /** Resend the existing pending invite email to the same recipient. */
+  resendInvite: (respondentEmail: string) =>
+    api.post('/mediations/invites/resend', { respondentEmail }),
+  /** Initiator edits a still-PENDING invite. */
+  editInvite: (
+    inviteId: string,
+    data: { respondentEmail?: string; respondentName?: string; disputeTitle?: string; disputeDescription?: string },
+  ) => api.patch(`/mediations/invites/${encodeURIComponent(inviteId)}`, data),
   getInviteByToken: (token: string) => api.get(`/mediations/invites/public/${encodeURIComponent(token)}`),
   acceptInvite: (token: string) => api.post(`/mediations/invites/${encodeURIComponent(token)}/accept`),
   declineInvite: (token: string) => api.post(`/mediations/invites/${encodeURIComponent(token)}/decline`),
@@ -830,11 +1011,43 @@ export const mediationApi = {
   getById: (id: string) => api.get(`/mediations/${encodeURIComponent(id)}`),
   attachRespondentLawyer: (id: string, lawyerId: string) =>
     api.post(`/mediations/${encodeURIComponent(id)}/respondent-lawyer`, { lawyerId }),
+  attachInitiatorLawyer: (id: string, lawyerId: string) =>
+    api.post(`/mediations/${encodeURIComponent(id)}/initiator-lawyer`, { lawyerId }),
   pickMediator: (id: string, mediatorId: string) =>
     api.post(`/mediations/${encodeURIComponent(id)}/mediator-pick`, { mediatorId }),
+  /** MA 2023 escape — parties couldn't agree → platform appoints a neutral. */
+  requestNeutralMediator: (id: string) =>
+    api.post(`/mediations/${encodeURIComponent(id)}/mediator-neutral`, {}),
   getRoom: (id: string) => api.get(`/mediations/${encodeURIComponent(id)}/room`),
   conclude: (id: string, data: { outcome: 'RESOLVED' | 'ESCALATED_TO_CASE'; settlementTerms?: string; closureNotes?: string }) =>
     api.post(`/mediations/${encodeURIComponent(id)}/conclude`, data),
+  /** Cancel a pre-session mediation (either disputing party). */
+  cancelMediation: (id: string, reason?: string) =>
+    api.post(`/mediations/${encodeURIComponent(id)}/cancel`, reason ? { reason } : {}),
+
+  // ─── Canonical flow ───
+  /** Respondent submits their own side of the dispute. */
+  submitRespondentSide: (id: string, data: { statement: string; documentUrls?: string[] }) =>
+    api.post(`/mediations/${encodeURIComponent(id)}/respondent-side`, data),
+  /** Respondent attaches their lawyer via an accepted appointment. */
+  attachRespondentLawyerFromAppointment: (id: string, appointmentId: string) =>
+    api.post(`/mediations/${encodeURIComponent(id)}/respondent-lawyer-from-appointment`, { appointmentId }),
+  /** A side shortlists 1–3 mediators. */
+  submitMediatorShortlist: (id: string, mediatorIds: string[]) =>
+    api.post(`/mediations/${encodeURIComponent(id)}/mediator-shortlist`, { mediatorIds }),
+  /** A side picks one final mediator from the union. */
+  submitFinalMediator: (id: string, mediatorId: string) =>
+    api.post(`/mediations/${encodeURIComponent(id)}/mediator-final`, { mediatorId }),
+  /** Start a client's 50% fee share — returns a Razorpay order. */
+  startMediationFee: (id: string) => api.post(`/mediations/${encodeURIComponent(id)}/fee/start`, {}),
+  /** Confirm a client's fee half with the Razorpay proof. */
+  confirmMediationFee: (
+    id: string,
+    proof: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string },
+  ) => api.post(`/mediations/${encodeURIComponent(id)}/fee/confirm`, proof),
+  /** Selected mediator accepts/declines the offer. */
+  respondToMediatorOffer: (id: string, accept: boolean) =>
+    api.post(`/mediations/${encodeURIComponent(id)}/mediator-offer-response`, { accept }),
 };
 
 // ─── Organization API ──────────────────────────────────────────
@@ -848,23 +1061,56 @@ export const organizationsApi = {
   createLawyer: (data: any) => api.post('/organizations/me/lawyers', data),
   listLawyers: (params?: any) => api.get('/organizations/me/lawyers', { params }),
   listOrgAppointmentRequests: () => api.get('/organizations/me/appointment-requests'),
-  // Server contract (assignOrgAppointmentRequestSchema):
-  //   { lawyerId, paymentMethod: 'razorpay' | 'wallet' }   (paymentMethod defaults to 'razorpay')
-  // - razorpay: a Payment order is created; the client is notified to pay
-  //   online via the existing /appointments/confirm-payment flow.
-  // - wallet:   the client's wallet is debited immediately and the Appointment
-  //   row is materialised right then.
+  // Pure task assignment — the client paid at booking time, so the body
+  // only carries the lawyer id. Server materialises the appointment,
+  // repoints the existing pre-paid Payment to it, and notifies the lawyer
+  // (task), the client (confirmed), and the org head (will receive
+  // accept/reject/complete pings as the lawyer works the appointment).
   assignAppointmentRequest: (
     id: string,
-    data: { lawyerId: string; paymentMethod?: 'razorpay' | 'wallet' },
+    data: { lawyerId: string },
   ) => api.post(`/organizations/me/appointment-requests/${encodeURIComponent(id)}/assign`, data),
   rejectAppointmentRequest: (id: string, data: { reason?: string }) =>
     api.post(`/organizations/me/appointment-requests/${encodeURIComponent(id)}/reject`, data),
   listClientAppointmentRequests: () => api.get('/organizations/clients/me/requests'),
   cancelClientAppointmentRequest: (id: string) =>
     api.post(`/organizations/clients/me/requests/${encodeURIComponent(id)}/cancel`),
-  createAppointmentRequest: (id: string, data: any) =>
-    api.post(`/organizations/${encodeURIComponent(id)}/appointment-requests`, data),
+  // Pay-at-booking-time: server returns { request, payment, paidVia }.
+  //   - paidVia: 'wallet'   → wallet was debited immediately, request is paid.
+  //   - paidVia: 'razorpay' → client must complete the Razorpay checkout
+  //                            and call confirmRequestPayment(...) below.
+  createAppointmentRequest: (
+    id: string,
+    data: {
+      scheduledAt: string;
+      durationMins?: number;
+      meetingType?: 'AUDIO_CALL' | 'VIDEO_CALL' | 'OFFICE_VISIT';
+      notes?: string;
+      paymentMethod?: 'wallet' | 'razorpay';
+    },
+  ) => api.post(`/organizations/${encodeURIComponent(id)}/appointment-requests`, data),
+  // Razorpay confirm hook for org-booking payments. Mirrors
+  // /appointments/:id/confirm-payment but scoped to OrgAppointmentRequest.
+  confirmRequestPayment: (
+    requestId: string,
+    data: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string },
+  ) => api.post(`/organizations/clients/me/requests/${encodeURIComponent(requestId)}/confirm-payment`, data),
+
+  // Documents on an OrgAppointmentRequest. Bytes are uploaded directly to
+  // Cloudinary; this only persists the URL + metadata. After the org
+  // assigns a lawyer, the server mirrors the orgRequestId docs onto the
+  // resulting Appointment so the assigned lawyer reaches them from
+  // AppointmentDetailScreen too.
+  attachRequestDocument: (
+    requestId: string,
+    data: { fileurl: string; fileName: string; mimeType: string; size?: number },
+  ) => api.post(`/organizations/clients/me/requests/${encodeURIComponent(requestId)}/documents`, data),
+  listClientRequestDocuments: (requestId: string) =>
+    api.get(`/organizations/clients/me/requests/${encodeURIComponent(requestId)}/documents`),
+  // Org-head read view — used by OrgRequestsScreen to render docs +
+  // run OCR / summary while choosing which lawyer to assign.
+  listOrgRequestDocuments: (requestId: string) =>
+    api.get(`/organizations/me/appointment-requests/${encodeURIComponent(requestId)}/documents`),
 };
 
 // ─── Legal Updates API ──────────────────────────────────────

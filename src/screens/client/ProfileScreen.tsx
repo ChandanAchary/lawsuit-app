@@ -180,6 +180,12 @@ export const ProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
         <View style={styles.menuCard}>
           <MenuItem icon="person-outline" label="Edit Profile" subtitle="Name, phone, avatar"
             onPress={() => navigation.navigate('EditProfile')} />
+          <MenuItem
+            icon="finger-print-outline"
+            label="Identity Verification"
+            subtitle={(authUser as any)?.ekycVerified ? 'Verified via Aadhaar' : 'Verify your identity with Aadhaar'}
+            onPress={() => navigation.navigate('EkycStatus')}
+          />
           <MenuItem icon="wallet-outline" label="Wallet" subtitle="Balance & transactions"
             onPress={() => navigation.navigate('Wallet')} />
           <MenuItem icon="card-outline" label="Bank & UPI Accounts" subtitle="Manage withdrawal accounts"

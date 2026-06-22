@@ -3,6 +3,8 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { format } from 'date-fns';
 import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS, CASE_STATUS_COLORS } from '../../constants';
 import { Case, CaseStatus, TimelineEvent, Hearing } from '../../types';
 import { casesApi, chatApi } from '../../services/api';
@@ -55,7 +57,16 @@ export const LawyerCaseDetailScreen: React.FC<{ navigation: any; route: any }> =
   const [eventDesc, setEventDesc] = useState('');
   const [showAddHearing, setShowAddHearing] = useState(false);
   const [hearingTitle, setHearingTitle] = useState('');
-  const [hearingDate, setHearingDate] = useState('');
+  // Hearing date is captured via the native picker. Initialised to
+  // "two weeks from today at 11:00" — sane default for a future hearing.
+  const [hearingDate, setHearingDate] = useState<Date>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 14);
+    d.setHours(11, 0, 0, 0);
+    return d;
+  });
+  const [showHearingDatePicker, setShowHearingDatePicker] = useState(false);
+  const [showHearingTimePicker, setShowHearingTimePicker] = useState(false);
   const [showResolve, setShowResolve] = useState(false);
   const [closeStatus, setCloseStatus] = useState<'CLOSED' | 'SETTLED'>('CLOSED');
   const [closureNotes, setClosureNotes] = useState('');
@@ -95,10 +106,19 @@ export const LawyerCaseDetailScreen: React.FC<{ navigation: any; route: any }> =
   };
 
   const addHearing = async () => {
-    if (!hearingTitle.trim() || !hearingDate.trim()) return Alert.alert('Required', 'Please enter title and date');
+    if (!hearingTitle.trim()) return Alert.alert('Required', 'Please enter a hearing title');
+    if (hearingDate.getTime() <= Date.now()) {
+      return Alert.alert('Invalid date', 'Hearing must be scheduled in the future.');
+    }
     try {
-      await casesApi.addHearing(caseId, { purpose: hearingTitle, date: hearingDate });
-      setShowAddHearing(false); setHearingTitle(''); setHearingDate('');
+      await casesApi.addHearing(caseId, { purpose: hearingTitle, date: hearingDate.toISOString() });
+      setShowAddHearing(false);
+      setHearingTitle('');
+      // Reset to a fresh "two weeks out" default for the next add.
+      const next = new Date();
+      next.setDate(next.getDate() + 14);
+      next.setHours(11, 0, 0, 0);
+      setHearingDate(next);
       fetchHearings();
     } catch { Alert.alert('Error', 'Failed to add hearing'); }
   };
@@ -175,12 +195,34 @@ export const LawyerCaseDetailScreen: React.FC<{ navigation: any; route: any }> =
           <Row label="Case Number" value={caseData.caseNumber || '—'} />
           <Row label="Category" value={caseData.category || '—'} />
           <Row label="Status" value={caseData.status} />
+          <Row label="Resolution" value={caseData.resolutionMethod || '—'} />
           <Row label="Filed" value={formatDate(caseData.createdAt)} />
           {caseData.description && <Text style={styles.desc}>{caseData.description}</Text>}
           {caseData.client && (
             <View style={styles.personRow}>
               <Ionicons name="person" size={18} color={COLORS.accent} />
               <Text style={styles.personText}>{caseData.client.name} (Client)</Text>
+            </View>
+          )}
+
+          {/* Lawyer-initiated mediation — canonical flow step 1. Sends the
+              invitation from the Case; the server records initiator client =
+              case client, initiator lawyer = this lawyer, and links
+              Mediation.caseId on accept. */}
+          {caseData.resolutionMethod === 'MEDIATION' && (
+            <View style={styles.mediationBox}>
+              <Text style={styles.mediationTitle}>Start the mediation</Text>
+              <Text style={styles.mediationDesc}>
+                Send a mediation invitation to the other party on your client's behalf.
+                They'll get an email (and an in-app notification if they're on NyayaX) and,
+                once they accept, the mediation flow begins.
+              </Text>
+              <Button
+                title="Send mediation invitation"
+                size="md"
+                icon={<Ionicons name="send" size={16} color={COLORS.white} />}
+                onPress={() => navigation.navigate('NewMediationInvite', { caseId })}
+              />
             </View>
           )}
         </ScrollView>
@@ -299,10 +341,61 @@ export const LawyerCaseDetailScreen: React.FC<{ navigation: any; route: any }> =
         <Button title="Add Event" onPress={addTimelineEvent} size="lg" />
       </BottomSheet>
 
-      {/* Add Hearing Modal */}
+      {/* Add Hearing Modal — uses native pickers for date + time so the
+          lawyer doesn't fight a free-text format and the value is always
+          a valid future timestamp. */}
       <BottomSheet visible={showAddHearing} onClose={() => setShowAddHearing(false)} title="Add Hearing">
         <TextInput style={styles.modalInput} placeholder="Hearing Title" value={hearingTitle} onChangeText={setHearingTitle} placeholderTextColor={COLORS.textMuted} />
-        <TextInput style={styles.modalInput} placeholder="Date (YYYY-MM-DD)" value={hearingDate} onChangeText={setHearingDate} placeholderTextColor={COLORS.textMuted} />
+        <TouchableOpacity
+          style={styles.hearingPickerPill}
+          activeOpacity={0.75}
+          onPress={() => setShowHearingDatePicker(true)}
+        >
+          <Ionicons name="calendar-outline" size={18} color={COLORS.primary} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.hearingPickerLabel}>Date</Text>
+            <Text style={styles.hearingPickerValue}>{format(hearingDate, 'EEE, dd MMM yyyy')}</Text>
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.hearingPickerPill}
+          activeOpacity={0.75}
+          onPress={() => setShowHearingTimePicker(true)}
+        >
+          <Ionicons name="time-outline" size={18} color={COLORS.primary} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.hearingPickerLabel}>Time</Text>
+            <Text style={styles.hearingPickerValue}>{format(hearingDate, 'hh:mm a')}</Text>
+          </View>
+        </TouchableOpacity>
+        {showHearingDatePicker && (
+          <DateTimePicker
+            value={hearingDate}
+            mode="date"
+            minimumDate={new Date()}
+            onChange={(_, picked) => {
+              setShowHearingDatePicker(false);
+              if (!picked) return;
+              const next = new Date(picked);
+              next.setHours(hearingDate.getHours(), hearingDate.getMinutes(), 0, 0);
+              setHearingDate(next);
+            }}
+          />
+        )}
+        {showHearingTimePicker && (
+          <DateTimePicker
+            value={hearingDate}
+            mode="time"
+            minuteInterval={15}
+            onChange={(_, picked) => {
+              setShowHearingTimePicker(false);
+              if (!picked) return;
+              const next = new Date(hearingDate);
+              next.setHours(picked.getHours(), picked.getMinutes(), 0, 0);
+              setHearingDate(next);
+            }}
+          />
+        )}
         <Button title="Add Hearing" onPress={addHearing} size="lg" />
       </BottomSheet>
 
@@ -354,6 +447,9 @@ const styles = StyleSheet.create({
   desc: { fontSize: FONT_SIZE.md, color: COLORS.textSecondary, marginTop: SPACING.xl, lineHeight: 22 },
   personRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginTop: SPACING.xl, backgroundColor: COLORS.white, padding: SPACING.lg, borderRadius: BORDER_RADIUS.lg, ...SHADOWS.sm },
   personText: { fontSize: FONT_SIZE.md, fontWeight: '600', color: COLORS.text },
+  mediationBox: { marginTop: SPACING.xl, backgroundColor: COLORS.white, padding: SPACING.lg, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.primary + '40', ...SHADOWS.sm },
+  mediationTitle: { fontSize: FONT_SIZE.md, fontWeight: '800', color: COLORS.text, marginBottom: 4 },
+  mediationDesc: { fontSize: FONT_SIZE.sm, color: COLORS.textSecondary, lineHeight: 20, marginBottom: SPACING.md },
   tlItem: { flexDirection: 'row', marginBottom: SPACING.xl, position: 'relative' },
   tlDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: COLORS.primary, marginTop: 4, marginRight: SPACING.md, zIndex: 1 },
   tlLine: { position: 'absolute', left: 5, top: 16, width: 2, height: '100%', backgroundColor: COLORS.borderLight },
@@ -403,4 +499,15 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surfaceAlt, borderRadius: BORDER_RADIUS.lg, paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md,
     fontSize: FONT_SIZE.md, color: COLORS.text, marginBottom: SPACING.md, textAlignVertical: 'top',
   },
+  hearingPickerPill: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
+    backgroundColor: COLORS.surfaceAlt, borderRadius: BORDER_RADIUS.lg,
+    paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md,
+    marginBottom: SPACING.md,
+  },
+  hearingPickerLabel: {
+    fontSize: FONT_SIZE.xs - 1, fontWeight: '600',
+    color: COLORS.textMuted, letterSpacing: 0.4, textTransform: 'uppercase',
+  },
+  hearingPickerValue: { fontSize: FONT_SIZE.md, fontWeight: '700', color: COLORS.text, marginTop: 2 },
 });

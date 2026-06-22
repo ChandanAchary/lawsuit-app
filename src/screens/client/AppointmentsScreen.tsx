@@ -190,6 +190,7 @@ export const AppointmentsScreen: React.FC<{ navigation: any }> = ({ navigation }
             : undefined
         }
         onViewAgreement={item.agreementUrl ? () => handleViewAgreement(item.agreementUrl!) : undefined}
+        onOpenMediation={item.mediationId ? () => navigation.navigate('MediationDetail', { id: item.mediationId }) : undefined}
         onReschedule={
           status === AppointmentStatus.CONFIRMED || status === AppointmentStatus.MISSED
             ? () => openReschedule(item.id) : undefined

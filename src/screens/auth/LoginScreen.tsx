@@ -50,7 +50,13 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     return (
       <View style={styles.container}>
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-        <View style={styles.roleScreen}>
+        {/* Scrollable so the three role cards + footer never get cut off on
+            short screens or at large system font scales. */}
+        <ScrollView
+          contentContainerStyle={styles.roleScroll}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
           <TouchableOpacity style={styles.themeBtn} onPress={handleThemeToggle}>
             <Ionicons name={isDark ? 'moon-outline' : 'sunny-outline'} size={20} color={COLORS.text} />
           </TouchableOpacity>
@@ -117,7 +123,7 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               <Text style={styles.footerLink}>Sign Up</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </ScrollView>
       </View>
     );
   }
@@ -241,6 +247,14 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   roleScreen: {
     flex: 1,
     paddingHorizontal: SPACING.xxl,
+  },
+  // ScrollView content container — flexGrow lets the footer sit at the
+  // bottom when the screen is tall, but allows overflow scrolling when
+  // it's short (small devices / large font scale).
+  roleScroll: {
+    flexGrow: 1,
+    paddingHorizontal: SPACING.xxl,
+    paddingBottom: SPACING.xxxl,
   },
   roleHeader: {
     marginTop: SPACING.xxxl,

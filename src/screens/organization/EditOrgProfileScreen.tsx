@@ -101,7 +101,9 @@ export const EditOrgProfileScreen: React.FC<{ navigation: any }> = ({ navigation
         setRegistrationNumber(org.registrationNumber || '');
         setGstNumber(org.gstNumber || '');
         setPanNumber(org.panNumber || '');
-        setConsultationFee(org.consultationFee ? String(org.consultationFee) : '');
+        // Stored in paise → show rupees in the input (consistent with the web
+        // edit form and every fee display, which all divide by 100).
+        setConsultationFee(org.consultationFee ? String(Math.round(org.consultationFee / 100)) : '');
         setPracticeAreas(org.practiceAreas || []);
         setCountry(org.country || 'India');
         setState(org.state || '');
@@ -240,7 +242,10 @@ export const EditOrgProfileScreen: React.FC<{ navigation: any }> = ({ navigation
         registrationNumber: registrationNumber.trim() || undefined,
         gstNumber: gstNumber.trim() || undefined,
         panNumber: panNumber.trim() || undefined,
-        consultationFee: consultationFee ? parseInt(consultationFee, 10) : undefined,
+        // consultationFee is stored in PAISE server-side (matches lawyer
+        // feePerConsultation + all display sites that divide by 100). The input
+        // holds rupees, so convert rupees → paise on save.
+        consultationFee: consultationFee ? parseInt(consultationFee, 10) * 100 : undefined,
         practiceAreas: practiceAreas.length > 0 ? practiceAreas : undefined,
         country: country.trim() || undefined,
         state: state.trim() || undefined,

@@ -167,23 +167,34 @@ export const SuperAdminCourtAdminOpsScreen: React.FC<{ navigation: any }> = ({ n
     }
   };
 
-  const renderPerf = ({ item }: { item: any }) => (
-    <TouchableOpacity style={styles.card} onPress={() => openDetail(item.courtAdminId || item.id, item.name)}>
-      <View style={styles.iconBg}>
-        <Ionicons name="shield-checkmark" size={20} color={COLORS.primary} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.name} numberOfLines={1}>{item.name || '—'}</Text>
-        <Text style={styles.sub} numberOfLines={1}>{item.email || ''}</Text>
-        <View style={styles.statsRow}>
-          <Stat label="Verified" value={String(item.verifiedCount ?? item.totalVerified ?? 0)} styles={styles} />
-          <Stat label="Pending" value={String(item.pendingCount ?? item.totalPending ?? 0)} styles={styles} />
-          <Stat label="Rejected" value={String(item.rejectedCount ?? item.totalRejected ?? 0)} styles={styles} />
+  // Perf row shape from /admin/court-admins/performance:
+  //   { courtAdmin: { id, name, email, ... }, totals: { processed, approved,
+  //     rejected, pending }, ratios, speed, quality, activity, performanceScore }
+  // The previous code read item.name / item.verifiedCount which are not
+  // present at the top level — that's why the cards rendered as dashes
+  // and React threw the duplicate-key warning (every row keyed
+  // "undefined" because item.courtAdminId / item.id don't exist).
+  const renderPerf = ({ item }: { item: any }) => {
+    const ca = item.courtAdmin || {};
+    const totals = item.totals || {};
+    return (
+      <TouchableOpacity style={styles.card} onPress={() => openDetail(ca.id, ca.name)}>
+        <View style={styles.iconBg}>
+          <Ionicons name="shield-checkmark" size={20} color={COLORS.primary} />
         </View>
-      </View>
-      <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
-    </TouchableOpacity>
-  );
+        <View style={{ flex: 1 }}>
+          <Text style={styles.name} numberOfLines={1}>{ca.name || '—'}</Text>
+          <Text style={styles.sub} numberOfLines={1}>{ca.email || ''}</Text>
+          <View style={styles.statsRow}>
+            <Stat label="Approved" value={String(totals.approved ?? 0)} styles={styles} />
+            <Stat label="Pending" value={String(totals.pending ?? 0)} styles={styles} />
+            <Stat label="Rejected" value={String(totals.rejected ?? 0)} styles={styles} />
+          </View>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
+      </TouchableOpacity>
+    );
+  };
 
   // Cycle response shape from /admin/salary-cycles/current:
   //   { cycle: { cycleMonth, cycleYear }, items: [{ courtAdmin, baseSalary,
@@ -237,7 +248,9 @@ export const SuperAdminCourtAdminOpsScreen: React.FC<{ navigation: any }> = ({ n
       {loading ? <Loading /> : tab === 'performance' ? (
         <FlatList
           data={perf}
-          keyExtractor={(it) => String(it.courtAdminId || it.id)}
+          // courtAdmin id lives nested in the perf payload — fall back to
+          // a stable index suffix so we don't collide on bad data either.
+          keyExtractor={(it, idx) => String(it.courtAdmin?.id || it.courtAdminId || it.id || `perf-${idx}`)}
           renderItem={renderPerf}
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(false); }} colors={[COLORS.primary]} />}
@@ -246,7 +259,7 @@ export const SuperAdminCourtAdminOpsScreen: React.FC<{ navigation: any }> = ({ n
       ) : tab === 'cycle' ? (
         <FlatList
           data={cycle?.items || cycle?.payable || []}
-          keyExtractor={(it) => String(it.courtAdminId || it.id)}
+          keyExtractor={(it, idx) => String(it.courtAdmin?.id || it.courtAdminId || it.id || `cycle-${idx}`)}
           renderItem={renderCycleItem}
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(false); }} colors={[COLORS.primary]} />}
@@ -272,7 +285,7 @@ export const SuperAdminCourtAdminOpsScreen: React.FC<{ navigation: any }> = ({ n
       ) : (
         <FlatList
           data={history}
-          keyExtractor={(it) => it.id || `${it.courtAdminId}-${it.paidAt}`}
+          keyExtractor={(it, idx) => String(it.id || `${it.courtAdminId || it.courtAdmin?.id || 'na'}-${it.paidAt || idx}`)}
           renderItem={renderHistory}
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(false); }} colors={[COLORS.primary]} />}

@@ -121,6 +121,9 @@ export const OrgLawyersScreen: React.FC<{ navigation: any }> = ({ navigation }) 
   const renderLawyer = ({ item }: { item: any }) => (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
+        {/* Salary entry — opens the org-side salary management surface for
+            this lawyer. Visible only after the org is verified, since the
+            backend rejects salary writes before then. */}
         <View style={styles.avatar}>
           {item.avatarUrl ? (
             <Image source={{ uri: item.avatarUrl }} style={styles.avatarImg} />
@@ -172,6 +175,26 @@ export const OrgLawyersScreen: React.FC<{ navigation: any }> = ({ navigation }) 
         </View>
       </View>
       {item.phone && <Text style={styles.phoneText}>📞 {item.phone}</Text>}
+
+      {/* Salary management — only enabled once the org is verified. The
+          backend route refuses earlier anyway, so we surface a helpful
+          disabled state instead of a 403 mid-flow. */}
+      <TouchableOpacity
+        style={[styles.salaryBtn, !((org?.isVerified === true) || org?.verificationStatus === 'APPROVED') && styles.salaryBtnDisabled]}
+        onPress={() => {
+          const isVerified = org?.isVerified === true || org?.verificationStatus === 'APPROVED';
+          if (!isVerified) {
+            Alert.alert('Verification Required', 'Your organisation must be verified before you can manage lawyer salaries.');
+            return;
+          }
+          navigation.navigate('OrgLawyerSalary', { lawyerId: item.id, name: item.name });
+        }}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="cash-outline" size={16} color={COLORS.primary} />
+        <Text style={styles.salaryBtnText}>Salary & payouts</Text>
+        <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} />
+      </TouchableOpacity>
     </View>
   );
 
@@ -320,6 +343,15 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   metaRow: { flexDirection: 'row', gap: SPACING.lg },
   metaText: { fontSize: FONT_SIZE.xs, color: COLORS.textSecondary },
   phoneText: { fontSize: FONT_SIZE.sm, color: COLORS.textSecondary, marginTop: SPACING.sm },
+  salaryBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
+    marginTop: SPACING.md,
+    paddingVertical: SPACING.md, paddingHorizontal: SPACING.lg,
+    borderRadius: BORDER_RADIUS.lg,
+    backgroundColor: COLORS.primary + '0E',
+  },
+  salaryBtnDisabled: { opacity: 0.45 },
+  salaryBtnText: { flex: 1, fontSize: FONT_SIZE.sm, fontWeight: '700', color: COLORS.primary },
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalContent: {

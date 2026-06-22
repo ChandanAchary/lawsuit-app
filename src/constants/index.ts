@@ -1,7 +1,11 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
-const FALLBACK_API_BASE_URL = 'https://lawsuit-server.onrender.com';
+// Production API lives on the DigitalOcean droplet behind nginx at
+// api.nyayax.com (migrated off Render). This fallback is only used when the
+// build-time EXPO_PUBLIC_API_URL env var is unset — keep it pointed at the
+// live host so installed builds without the env var still reach a real server.
+const FALLBACK_API_BASE_URL = 'https://api.nyayax.com';
 const ENV_API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL || '').trim();
 export const DEFAULT_API_BASE_URL = ENV_API_BASE_URL || FALLBACK_API_BASE_URL;
 export const REMOTE_API_CONFIG_URL = (process.env.EXPO_PUBLIC_API_CONFIG_URL || '').trim();

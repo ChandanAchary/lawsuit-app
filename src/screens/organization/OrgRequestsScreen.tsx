@@ -19,12 +19,14 @@ export const OrgRequestsScreen: React.FC<{ navigation: any }> = ({ navigation })
   const [lawyers, setLawyers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  // Docs per request — fetched alongside the requests list. Map by id so
+  // each card pulls its own (small) array without re-rendering the world.
+  const [docsByRequest, setDocsByRequest] = useState<Record<string, any[]>>({});
 
   // Assign Modal
   const [selectedReq, setSelectedReq] = useState<any>(null);
   const [actionType, setActionType] = useState<'ASSIGN' | 'REJECT' | null>(null);
   const [selectedLawyerId, setSelectedLawyerId] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'wallet'>('razorpay');
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -35,8 +37,24 @@ export const OrgRequestsScreen: React.FC<{ navigation: any }> = ({ navigation })
         organizationsApi.listOrgAppointmentRequests(),
         organizationsApi.listLawyers(),
       ]);
-      setRequests(reqRes.data.requests || reqRes.data.items || reqRes.data || []);
+      const reqs = reqRes.data.requests || reqRes.data.items || reqRes.data || [];
+      setRequests(reqs);
       setLawyers(lawRes.data.lawyers || lawRes.data.items || lawRes.data || []);
+
+      // Fan-out doc fetches in parallel. Errors are swallowed per-request so
+      // a single 4xx doesn't break the whole screen.
+      const arr = Array.isArray(reqs) ? reqs : [];
+      const docResults = await Promise.all(
+        arr.map((r: any) =>
+          organizationsApi
+            .listOrgRequestDocuments(r.id)
+            .then((d) => ({ id: r.id, items: d.data?.items || [] }))
+            .catch(() => ({ id: r.id, items: [] })),
+        ),
+      );
+      const map: Record<string, any[]> = {};
+      for (const r of docResults) map[r.id] = r.items;
+      setDocsByRequest(map);
     } catch {
       // ignore
     } finally {
@@ -53,56 +71,159 @@ export const OrgRequestsScreen: React.FC<{ navigation: any }> = ({ navigation })
     setSubmitting(true);
     try {
       if (actionType === 'ASSIGN') {
+        // Pure task assignment — the client paid at booking time. The
+        // lawyer gets the appointment dropped on their queue; the org head
+        // will receive notifications as the lawyer accepts / rejects /
+        // completes.
         await organizationsApi.assignAppointmentRequest(selectedReq.id, {
           lawyerId: selectedLawyerId,
-          paymentMethod,
         });
         Alert.alert(
-          'Success',
-          paymentMethod === 'wallet'
-            ? 'Lawyer assigned and client wallet has been charged.'
-            : 'Lawyer assigned. The client has been asked to pay online to confirm.',
+          'Lawyer Assigned',
+          'The lawyer has been notified. You\'ll get an update when they accept or decline.',
         );
       } else {
         await organizationsApi.rejectAppointmentRequest(selectedReq.id, { reason });
         Alert.alert('Success', 'Request rejected');
       }
-      setSelectedReq(null); setActionType(null); setReason(''); setSelectedLawyerId(''); setPaymentMethod('razorpay');
+      setSelectedReq(null); setActionType(null); setReason(''); setSelectedLawyerId('');
       fetchData(false);
     } catch (err: any) {
       Alert.alert('Error', err?.response?.data?.error || 'Failed to process request');
     } finally { setSubmitting(false); }
   };
 
-  const renderRequest = ({ item }: { item: any }) => (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        <View style={styles.avatar}>
-          <Ionicons name="person" size={20} color={COLORS.primary} />
+  const renderRequest = ({ item }: { item: any }) => {
+    const scheduled = item.scheduledAt ? new Date(item.scheduledAt) : null;
+    const assignedLawyerName = item.assignedLawyer?.name || null;
+    const docs = docsByRequest[item.id] || [];
+    return (
+      // Tap-through opens the full lifecycle view (assignment trail,
+      // appointment status, payment status, activity timeline).
+      <TouchableOpacity
+        style={styles.card}
+        activeOpacity={0.85}
+        onPress={() => navigation.navigate('OrgRequestDetail', { requestId: item.id, request: item })}
+      >
+        <View style={styles.cardHeader}>
+          <View style={styles.avatar}>
+            <Ionicons name="person" size={20} color={COLORS.primary} />
+          </View>
+          <View style={styles.cardInfo}>
+            <Text style={styles.cardName}>{item.client?.name || 'Client'}</Text>
+            <Text style={styles.cardMeta}>Submitted {formatDate(item.createdAt)}</Text>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: item.status === 'PENDING' ? '#FEF3C7' : COLORS.surfaceAlt }]}>
+            <Text style={[styles.statusText, { color: item.status === 'PENDING' ? '#D97706' : COLORS.text }]}>{item.status}</Text>
+          </View>
         </View>
-        <View style={styles.cardInfo}>
-          <Text style={styles.cardName}>{item.client?.name || 'Client'}</Text>
-          <Text style={styles.cardMeta}>{formatDate(item.createdAt)}</Text>
+
+        {/* Schedule & meeting type at-a-glance */}
+        <View style={styles.metaRow}>
+          {scheduled && (
+            <View style={styles.metaItem}>
+              <Ionicons name="calendar-outline" size={14} color={COLORS.textSecondary} />
+              <Text style={styles.metaText}>{formatDate(item.scheduledAt)}</Text>
+            </View>
+          )}
+          {!!item.durationMins && (
+            <View style={styles.metaItem}>
+              <Ionicons name="timer-outline" size={14} color={COLORS.textSecondary} />
+              <Text style={styles.metaText}>{item.durationMins} min</Text>
+            </View>
+          )}
+          {!!item.meetingType && (
+            <View style={styles.metaItem}>
+              <Ionicons name="videocam-outline" size={14} color={COLORS.textSecondary} />
+              <Text style={styles.metaText}>{String(item.meetingType).replace('_', ' ')}</Text>
+            </View>
+          )}
         </View>
-        <View style={[styles.statusBadge, { backgroundColor: item.status === 'PENDING' ? '#FEF3C7' : COLORS.surfaceAlt }]}>
-          <Text style={[styles.statusText, { color: item.status === 'PENDING' ? '#D97706' : COLORS.text }]}>{item.status}</Text>
+
+        {/* Case description — what the client wrote on the booking sheet.
+            Surfaced before the Assign / Reject buttons so the org head reads
+            the issue before picking a lawyer. */}
+        {!!item.notes && (
+          <View style={styles.notesBlock}>
+            <View style={styles.notesHeader}>
+              <Ionicons name="document-text-outline" size={14} color={COLORS.primary} />
+              <Text style={styles.notesLabel}>Case description</Text>
+            </View>
+            <Text style={styles.notesText}>{item.notes}</Text>
+          </View>
+        )}
+
+        {/* Supporting documents the client attached at booking. Each row
+            taps through to DocumentAiScreen for OCR / summary / Q&A — the
+            org head's primary triage tool when picking which lawyer to
+            assign. */}
+        {docs.length > 0 && (
+          <View style={styles.docsBlock}>
+            <View style={styles.docsHeader}>
+              <Ionicons name="folder-open-outline" size={14} color={COLORS.primary} />
+              <Text style={styles.docsLabel}>{docs.length} supporting document{docs.length === 1 ? '' : 's'}</Text>
+            </View>
+            {docs.map((d: any) => (
+              <TouchableOpacity
+                key={d.id}
+                style={styles.docRow}
+                activeOpacity={0.7}
+                onPress={() =>
+                  navigation.navigate('DocumentAi', {
+                    documentId: d.id,
+                    document: d,
+                    contextLabel: 'Booking doc',
+                  })
+                }
+              >
+                <Ionicons
+                  name={d.mimeType?.startsWith('image/') ? 'image-outline' : 'document-outline'}
+                  size={16}
+                  color={COLORS.primary}
+                />
+                <Text style={styles.docRowName} numberOfLines={1}>{d.filename}</Text>
+                <Ionicons name="flash-outline" size={14} color={COLORS.primary} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {/* If already assigned, show which lawyer handled it. The server
+            keeps the request row even after assignment so the org has an
+            audit trail of routing decisions. */}
+        {assignedLawyerName && (
+          <View style={styles.assignedRow}>
+            <Ionicons name="person-add" size={14} color={COLORS.success} />
+            <Text style={styles.assignedText}>Assigned to {assignedLawyerName}</Text>
+          </View>
+        )}
+
+        {item.rejectionReason && (
+          <Text style={styles.reasonText}>Rejection reason: {item.rejectionReason}</Text>
+        )}
+
+        {item.status === 'PENDING' && (
+          <View style={styles.cardActions}>
+            <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#D1FAE5' }]} onPress={() => { setSelectedReq(item); setActionType('ASSIGN'); }}>
+              <Ionicons name="person-add" size={18} color="#10B981" />
+              <Text style={[styles.actionText, { color: '#10B981' }]}>Assign Lawyer</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#FEE2E2' }]} onPress={() => { setSelectedReq(item); setActionType('REJECT'); }}>
+              <Ionicons name="close" size={18} color="#EF4444" />
+              <Text style={[styles.actionText, { color: '#EF4444' }]}>Reject</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* "View details" affordance — visible on every card so the org
+            head sees that tapping it opens the lifecycle screen. */}
+        <View style={styles.viewDetailRow}>
+          <Text style={styles.viewDetailText}>View full details</Text>
+          <Ionicons name="chevron-forward" size={14} color={COLORS.primary} />
         </View>
-      </View>
-      {item.reason && <Text style={styles.reasonText}>Reason: {item.reason}</Text>}
-      {item.status === 'PENDING' && (
-        <View style={styles.cardActions}>
-          <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#D1FAE5' }]} onPress={() => { setSelectedReq(item); setActionType('ASSIGN'); }}>
-            <Ionicons name="person-add" size={18} color="#10B981" />
-            <Text style={[styles.actionText, { color: '#10B981' }]}>Assign Lawyer</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#FEE2E2' }]} onPress={() => { setSelectedReq(item); setActionType('REJECT'); }}>
-            <Ionicons name="close" size={18} color="#EF4444" />
-            <Text style={[styles.actionText, { color: '#EF4444' }]}>Reject</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -124,12 +245,17 @@ export const OrgRequestsScreen: React.FC<{ navigation: any }> = ({ navigation })
         />
       )}
 
-      <Modal visible={!!actionType} transparent animationType="slide" onRequestClose={() => { setActionType(null); setSelectedReq(null); setSelectedLawyerId(''); setReason(''); setPaymentMethod('razorpay'); }}>
+      <Modal
+        visible={!!actionType}
+        transparent
+        animationType="slide"
+        onRequestClose={() => { setActionType(null); setSelectedReq(null); setSelectedLawyerId(''); setReason(''); }}
+      >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{actionType === 'ASSIGN' ? 'Assign Lawyer' : 'Reject Request'}</Text>
-              <TouchableOpacity onPress={() => { setActionType(null); setSelectedReq(null); setSelectedLawyerId(''); setReason(''); setPaymentMethod('razorpay'); }}>
+              <TouchableOpacity onPress={() => { setActionType(null); setSelectedReq(null); setSelectedLawyerId(''); setReason(''); }}>
                 <Ionicons name="close" size={24} color={COLORS.text} />
               </TouchableOpacity>
             </View>
@@ -151,27 +277,13 @@ export const OrgRequestsScreen: React.FC<{ navigation: any }> = ({ navigation })
                     </View>
                   )}
 
-                  <Text style={styles.label}>How should the client pay?</Text>
-                  <View style={styles.paymentRow}>
-                    <TouchableOpacity
-                      style={[styles.paymentChip, paymentMethod === 'razorpay' && styles.paymentChipActive]}
-                      onPress={() => setPaymentMethod('razorpay')}
-                    >
-                      <Ionicons name="card-outline" size={16} color={paymentMethod === 'razorpay' ? COLORS.white : COLORS.textSecondary} />
-                      <Text style={[styles.paymentChipText, paymentMethod === 'razorpay' && styles.paymentChipTextActive]}>Online (Razorpay)</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.paymentChip, paymentMethod === 'wallet' && styles.paymentChipActive]}
-                      onPress={() => setPaymentMethod('wallet')}
-                    >
-                      <Ionicons name="wallet-outline" size={16} color={paymentMethod === 'wallet' ? COLORS.white : COLORS.textSecondary} />
-                      <Text style={[styles.paymentChipText, paymentMethod === 'wallet' && styles.paymentChipTextActive]}>From client wallet</Text>
-                    </TouchableOpacity>
-                  </View>
+                  {/* Payment-method picker removed by request — the
+                      assignment immediately becomes a task on the lawyer's
+                      queue, and the client is notified separately to pay
+                      online. The org head doesn't pick payment. */}
                   <Text style={styles.helpText}>
-                    {paymentMethod === 'wallet'
-                      ? 'The client’s wallet will be charged immediately. Fails if their balance is insufficient.'
-                      : 'The client will be notified to pay online before the appointment is confirmed.'}
+                    The lawyer will be notified about this assignment and the case will appear in their
+                    appointments queue. The client will be asked to pay online to confirm the booking.
                   </Text>
                 </>
               ) : (
@@ -204,6 +316,55 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: BORDER_RADIUS.full },
   statusText: { fontSize: FONT_SIZE.xs, fontWeight: '700' },
   reasonText: { fontSize: FONT_SIZE.sm, color: COLORS.textSecondary, marginTop: SPACING.md, fontStyle: 'italic' },
+
+  metaRow: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.lg,
+    marginTop: SPACING.md, paddingTop: SPACING.md,
+    borderTopWidth: 1, borderTopColor: COLORS.borderLight,
+  },
+  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  metaText: { fontSize: FONT_SIZE.sm, color: COLORS.textSecondary },
+
+  notesBlock: {
+    marginTop: SPACING.md,
+    padding: SPACING.md,
+    backgroundColor: COLORS.primary + '08',
+    borderRadius: BORDER_RADIUS.lg,
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.primary,
+  },
+  notesHeader: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
+  notesLabel: {
+    fontSize: FONT_SIZE.xs - 1, fontWeight: '700',
+    color: COLORS.primary, letterSpacing: 0.5, textTransform: 'uppercase',
+  },
+  notesText: { fontSize: FONT_SIZE.sm, color: COLORS.text, lineHeight: 19 },
+
+  assignedRow: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
+    marginTop: SPACING.md,
+  },
+  assignedText: { fontSize: FONT_SIZE.sm, color: COLORS.success, fontWeight: '600' },
+
+  docsBlock: { marginTop: SPACING.md, gap: 6 },
+  docsHeader: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
+  docsLabel: {
+    fontSize: FONT_SIZE.xs - 1, fontWeight: '700',
+    color: COLORS.primary, letterSpacing: 0.5, textTransform: 'uppercase',
+  },
+  docRow: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
+    backgroundColor: COLORS.surfaceAlt, borderRadius: BORDER_RADIUS.lg,
+    paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm,
+  },
+  docRowName: { flex: 1, fontSize: FONT_SIZE.sm, color: COLORS.text, fontWeight: '600' },
+
+  viewDetailRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end',
+    gap: 4, marginTop: SPACING.md,
+    paddingTop: SPACING.md, borderTopWidth: 1, borderTopColor: COLORS.borderLight,
+  },
+  viewDetailText: { fontSize: FONT_SIZE.xs, fontWeight: '700', color: COLORS.primary },
   cardActions: { flexDirection: 'row', gap: SPACING.md, marginTop: SPACING.md, paddingTop: SPACING.md, borderTopWidth: 1, borderTopColor: COLORS.borderLight },
   actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.sm, paddingVertical: SPACING.md, borderRadius: BORDER_RADIUS.lg },
   actionText: { fontSize: FONT_SIZE.sm, fontWeight: '700' },
@@ -219,15 +380,6 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   lawyerChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   lawyerChipText: { fontSize: FONT_SIZE.sm, color: COLORS.textSecondary, fontWeight: '600' },
   lawyerChipTextActive: { color: COLORS.white },
-  paymentRow: { flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.sm },
-  paymentChip: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.xs,
-    paddingHorizontal: SPACING.md, paddingVertical: SPACING.md, borderRadius: BORDER_RADIUS.lg,
-    backgroundColor: COLORS.surfaceAlt, borderWidth: 1, borderColor: COLORS.border,
-  },
-  paymentChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  paymentChipText: { fontSize: FONT_SIZE.sm, fontWeight: '700', color: COLORS.textSecondary },
-  paymentChipTextActive: { color: COLORS.white },
   helpText: { fontSize: FONT_SIZE.xs, color: COLORS.textMuted, marginBottom: SPACING.xl, lineHeight: 16 },
   input: { backgroundColor: COLORS.surfaceAlt, borderRadius: BORDER_RADIUS.lg, paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md, fontSize: FONT_SIZE.md, color: COLORS.text, marginBottom: SPACING.md },
 });

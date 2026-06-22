@@ -10,10 +10,20 @@ import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { referralApi } from '../../services/api';
 import { formatErrorMessage } from '../../utils/formatError';
 
+interface PendingReferral {
+  id: string;
+  referredUserId: string;
+  completedConsultations: number;
+  requiredConsultations: number;
+  progress: number; // 0..100
+}
+
 interface ReferralInfo {
   totalReferred: number;
   rewardsPaid: number;
   totalEarnings: number;
+  pendingReferrals: PendingReferral[];
+  referrals: any[];
 }
 
 export const ReferralScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
@@ -48,10 +58,12 @@ export const ReferralScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
         totalReferred: d.totalReferred || 0,
         rewardsPaid: d.rewardsPaid || 0,
         totalEarnings: d.totalEarnings ? d.totalEarnings / 100 : 0,
+        pendingReferrals: Array.isArray(d.pendingReferrals) ? d.pendingReferrals : [],
+        referrals: Array.isArray(d.referrals) ? d.referrals : [],
       });
       setReferredBy(d.referredBy || d.referredByCode || null);
     } catch {
-      setInfo({ totalReferred: 0, rewardsPaid: 0, totalEarnings: 0 });
+      setInfo({ totalReferred: 0, rewardsPaid: 0, totalEarnings: 0, pendingReferrals: [], referrals: [] });
     } finally { setLoading(false); }
   };
 
@@ -145,6 +157,33 @@ export const ReferralScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
           <Text style={styles.statLabel}>Earned</Text>
         </View>
       </View>
+
+      {/* Pending referrals — surfaces server-returned pendingReferrals so the
+          referrer can see how close each invitee is to the 10-consultation
+          milestone. Empty state is hidden so first-time users aren't shown
+          a sad zero-row table. */}
+      {(info?.pendingReferrals?.length ?? 0) > 0 && (
+        <View style={styles.referralsCard}>
+          <Text style={styles.referralsTitle}>Pending Rewards</Text>
+          <Text style={styles.referralsSub}>
+            Referrals who haven't yet completed their 10 consultations.
+          </Text>
+          {(info?.pendingReferrals || []).map((r) => (
+            <View key={r.id} style={styles.refRow}>
+              <View style={styles.refRowHeader}>
+                <Ionicons name="person-circle-outline" size={20} color={COLORS.textMuted} />
+                <Text style={styles.refRowText}>
+                  {r.completedConsultations} / {r.requiredConsultations} consultations
+                </Text>
+                <Text style={styles.refRowPct}>{r.progress}%</Text>
+              </View>
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${Math.min(100, r.progress)}%` }]} />
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
 
       {/* Apply a referral code */}
       {!referredBy ? (
@@ -259,4 +298,20 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   },
   howStepNumText: { fontSize: FONT_SIZE.sm, fontWeight: '700', color: COLORS.white },
   howStepText: { flex: 1, fontSize: FONT_SIZE.md, color: COLORS.text, lineHeight: 22 },
+
+  referralsCard: {
+    marginHorizontal: SPACING.xl, marginTop: SPACING.xl,
+    borderRadius: BORDER_RADIUS.xl, backgroundColor: COLORS.white,
+    padding: SPACING.xl, ...SHADOWS.sm,
+  },
+  referralsTitle: { fontSize: FONT_SIZE.lg, fontWeight: '800', color: COLORS.text },
+  referralsSub: { fontSize: FONT_SIZE.xs, color: COLORS.textMuted, marginTop: 4, marginBottom: SPACING.lg },
+  refRow: { paddingVertical: SPACING.md, borderTopWidth: 1, borderTopColor: COLORS.borderLight },
+  refRowHeader: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginBottom: 6 },
+  refRowText: { flex: 1, fontSize: FONT_SIZE.sm, color: COLORS.text, fontWeight: '600' },
+  refRowPct: { fontSize: FONT_SIZE.xs, color: COLORS.textMuted, fontWeight: '700' },
+  progressTrack: {
+    height: 6, borderRadius: 3, backgroundColor: COLORS.borderLight, overflow: 'hidden',
+  },
+  progressFill: { height: '100%', backgroundColor: COLORS.primary, borderRadius: 3 },
 });

@@ -32,6 +32,15 @@ const ACTION_META: Record<Action, { title: string; danger?: boolean; reasonRequi
 // — admins are managed by the AdminTeam screen, not the user-control flow.
 const CONTROLLABLE: readonly string[] = ['CLIENT', 'LAWYER', 'ORGANIZATION', 'COURT_ADMIN'];
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// Salary amounts (EntitySalary base + bonuses + payouts) are stored in
+// rupees, not paise — render them as plain INR currency.
+const fmtRupee = (n?: number | null) =>
+  n != null
+    ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Number(n))
+    : '—';
+
 type RouteParams = { userId: string; role?: string };
 
 export const AdminUserDetailScreen: React.FC<{ navigation: any; route: { params: RouteParams } }> = ({ navigation, route }) => {
@@ -214,6 +223,212 @@ export const AdminUserDetailScreen: React.FC<{ navigation: any; route: { params:
           {user.banReason && <KV k="Ban reason" v={user.banReason} styles={styles} />}
         </Section>
 
+        {/* Affiliation + Salary — LAWYER-only.
+            • Affiliation tells us who pays this lawyer (firm vs platform).
+            • Salary surfaces the active EntitySalary config + last payout
+              so the admin can audit at a glance. Both blocks come back from
+              the server in `user.organization` and `user.salary`. */}
+        {role === 'LAWYER' && (
+          <>
+            <Section title="Affiliation" styles={styles}>
+              {user.organization ? (
+                <TouchableOpacity
+                  style={styles.lawyerRow}
+                  onPress={() => navigation.navigate('AdminUserDetail', {
+                    userId: user.organization.id,
+                    role: 'ORGANIZATION',
+                  })}
+                >
+                  {user.organization.avatarUrl ? (
+                    <Image source={{ uri: user.organization.avatarUrl }} style={styles.lawyerAvatar} />
+                  ) : (
+                    <View style={[styles.lawyerAvatar, styles.lawyerAvatarPH]}>
+                      <Ionicons name="business" size={18} color={COLORS.primary} />
+                    </View>
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <View style={styles.lawyerNameRow}>
+                      <Text style={styles.lawyerName} numberOfLines={1}>
+                        {user.organization.name || 'Organization'}
+                      </Text>
+                      {user.organization.isVerified && (
+                        <View style={[styles.tag, { backgroundColor: '#DBEAFE' }]}>
+                          <Text style={[styles.tagText, { color: '#1D4ED8' }]}>VERIFIED</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.lawyerSub} numberOfLines={1}>
+                      Salary &amp; payouts managed by this firm
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} />
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.lawyerRow}>
+                  <View style={[styles.lawyerAvatar, { backgroundColor: '#D1FAE5' }]}>
+                    <Ionicons name="person" size={18} color="#047857" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.lawyerName}>Independent lawyer</Text>
+                    <Text style={styles.lawyerSub}>
+                      Paid directly by the platform (super admin)
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </Section>
+
+            <Section title="Salary" styles={styles}>
+              <KV
+                k="Paid by"
+                v={
+                  user.salary?.paidBy === 'ORGANIZATION'
+                    ? user.organization?.name || 'Organization'
+                    : 'Platform (super admin)'
+                }
+                styles={styles}
+              />
+              {user.salary?.config ? (
+                <>
+                  <KV k="Base salary" v={fmtRupee(user.salary.config.baseSalary)} styles={styles} />
+                  <KV
+                    k="Per consultation bonus"
+                    v={fmtRupee(user.salary.config.bonusPerConsultation)}
+                    styles={styles}
+                  />
+                  <KV
+                    k="Per case-closed bonus"
+                    v={fmtRupee(user.salary.config.bonusPerCaseClosed)}
+                    styles={styles}
+                  />
+                  <KV
+                    k="Per case-won bonus"
+                    v={fmtRupee(user.salary.config.bonusPerWonCase)}
+                    styles={styles}
+                  />
+                  {user.salary.config.isOnHold ? (
+                    <View style={styles.holdBanner}>
+                      <Ionicons name="pause-circle-outline" size={14} color="#B45309" />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.holdTitle}>On hold</Text>
+                        {user.salary.config.holdReason && (
+                          <Text style={styles.holdReason}>{user.salary.config.holdReason}</Text>
+                        )}
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={[styles.tag, styles.activePill]}>
+                      <Text style={[styles.tagText, { color: '#047857' }]}>ACTIVE</Text>
+                    </View>
+                  )}
+                </>
+              ) : (
+                <Text style={styles.emptyHint}>
+                  No salary configuration set yet.
+                  {user.salary?.paidBy === 'ORGANIZATION'
+                    ? ' The organization head can set it from their salary page.'
+                    : ' Set it from the salary controls.'}
+                </Text>
+              )}
+
+              {user.salary?.lastPayout && (
+                <View style={styles.payoutCard}>
+                  <Text style={styles.payoutLabel}>LAST PAYOUT</Text>
+                  <View style={styles.payoutRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.payoutCycle}>
+                        {user.salary.lastPayout.cycleMonth
+                          ? MONTHS[user.salary.lastPayout.cycleMonth - 1]
+                          : '—'}{' '}
+                        {user.salary.lastPayout.cycleYear ?? ''}
+                      </Text>
+                      {user.salary.lastPayout.paidAt && (
+                        <Text style={styles.payoutSub}>
+                          Paid {formatDate(user.salary.lastPayout.paidAt)}
+                        </Text>
+                      )}
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={styles.payoutAmount}>
+                        {fmtRupee(user.salary.lastPayout.netPayable)}
+                      </Text>
+                      <Text style={styles.payoutSub}>
+                        Base {fmtRupee(user.salary.lastPayout.baseSalary)}
+                        {(user.salary.lastPayout.bonusAmount ?? 0) > 0
+                          ? ` + ${fmtRupee(user.salary.lastPayout.bonusAmount)}`
+                          : ''}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              )}
+            </Section>
+          </>
+        )}
+
+        {/* Lawyers under this firm — server includes up to 50 active lawyers
+            on the org detail response. The count comes from `_count.lawyers`. */}
+        {role === 'ORGANIZATION' && (
+          <Section
+            title={`Lawyers (${user._count?.lawyers ?? user.lawyers?.length ?? 0})`}
+            styles={styles}
+          >
+            {!user.lawyers || user.lawyers.length === 0 ? (
+              <Text style={styles.emptyHint}>No lawyers on the roster yet.</Text>
+            ) : (
+              <>
+                {user.lawyers.map((l: any) => (
+                  <TouchableOpacity
+                    key={l.id}
+                    style={styles.lawyerRow}
+                    onPress={() => navigation.navigate('AdminUserDetail', { userId: l.id, role: 'LAWYER' })}
+                  >
+                    {l.avatarUrl ? (
+                      <Image source={{ uri: l.avatarUrl }} style={styles.lawyerAvatar} />
+                    ) : (
+                      <View style={[styles.lawyerAvatar, styles.lawyerAvatarPH]}>
+                        <Text style={styles.lawyerAvatarText}>
+                          {(l.name || '?').charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <View style={styles.lawyerNameRow}>
+                        <Text style={styles.lawyerName} numberOfLines={1}>
+                          {l.name || 'Unnamed'}
+                        </Text>
+                        {l.isVerified && (
+                          <View style={[styles.tag, { backgroundColor: '#DBEAFE' }]}>
+                            <Text style={[styles.tagText, { color: '#1D4ED8' }]}>VERIFIED</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={styles.lawyerSub} numberOfLines={1}>
+                        {l.email || l.phone || '—'}
+                      </Text>
+                      {(l.specializations?.length || l.experienceYears != null) && (
+                        <Text style={styles.lawyerMeta} numberOfLines={1}>
+                          {(l.specializations || []).slice(0, 2).join(', ')}
+                          {l.experienceYears != null
+                            ? `${l.specializations?.length ? ' · ' : ''}${l.experienceYears} yrs`
+                            : ''}
+                        </Text>
+                      )}
+                    </View>
+                    <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} />
+                  </TouchableOpacity>
+                ))}
+                {(user._count?.lawyers ?? 0) > (user.lawyers?.length ?? 0) && (
+                  <Text style={styles.emptyHint}>
+                    Showing {user.lawyers.length} of {user._count.lawyers} — open the Lawyers screen
+                    for the full roster.
+                  </Text>
+                )}
+              </>
+            )}
+          </Section>
+        )}
+
         {/* Actions */}
         <Section title="Actions" styles={styles}>
           {/* Simple admin Verify shortcut — flips lawyer/client/org/court-admin
@@ -238,6 +453,22 @@ export const AdminUserDetailScreen: React.FC<{ navigation: any; route: { params:
               <ActionRow icon="key-outline" label="Force password reset" tone="primary" onPress={() => startAction('FORCE_PW_RESET')} styles={styles} COLORS={COLORS} />
               {!isDeleted && (
                 <ActionRow icon="trash-outline" label="Soft delete account" tone="danger" onPress={() => startAction('SOFT_DELETE')} styles={styles} COLORS={COLORS} />
+              )}
+              {/* Monthly activity log — opens the dedicated performance log
+                  for the picked role. Available for all three: lawyer, org,
+                  court admin. Source of truth for the salary decision. */}
+              {(role === 'LAWYER' || role === 'ORGANIZATION' || role === 'COURT_ADMIN') && (
+                <ActionRow
+                  icon="pulse-outline"
+                  label="Monthly activity log"
+                  tone="primary"
+                  onPress={() => navigation.navigate('AdminPerformanceLog', {
+                    role,
+                    subjectId: user.id,
+                    name: user.name || user.email,
+                  })}
+                  styles={styles} COLORS={COLORS}
+                />
               )}
               {/* Salary & performance — opens the dedicated screen for
                   base salary, bonus rates, hold/release, and per-cycle payout. */}
@@ -420,6 +651,38 @@ const getStyles = (C: any) => StyleSheet.create({
     paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md,
     fontSize: FONT_SIZE.md, color: C.text, marginBottom: SPACING.md,
   },
+
+  // Lawyers-under-firm section (rendered only when role === 'ORGANIZATION')
+  emptyHint: { fontSize: FONT_SIZE.sm, color: C.textMuted, paddingVertical: SPACING.sm, fontStyle: 'italic' },
+  lawyerRow: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.md,
+    paddingVertical: SPACING.md, borderBottomWidth: 1, borderBottomColor: C.borderLight,
+  },
+  lawyerAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  lawyerAvatarPH: { backgroundColor: C.primaryLight + '30' },
+  lawyerAvatarText: { fontSize: FONT_SIZE.md, fontWeight: '800', color: C.primary },
+  lawyerNameRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs, flexWrap: 'wrap' },
+  lawyerName: { fontSize: FONT_SIZE.md, fontWeight: '700', color: C.text },
+  lawyerSub: { fontSize: FONT_SIZE.sm, color: C.textSecondary, marginTop: 2 },
+  lawyerMeta: { fontSize: FONT_SIZE.xs, color: C.textMuted, marginTop: 2 },
+
+  // Salary section (LAWYER-only)
+  holdBanner: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: SPACING.xs,
+    backgroundColor: '#FEF3C7', borderRadius: BORDER_RADIUS.md, padding: SPACING.sm, marginTop: SPACING.sm,
+  },
+  holdTitle: { fontSize: FONT_SIZE.xs, fontWeight: '800', color: '#B45309' },
+  holdReason: { fontSize: FONT_SIZE.xs, color: '#92400E', marginTop: 2 },
+  activePill: { backgroundColor: '#D1FAE5', alignSelf: 'flex-start', marginTop: SPACING.xs },
+  payoutCard: {
+    marginTop: SPACING.md, paddingTop: SPACING.md,
+    borderTopWidth: 1, borderTopColor: C.borderLight,
+  },
+  payoutLabel: { fontSize: 10, fontWeight: '700', color: C.textMuted, letterSpacing: 0.5, marginBottom: SPACING.xs },
+  payoutRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
+  payoutCycle: { fontSize: FONT_SIZE.md, fontWeight: '700', color: C.text },
+  payoutSub: { fontSize: FONT_SIZE.xs, color: C.textMuted, marginTop: 2 },
+  payoutAmount: { fontSize: FONT_SIZE.md, fontWeight: '800', color: '#047857' },
 });
 
 export default AdminUserDetailScreen;

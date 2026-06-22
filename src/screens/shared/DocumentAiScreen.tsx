@@ -6,25 +6,38 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
 import { useThemeStore, useColors } from '../../stores/themeStore';
-import { casesApi } from '../../services/api';
+import { casesApi, documentsApi } from '../../services/api';
 import { Document } from '../../types';
 import { formatErrorMessage } from '../../utils/formatError';
 
+// Two route shapes are supported:
+//   1. Legacy case-scoped:   { caseId, document }         — uses casesApi.*
+//   2. Generic per-document: { documentId, document?, contextLabel? }  — uses documentsApi.*
+//
+// The generic shape works for case docs, appointment docs, and chat
+// attachments uniformly because the server's /documents/:id/* routes walk
+// the document's parent (case / appointment / chat) for permission.
 export const DocumentAiScreen: React.FC<{ route: any; navigation: any }> = ({ route, navigation }) => {
-  const { caseId, document } = route.params;
+  const { caseId, document, documentId, contextLabel } = route.params || {};
   const isDark = useThemeStore((s: any) => s.isDark);
   const COLORS = useColors();
   const styles = React.useMemo(() => getStyles(COLORS), [isDark]);
 
   const [activeTab, setActiveTab] = useState<'content' | 'summary' | 'ask'>('content');
-  const [doc, setDoc] = useState<Document>(document);
+  // Route may pass a partial doc OR none at all (if we only have its id).
+  // We synthesise a placeholder so the screen renders before the first
+  // extract / fetch returns.
+  const initialDocId: string = (document?.id as string) || (documentId as string) || '';
+  const [doc, setDoc] = useState<Document>(
+    (document as Document) || ({ id: initialDocId, extractionStatus: 'NOT_STARTED' } as any),
+  );
+
+  const useGeneric = !caseId; // generic route when no caseId present
 
   // Extract
   const [extracting, setExtracting] = useState(false);
-  
   // Summarize
   const [summarizing, setSummarizing] = useState(false);
-  
   // Ask
   const [question, setQuestion] = useState('');
   const [asking, setAsking] = useState(false);
@@ -40,6 +53,20 @@ export const DocumentAiScreen: React.FC<{ route: any; navigation: any }> = ({ ro
   }, [doc.extractionStatus]);
 
   const fetchDocument = async () => {
+    if (useGeneric) {
+      // No bulk-doc endpoint in generic mode — re-run extract to re-poll
+      // status. This is the same approach the server returns: extract is
+      // idempotent and returns the latest snapshot.
+      try {
+        const { data } = await documentsApi.extract(doc.id);
+        const updated = data?.document;
+        if (updated) {
+          setDoc((prev) => ({ ...prev, ...updated }));
+          if (updated.extractionStatus === 'COMPLETED') setExtracting(false);
+        }
+      } catch {}
+      return;
+    }
     try {
       const { data } = await casesApi.getDocuments(caseId);
       const docs = data.documents || data.items || data || [];
@@ -56,9 +83,20 @@ export const DocumentAiScreen: React.FC<{ route: any; navigation: any }> = ({ ro
   const handleExtract = async () => {
     try {
       setExtracting(true);
-      await casesApi.extractText(caseId, doc.id);
+      if (useGeneric) {
+        const { data } = await documentsApi.extract(doc.id);
+        const updated = data?.document;
+        if (updated) {
+          setDoc((prev) => ({ ...prev, ...updated }));
+          if (updated.extractionStatus === 'COMPLETED') setExtracting(false);
+        } else {
+          fetchDocument();
+        }
+      } else {
+        await casesApi.extractText(caseId, doc.id);
+        fetchDocument();
+      }
       Alert.alert('Processing Started', 'The document text is being extracted. This might take a few moments.');
-      fetchDocument();
     } catch (err: any) {
       Alert.alert('Error', formatErrorMessage(err) || 'Failed to start extraction');
       setExtracting(false);
@@ -68,11 +106,12 @@ export const DocumentAiScreen: React.FC<{ route: any; navigation: any }> = ({ ro
   const handleSummarize = async () => {
     try {
       setSummarizing(true);
-      const { data } = await casesApi.summarize(caseId, doc.id);
+      const { data } = useGeneric
+        ? await documentsApi.summarize(doc.id)
+        : await casesApi.summarize(caseId, doc.id);
       if (data?.summary) {
         setDoc((prev) => ({ ...prev, summary: data.summary }));
       } else {
-        // Optimistically fetch
         fetchDocument();
       }
     } catch (err: any) {
@@ -87,17 +126,17 @@ export const DocumentAiScreen: React.FC<{ route: any; navigation: any }> = ({ ro
     const q = question.trim();
     setQuestion('');
     setAsking(true);
-    
-    // Add to history optimistically
     setQaHistory(prev => [...prev, { q, a: '...' }]);
 
     try {
-      const { data } = await casesApi.askQuestion(caseId, doc.id, q);
-      setQaHistory(prev => prev.map((item, idx) => 
+      const { data } = useGeneric
+        ? await documentsApi.ask(doc.id, q)
+        : await casesApi.askQuestion(caseId, doc.id, q);
+      setQaHistory(prev => prev.map((item, idx) =>
         idx === prev.length - 1 ? { q, a: data.answer || 'No answer provided.' } : item
       ));
     } catch (err: any) {
-      setQaHistory(prev => prev.map((item, idx) => 
+      setQaHistory(prev => prev.map((item, idx) =>
         idx === prev.length - 1 ? { q, a: `Error: ${formatErrorMessage(err)}` } : item
       ));
     } finally {
@@ -113,7 +152,10 @@ export const DocumentAiScreen: React.FC<{ route: any; navigation: any }> = ({ ro
         </TouchableOpacity>
         <View style={styles.headerTitleWrap}>
           <Text style={styles.headerTitle}>Document AI</Text>
-          <Text style={styles.headerSubtitle} numberOfLines={1}>{doc.fileName || doc.name}</Text>
+          <Text style={styles.headerSubtitle} numberOfLines={1}>
+            {(doc as any).filename || doc.fileName || doc.name || 'Document'}
+            {contextLabel ? ` · ${contextLabel}` : ''}
+          </Text>
         </View>
       </View>
 

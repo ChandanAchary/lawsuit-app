@@ -1,4 +1,5 @@
 import { Alert } from 'react-native';
+import { rewriteSandboxError } from './ekycProvider';
 
 function firstZodError(node: any): string | null {
   if (!node || typeof node !== 'object') return null;
@@ -28,7 +29,30 @@ function extractFromErrorPayload(payload: any): string | null {
   return null;
 }
 
+/** Extract a raw user-facing string from an unknown error shape, then run
+ *  Sandbox-specific rewrites so cryptic provider errors get turned into
+ *  copy that tells the user what to *do*. Anything not Sandbox-shaped
+ *  passes through unchanged.
+ *
+ *  We also pass the originating axios URL down so the eKYC rewrites only
+ *  fire when the error actually came from the eKYC API — otherwise generic
+ *  errors like "Unauthorized" or "Forbidden" from totally unrelated
+ *  endpoints (document AI, Cloudinary, JWT refresh, etc.) were being
+ *  rewritten into the eKYC sandbox-down message.
+ */
 export function formatErrorMessage(msg: any): string {
+  return applyRewrites(extractRawMessage(msg), extractRequestUrl(msg));
+}
+
+function extractRequestUrl(msg: any): string {
+  if (!msg || typeof msg !== 'object') return '';
+  // axios stores the originating request config on the error.
+  const fromErr = msg?.config?.url;
+  const fromResp = msg?.response?.config?.url;
+  return String(fromErr || fromResp || '');
+}
+
+function extractRawMessage(msg: any): string {
   if (typeof msg === 'string') return msg;
   if (msg == null) return '';
 
@@ -65,6 +89,13 @@ export function formatErrorMessage(msg: any): string {
     }
   }
   return String(msg);
+}
+
+function applyRewrites(raw: string, url: string): string {
+  if (!raw) return raw;
+  // Sandbox-specific rewrites for the eKYC provider's known error patterns.
+  // Keep this list in ekycProvider.ts so the same logic ships in the web FE.
+  return rewriteSandboxError(raw, { url });
 }
 
 export function alertError(title: string, err: unknown, fallback = 'Something went wrong'): void {

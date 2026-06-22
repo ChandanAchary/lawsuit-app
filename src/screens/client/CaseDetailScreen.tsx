@@ -3,14 +3,17 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList, Alert, ActivityIndicator, TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
 import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS, CASE_STATUS_COLORS } from '../../constants';
 import { Case, CaseStatus, Document as CaseDoc, TimelineEvent, Hearing } from '../../types';
-import { casesApi, chatApi } from '../../services/api';
+import { casesApi, chatApi, storageApi, mediationApi } from '../../services/api';
 import { formatDate, formatTime, formatDateTime } from '../../utils/date';
 import { StatusBadge, Loading, EmptyState } from '../../components/Common';
 import { ChatTab } from '../../components/ChatTab';
 import { Button } from '../../components/Button';
 import { safeGoBack } from '../../utils/navigation';
+import { formatErrorMessage } from '../../utils/formatError';
+import { resolveMime } from '../../utils/mimeFromFilename';
 
 interface CaseTask {
   id: string;
@@ -47,8 +50,33 @@ export const CaseDetailScreen: React.FC<{ navigation: any; route: any }> = ({ na
   const [creatingTask, setCreatingTask] = useState(false);
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
   const [chatId, setChatId] = useState<string | null>(null);
+  // When a case is resolved via mediation, the matching Mediation row carries
+  // caseId. We resolve it here so the Info tab can deep-link the client into
+  // the mediation thread (clients can open but never start a mediation).
+  const [linkedMediationId, setLinkedMediationId] = useState<string | null>(null);
 
   useEffect(() => { fetchCase(); }, [caseId]);
+
+  // Resolve the linked mediation once we know the case is mediation-bound.
+  useEffect(() => {
+    const method = String(caseData?.resolutionMethod || '').toUpperCase();
+    if (!caseData || method !== 'MEDIATION') {
+      setLinkedMediationId(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await mediationApi.list();
+        const items: any[] = data?.data || data?.items || [];
+        const match = items.find((m) => m?.caseId === caseId);
+        if (!cancelled) setLinkedMediationId(match?.id || null);
+      } catch {
+        if (!cancelled) setLinkedMediationId(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [caseData, caseId]);
 
   useEffect(() => {
     if (caseData) {
@@ -91,6 +119,74 @@ export const CaseDetailScreen: React.FC<{ navigation: any; route: any }> = ({ na
       const { data } = await casesApi.getDocuments(caseId);
       setDocuments(data.items || data.documents || []);
     } catch {}
+  };
+
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+
+  // Pick a file from device storage, push to Cloudinary via the server-signed
+  // payload, then save the resulting URL on the case so the OCR / AI flow on
+  // DocumentAiScreen can run against it.
+  const handleAddDocument = async () => {
+    try {
+      const pick = await DocumentPicker.getDocumentAsync({
+        // Server's OCR pipeline accepts PDF, common images, and DOCX. Restrict
+        // here so the user doesn't pick a .zip and hit a 400 later.
+        type: ['application/pdf', 'image/*', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (pick.canceled || !pick.assets?.[0]) return;
+      const asset = pick.assets[0];
+
+      setUploadingDoc(true);
+      const { data: signData } = await storageApi.getCloudinarySignature('case-documents');
+
+      // expo-document-picker sometimes returns mimeType as undefined or
+      // 'application/octet-stream' on Android — especially for PDFs picked
+      // from Drive/Downloads. The server's OCR dispatcher routes by mime
+      // string equality, so a generic octet-stream is a guaranteed
+      // "Unsupported mime type for extraction" later. Infer from the
+      // filename extension as a fallback so PDFs always carry the real
+      // application/pdf mime end-to-end.
+      const fileName = asset.name || 'upload';
+      const mimeType = resolveMime(asset.mimeType, fileName);
+
+      const formData = new FormData();
+      formData.append('file', {
+        uri: asset.uri,
+        type: mimeType,
+        name: fileName,
+      } as any);
+      formData.append('timestamp', String(signData.timestamp));
+      formData.append('signature', signData.signature);
+      formData.append('api_key', signData.apiKey);
+      formData.append('folder', signData.folder);
+
+      // Cloudinary's /image/upload endpoint rejects non-image bytes; for PDFs
+      // and DOCX we have to use the /raw/upload endpoint instead. Detect by
+      // mime so the same flow handles both branches.
+      const resourceType = mimeType.startsWith('image/') ? 'image' : 'raw';
+      const uploadRes = await fetch(
+        `https://api.cloudinary.com/v1_1/${encodeURIComponent(signData.cloudName)}/${resourceType}/upload`,
+        { method: 'POST', body: formData },
+      );
+      const uploadData = await uploadRes.json();
+      if (!uploadData?.secure_url) {
+        throw new Error(uploadData?.error?.message || 'Cloudinary upload failed');
+      }
+
+      await casesApi.uploadDocument(caseId, {
+        fileurl: uploadData.secure_url,
+        fileName,
+        mimeType,
+        size: asset.size,
+      });
+      await fetchDocuments();
+    } catch (err: any) {
+      Alert.alert('Upload failed', formatErrorMessage(err) || 'Could not upload document');
+    } finally {
+      setUploadingDoc(false);
+    }
   };
 
   const fetchTasks = async () => {
@@ -182,6 +278,34 @@ export const CaseDetailScreen: React.FC<{ navigation: any; route: any }> = ({ na
           <InfoRow label="Status" value={caseData.status} />
           <InfoRow label="Resolution" value={caseData.resolutionMethod || '—'} />
           <InfoRow label="Filed Date" value={formatDate(caseData.createdAt)} />
+
+          {/* Mediation deep-link. When the case is resolved via mediation we
+              surface its status: tappable (open the mediation thread) once a
+              Mediation row exists, or a passive hint while the lawyer hasn't
+              started it yet. Clients can never initiate — that's lawyer-only. */}
+          {String(caseData.resolutionMethod || '').toUpperCase() === 'MEDIATION' && (
+            linkedMediationId ? (
+              <TouchableOpacity
+                style={styles.mediationLink}
+                activeOpacity={0.7}
+                onPress={() => navigation.navigate('MediationDetail', { id: linkedMediationId })}
+              >
+                <Ionicons name="people-circle" size={22} color={COLORS.primary} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.mediationLinkTitle}>This case is in mediation</Text>
+                  <Text style={styles.mediationLinkSub}>Tap to open the mediation and track its progress</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={COLORS.primary} />
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.mediationNote}>
+                <Ionicons name="information-circle-outline" size={18} color={COLORS.textSecondary} />
+                <Text style={styles.mediationNoteText}>
+                  This case is set for mediation. Your lawyer will start the mediation and invite the other party.
+                </Text>
+              </View>
+            )
+          )}
           {caseData.description && (
             <View style={styles.descSection}>
               <Text style={styles.descLabel}>Description</Text>
@@ -317,6 +441,25 @@ export const CaseDetailScreen: React.FC<{ navigation: any; route: any }> = ({ na
 
       {activeTab === 'documents' && (
         <ScrollView style={styles.tabContent} contentContainerStyle={styles.tabPadding}>
+          <TouchableOpacity
+            style={styles.uploadBtn}
+            onPress={handleAddDocument}
+            disabled={uploadingDoc}
+            activeOpacity={0.8}
+          >
+            {uploadingDoc ? (
+              <ActivityIndicator color={COLORS.white} />
+            ) : (
+              <>
+                <Ionicons name="cloud-upload-outline" size={20} color={COLORS.white} />
+                <Text style={styles.uploadBtnText}>Add Document</Text>
+              </>
+            )}
+          </TouchableOpacity>
+          <Text style={styles.uploadHint}>
+            PDF, image, or DOCX. Tap the ⚡ icon after upload to run OCR / AI.
+          </Text>
+
           {documents.length === 0 ? (
             <EmptyState icon="📄" title="No Documents" message="No documents uploaded yet" />
           ) : (
@@ -331,8 +474,14 @@ export const CaseDetailScreen: React.FC<{ navigation: any; route: any }> = ({ na
                   <TouchableOpacity onPress={() => navigation.navigate('DocumentAi', { caseId, document: doc })}>
                     <Ionicons name="flash-outline" size={20} color={COLORS.primary} />
                   </TouchableOpacity>
-                  <TouchableOpacity>
-                    <Ionicons name="download-outline" size={20} color={COLORS.primary} />
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate('DocumentPreview', {
+                      url: (doc as any).fileUrl || (doc as any).url,
+                      name: (doc as any).fileName || doc.name,
+                      mimeType: (doc as any).mimeType,
+                    })}
+                  >
+                    <Ionicons name="eye-outline" size={20} color={COLORS.primary} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -360,7 +509,11 @@ const styles = StyleSheet.create({
   backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
   topBarTitle: { flex: 1, marginLeft: SPACING.md, flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
   topBarText: { fontSize: FONT_SIZE.lg, fontWeight: '700', color: COLORS.text, flex: 1 },
-  tabStrip: { backgroundColor: COLORS.white, borderBottomWidth: 1, borderBottomColor: COLORS.borderLight },
+  // maxHeight pins the horizontal tab ScrollView to its content height. Without
+  // it, a horizontal ScrollView in a flex-column parent greedily expands to
+  // fill all remaining vertical space — floating the tabs mid-screen and
+  // pushing the tab content to the bottom (matches the lawyer screen).
+  tabStrip: { backgroundColor: COLORS.white, borderBottomWidth: 1, borderBottomColor: COLORS.borderLight, maxHeight: 50 },
   tabStripContent: { paddingHorizontal: SPACING.md, gap: SPACING.xs },
   tabItem: {
     flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: SPACING.md, paddingHorizontal: SPACING.md,
@@ -380,6 +533,20 @@ const styles = StyleSheet.create({
   descSection: { marginTop: SPACING.xl },
   descLabel: { fontSize: FONT_SIZE.lg, fontWeight: '700', color: COLORS.text, marginBottom: SPACING.sm },
   descText: { fontSize: FONT_SIZE.md, color: COLORS.textSecondary, lineHeight: 22 },
+  mediationLink: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.md,
+    backgroundColor: COLORS.primary + '12', borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg, marginTop: SPACING.lg,
+    borderWidth: 1, borderColor: COLORS.primary + '30',
+  },
+  mediationLinkTitle: { fontSize: FONT_SIZE.md, fontWeight: '800', color: COLORS.primary },
+  mediationLinkSub: { fontSize: FONT_SIZE.xs, color: COLORS.textSecondary, marginTop: 2 },
+  mediationNote: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: SPACING.sm,
+    backgroundColor: COLORS.surfaceAlt, borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg, marginTop: SPACING.lg,
+  },
+  mediationNoteText: { flex: 1, fontSize: FONT_SIZE.sm, color: COLORS.textSecondary, lineHeight: 19 },
   personCard: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING.md, backgroundColor: COLORS.white,
     borderRadius: BORDER_RADIUS.lg, padding: SPACING.lg, marginTop: SPACING.md, ...SHADOWS.sm,
@@ -452,6 +619,17 @@ const styles = StyleSheet.create({
   taskStatusBtnText: { fontSize: FONT_SIZE.xs, color: COLORS.textSecondary, fontWeight: '600' },
   taskStatusBtnTextActive: { color: COLORS.white },
   chatContainer: { flex: 1 },
+  uploadBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.sm,
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.lg, borderRadius: BORDER_RADIUS.xl,
+    ...SHADOWS.sm,
+  },
+  uploadBtnText: { color: COLORS.white, fontSize: FONT_SIZE.md, fontWeight: '700' },
+  uploadHint: {
+    fontSize: FONT_SIZE.xs, color: COLORS.textMuted,
+    textAlign: 'center', marginTop: SPACING.sm, marginBottom: SPACING.lg,
+  },
   docRow: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING.md, backgroundColor: COLORS.white,
     borderRadius: BORDER_RADIUS.lg, padding: SPACING.lg, marginBottom: SPACING.md, ...SHADOWS.sm,

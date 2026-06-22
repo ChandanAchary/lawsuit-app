@@ -5,7 +5,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../../constants';
-import { selfSalaryApi } from '../../services/api';
+import { selfSalaryApi, courtAdminApi } from '../../services/api';
 import { Loading } from '../../components/Common';
 import { useColors, useThemeStore } from '../../stores/themeStore';
 import { useAuthStore } from '../../stores/authStore';
@@ -45,7 +45,8 @@ export const MySalaryScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
 
   const user = useAuthStore((s) => s.user);
   const isOrg = user?.role === UserRole.ORGANIZATION;
-  const subjectLabel = isOrg ? 'Organization' : 'Lawyer';
+  const isCourtAdmin = user?.role === UserRole.COURT_ADMIN;
+  const subjectLabel = isCourtAdmin ? 'Court Admin' : isOrg ? 'Organization' : 'Lawyer';
 
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -54,16 +55,19 @@ export const MySalaryScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   const load = useCallback(async (showLoader = true) => {
     if (showLoader) setLoading(true);
     try {
-      const res = isOrg
-        ? await selfSalaryApi.getMyOrganizationSalary()
-        : await selfSalaryApi.getMyLawyerSalary();
-      setData(res.data || null);
+      const res = isCourtAdmin
+        ? await courtAdminApi.getMySalary()
+        : isOrg
+          ? await selfSalaryApi.getMyOrganizationSalary()
+          : await selfSalaryApi.getMyLawyerSalary();
+      // Court-admin endpoint wraps in { data }, lawyer/org return flat.
+      setData((res.data?.data ?? res.data) || null);
     } catch (err: any) {
       Alert.alert('Error', formatErrorMessage(err) || 'Failed to load salary');
     } finally {
       setLoading(false); setRefreshing(false);
     }
-  }, [isOrg]);
+  }, [isOrg, isCourtAdmin]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -77,6 +81,101 @@ export const MySalaryScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
       <Loading />
     </View>
   );
+
+  // ── Court-admin salary: a simpler shape than lawyer/org. Court admins
+  // earn a flat monthly base (no per-consultation/case bonuses), so the
+  // server returns { config: { baseSalary, isHeld, holdReason }, cycles }.
+  if (isCourtAdmin) {
+    const caConfig = data?.config;
+    const caCycles: any[] = data?.cycles || [];
+    const caHeld = !!caConfig?.isHeld;
+    return (
+      <View style={styles.container}>
+        <Header onBack={() => navigation.goBack()} subtitle="Court Admin · Salary" styles={styles} COLORS={COLORS} />
+        <ScrollView
+          contentContainerStyle={styles.body}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(false); }} colors={[COLORS.primary]} />}
+        >
+          {!caConfig ? (
+            <View style={styles.emptyCard}>
+              <Ionicons name="cash-outline" size={36} color={COLORS.textMuted} />
+              <Text style={styles.emptyTitle}>No salary configured yet</Text>
+              <Text style={styles.emptySub}>
+                Your base salary will appear here once a super admin sets it up.
+              </Text>
+            </View>
+          ) : (
+            <>
+              <View style={[styles.statusPill, { backgroundColor: caHeld ? '#FEE2E2' : '#D1FAE5' }]}>
+                <Ionicons name={caHeld ? 'pause-circle' : 'checkmark-circle'} size={14} color={caHeld ? '#B91C1C' : '#047857'} />
+                <Text style={[styles.statusPillText, { color: caHeld ? '#B91C1C' : '#047857' }]}>
+                  {caHeld ? 'SALARY ON HOLD' : 'SALARY ACTIVE'}
+                </Text>
+              </View>
+              {caHeld && caConfig?.holdReason ? (
+                <View style={styles.holdNote}>
+                  <Text style={styles.holdNoteLabel}>WHY SALARY IS PAUSED</Text>
+                  <Text style={styles.holdNoteText}>{caConfig.holdReason}</Text>
+                </View>
+              ) : null}
+
+              <View style={styles.card}>
+                <Text style={styles.sectionLabel}>CURRENT BASE SALARY</Text>
+                <Text style={[styles.netValue, { marginTop: SPACING.sm }]}>
+                  ₹{Number(caConfig.baseSalary ?? 0).toLocaleString('en-IN')}
+                </Text>
+                <Text style={styles.previewHint}>Paid monthly per platform salary cycle.</Text>
+              </View>
+            </>
+          )}
+
+          <Text style={[styles.sectionLabel, { marginHorizontal: SPACING.xs, marginTop: SPACING.lg }]}>
+            RECENT CYCLES
+          </Text>
+          {caCycles.length === 0 ? (
+            <View style={[styles.card, { alignItems: 'center', paddingVertical: SPACING.lg }]}>
+              <Text style={styles.emptyMuted}>No salary cycles yet.</Text>
+            </View>
+          ) : (
+            <View style={styles.card}>
+              {caCycles.map((c: any, idx: number) => (
+                <View key={c.id || idx} style={[styles.histRow, idx === caCycles.length - 1 && { borderBottomWidth: 0 }]}>
+                  <View style={styles.histRowTop}>
+                    <Text style={styles.histAmount}>₹{Number(c.amount || 0).toLocaleString('en-IN')}</Text>
+                    <View style={[styles.cycleStatusPill, { backgroundColor: c.status === 'PAID' ? '#D1FAE5' : '#FEF3C7' }]}>
+                      <Text style={[styles.cycleStatusText, { color: c.status === 'PAID' ? '#047857' : '#B45309' }]}>
+                        {c.status || 'PENDING'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={styles.histLine}>
+                    {c.cycleStart ? formatDate(c.cycleStart) : '—'} — {c.cycleEnd ? formatDate(c.cycleEnd) : '—'}
+                  </Text>
+                  {c.paidAt ? (
+                    <Text style={styles.histMeta}>Paid {formatDate(c.paidAt)} · {formatTime(c.paidAt)}</Text>
+                  ) : null}
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Bank accounts — destination for salary payouts */}
+          <View style={styles.card}>
+            <View style={styles.bankHeader}>
+              <Text style={styles.sectionLabel}>BANK / UPI ACCOUNTS</Text>
+              <TouchableOpacity style={styles.manageBtn} onPress={() => navigation.navigate('BankAccounts')}>
+                <Ionicons name="add" size={14} color={COLORS.primary} />
+                <Text style={styles.manageBtnText}>Manage</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.emptyMuted}>
+              Add a bank or UPI account so the super admin knows where to send your salary.
+            </Text>
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
 
   const config = data?.config;
   const cycle = data?.cycle;
@@ -425,6 +524,9 @@ const getStyles = (C: any) => StyleSheet.create({
   moreAccountsText: { fontSize: FONT_SIZE.xs, color: C.textMuted, marginTop: SPACING.sm },
 
   emptyMuted: { fontSize: FONT_SIZE.sm, color: C.textMuted, fontStyle: 'italic' },
+
+  cycleStatusPill: { paddingHorizontal: SPACING.sm, paddingVertical: 2, borderRadius: BORDER_RADIUS.full },
+  cycleStatusText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
 
   histRow: { paddingVertical: SPACING.sm, borderBottomWidth: 1, borderBottomColor: C.borderLight },
   histRowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
