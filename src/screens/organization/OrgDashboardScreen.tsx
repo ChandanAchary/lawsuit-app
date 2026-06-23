@@ -1,7 +1,7 @@
 import { useThemeStore, useColors } from '../../stores/themeStore';
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -103,6 +103,8 @@ export const OrgDashboardScreen: React.FC<{ navigation: any }> = ({ navigation }
       contentContainerStyle={styles.scrollContent}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />}
     >
+      {/* Dark hero header → light status-bar icons (readable on the gradient). */}
+      <StatusBar barStyle="light-content" />
       <LinearGradient colors={[COLORS.midnight, COLORS.primary]} style={styles.hero}>
         <TouchableOpacity style={styles.notificationBtn} onPress={() => navigation.navigate('Notifications')}>
           <Ionicons name="notifications-outline" size={22} color={COLORS.white} />

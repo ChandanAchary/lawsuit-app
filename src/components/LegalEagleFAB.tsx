@@ -12,6 +12,8 @@ import {
   Animated,
   Keyboard,
   Pressable,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Markdown from 'react-native-markdown-display';
@@ -39,6 +41,13 @@ export const LegalEagleFAB: React.FC<{ visible?: boolean }> = ({ visible = true 
   // + the device's bottom inset). The popup floats above this so the nav bar
   // stays visible below it.
   const tabBarSpace = 90 + insets.bottom;
+  // A RN Modal renders in its own window where `insets.top` can read 0, so fall
+  // back to the Android status-bar height — keeps the popup header below the
+  // notch/status bar instead of colliding with the clock + battery icons.
+  const topInset = Math.max(
+    insets.top,
+    Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 0,
+  );
 
   useEffect(() => {
     const showSub = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
@@ -115,6 +124,9 @@ export const LegalEagleFAB: React.FC<{ visible?: boolean }> = ({ visible = true 
         onRequestClose={() => setOpen(false)}
       >
         <View style={styles.overlay}>
+          {/* The popup sits over a dark dim backdrop, so use light status-bar
+              icons (clock/battery) regardless of theme — readable on the dim. */}
+          <StatusBar barStyle="light-content" />
           {/* Dim backdrop — tapping outside the panel closes the popup. It stops
               above the bottom tab bar (collapses to full-screen while typing) so
               the nav bar stays visible and un-dimmed below the floating sheet. */}
@@ -134,8 +146,8 @@ export const LegalEagleFAB: React.FC<{ visible?: boolean }> = ({ visible = true 
                 styles.panel,
                 {
                   backgroundColor: C.background,
-                  // Leave a tappable dim strip up top (clears the status bar).
-                  marginTop: insets.top + 56,
+                  // Clear the status bar/notch + leave a tappable dim strip up top.
+                  marginTop: topInset + 36,
                   // Float above the tab bar (closed) / sit flush above the
                   // keyboard (open, tab bar hidden anyway).
                   marginBottom: keyboardVisible ? 0 : tabBarSpace,

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Image,
+  View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Image, StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -98,6 +98,8 @@ export const AdminDashboardScreen: React.FC<{ navigation: any }> = ({ navigation
       contentContainerStyle={styles.scrollContent}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />}
     >
+      {/* Dark hero header → light status-bar icons (readable on the gradient). */}
+      <StatusBar barStyle="light-content" />
       <LinearGradient colors={[COLORS.midnight, COLORS.primary]} style={styles.hero}>
         {/* Profile avatar — top-left. Renders the user's avatarUrl when
             present and falls back to the generic person icon otherwise so

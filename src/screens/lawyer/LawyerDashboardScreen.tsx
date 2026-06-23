@@ -2,7 +2,7 @@ import {  useThemeStore , useColors } from '../../stores/themeStore';
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Image,
-  ActivityIndicator,
+  ActivityIndicator, StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -171,6 +171,9 @@ export const LawyerDashboardScreen: React.FC<{ navigation: any }> = ({ navigatio
       contentContainerStyle={styles.scrollContent}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />}
     >
+      {/* Dark hero header → light status-bar icons so the clock/battery stay
+          readable (the global theme-based default would be dark/invisible here). */}
+      <StatusBar barStyle="light-content" />
       {/* Hero */}
       <LinearGradient colors={[COLORS.primary, COLORS.midnight]} style={styles.hero}>
         <View style={styles.greetingRow}>
