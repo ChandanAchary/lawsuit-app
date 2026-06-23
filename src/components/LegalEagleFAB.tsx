@@ -10,6 +10,8 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Animated,
+  Keyboard,
+  Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Markdown from 'react-native-markdown-display';
@@ -31,7 +33,21 @@ export const LegalEagleFAB: React.FC<{ visible?: boolean }> = ({ visible = true 
   const insets = useSafeAreaInsets();
   const { messages, loading, open, setOpen, hydrate, send, clear } = useLegalEagleStore();
   const [input, setInput] = useState('');
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+  // Vertical space the floating bottom tab bar occupies (height 72 + bottom 10
+  // + the device's bottom inset). The popup floats above this so the nav bar
+  // stays visible below it.
+  const tabBarSpace = 90 + insets.bottom;
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   // Animate the FAB in/out as the active screen changes (visible only on the
   // main tab screens). useNativeDriver keeps opacity + scale on the UI thread.
@@ -91,15 +107,41 @@ export const LegalEagleFAB: React.FC<{ visible?: boolean }> = ({ visible = true 
         </Animated.View>
       )}
 
-      <Modal visible={open} animationType="slide" transparent onRequestClose={() => setOpen(false)}>
+      <Modal
+        visible={open}
+        animationType="slide"
+        transparent
+        statusBarTranslucent
+        onRequestClose={() => setOpen(false)}
+      >
         <View style={styles.overlay}>
+          {/* Dim backdrop — tapping outside the panel closes the popup. It stops
+              above the bottom tab bar (collapses to full-screen while typing) so
+              the nav bar stays visible and un-dimmed below the floating sheet. */}
+          <Pressable
+            style={[styles.backdrop, { bottom: keyboardVisible ? 0 : tabBarSpace }]}
+            onPress={() => setOpen(false)}
+          />
           <KeyboardAvoidingView
             // 'padding' on both platforms so the input lifts above the keyboard
             // inside the Modal (Android Modals don't get the window's resize).
             behavior="padding"
             style={styles.kav}
+            pointerEvents="box-none"
           >
-            <View style={[styles.panel, { backgroundColor: C.background }]}>
+            <View
+              style={[
+                styles.panel,
+                {
+                  backgroundColor: C.background,
+                  // Leave a tappable dim strip up top (clears the status bar).
+                  marginTop: insets.top + 56,
+                  // Float above the tab bar (closed) / sit flush above the
+                  // keyboard (open, tab bar hidden anyway).
+                  marginBottom: keyboardVisible ? 0 : tabBarSpace,
+                },
+              ]}
+            >
               {/* Header */}
               <View style={[styles.header, { borderBottomColor: C.border }]}>
                 <View style={styles.headerLeft}>
@@ -234,8 +276,15 @@ const styles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'flex-end',
+  },
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    // `bottom` is set inline (collapses to 0 while the keyboard is up).
+    backgroundColor: 'rgba(0,0,0,0.45)',
   },
   kav: {
     // Fill the overlay so the 85%-tall panel has a parent height to shrink
@@ -244,7 +293,10 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   panel: {
-    height: '85%',
+    // flex:1 (instead of a fixed %) so the sheet fills the space between the
+    // top dim strip and the tab-bar gap, and shrinks cleanly when the keyboard
+    // pads the KAV — no clipped header.
+    flex: 1,
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
     overflow: 'hidden',
